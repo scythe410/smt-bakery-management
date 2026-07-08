@@ -37,7 +37,38 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "comingSoon": "Your dashboard lands in an upcoming step."
+    "comingSoon": "Your dashboard lands in an upcoming step.",
+    "todaysSales": "Today's Sales",
+    "ordersToday": "Orders Today",
+    "orderStatus": {
+      "total": "Total",
+      "completed": "Completed",
+      "pending": "Pending",
+      "cancelled": "Cancelled"
+    },
+    "estNetProfit": "Est. Net Profit Today",
+    "income": "Income",
+    "expenses": "Expenses",
+    "bookings": {
+      "title": "Today's Bookings",
+      "empty": "No bookings scheduled for today.",
+      "reservation": "Reservation",
+      "customOrder": "Custom order",
+      "guest": "Guest",
+      "partyOf": "Party of {{count}}",
+      "balanceDue": "Balance due",
+      "status": {
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "error": {
+      "title": "Couldn't load your dashboard.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
   },
   "settings": {
     "title": "Settings",

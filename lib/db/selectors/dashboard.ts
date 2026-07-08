@@ -38,6 +38,18 @@ export type DashboardSummary = {
   commissionCents: number;
   /** Estimated net profit = income − COGS − expenses. Labelled "Est." in UI. */
   estNetProfitCents: number;
+  /**
+   * The Est. Net Profit card's Income / Expenses two-line breakdown (SPEC §3.1),
+   * shaped so the card renders two figures and does no math. Framed as the owner
+   * reads it: Income is the day's sales; Expenses bundles every cost against them
+   * — platform commission + estimated COGS + operating expenses. By construction
+   * `incomeCents - expensesCents === estNetProfitCents`, so the breakdown always
+   * reconciles with the hero figure above it.
+   */
+  profit: {
+    incomeCents: number;
+    expensesCents: number;
+  };
 };
 
 async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummary> {
@@ -57,6 +69,11 @@ async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummar
     period.timezone,
   );
   const expensesCents = totalExpensesCents(expenses);
+  const estNet = estNetProfitCents({
+    netCents: agg.netCents,
+    cogsCents: agg.cogsCents,
+    expensesCents,
+  });
 
   return {
     salesCents: agg.grossCents,
@@ -65,11 +82,13 @@ async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummar
     expensesCents,
     cogsCents: agg.cogsCents,
     commissionCents: agg.commissionCents,
-    estNetProfitCents: estNetProfitCents({
-      netCents: agg.netCents,
-      cogsCents: agg.cogsCents,
-      expensesCents,
-    }),
+    estNetProfitCents: estNet,
+    profit: {
+      // Income line = the day's sales (matches the Today's Sales card exactly).
+      incomeCents: agg.grossCents,
+      // Everything netted off sales to reach profit, in one line.
+      expensesCents: agg.commissionCents + agg.cogsCents + expensesCents,
+    },
   };
 }
 

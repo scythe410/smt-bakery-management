@@ -71,3 +71,23 @@
     }
   }
 }
+
+/*
+ * One restrained entrance (DESIGN.md §7): sections fade + rise ~150ms as they
+ * resolve from their skeletons. Disabled under prefers-reduced-motion by the
+ * base rule above. Keep this the only orchestrated motion on the screen.
+ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 150ms ease-out both;
+}

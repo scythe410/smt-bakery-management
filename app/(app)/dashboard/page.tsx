@@ -1,11 +1,27 @@
-// Dashboard — landing screen for every role. The screen title is rendered by
-// the shell header; the full build lands in a later step. requireProfile()
-// re-asserts the session at the page level (defence in depth beside the layout).
+// Dashboard — the landing screen for every role (SPEC §3.1). The header renders
+// the title; this page lays out the sections top to bottom: Today's Sales, the
+// Orders Today 2×2 grid, Est. Net Profit (with Income/Expenses breakdown), then
+// Today's Bookings.
+//
+// Each data-driven section is its own Suspense boundary so it streams
+// independently behind a shape-matched skeleton (DESIGN.md §6) — the stats and
+// the bookings don't block each other. The session is gated in the (app) layout
+// (redirects unauthenticated users) and re-asserted inside DashboardStats.
 
-import { requireProfile } from "@/lib/auth";
-import { ComingSoon } from "@/components/app/coming-soon";
+import { Suspense } from "react";
+import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { TodaysBookings } from "@/components/dashboard/todays-bookings";
+import { StatsSkeleton, BookingsSkeleton } from "@/components/dashboard/dashboard-skeletons";
 
-export default async function DashboardPage() {
-  await requireProfile();
-  return <ComingSoon messageKey="dashboard.comingSoon" />;
+export default function DashboardPage() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Suspense fallback={<StatsSkeleton />}>
+        <DashboardStats />
+      </Suspense>
+      <Suspense fallback={<BookingsSkeleton />}>
+        <TodaysBookings />
+      </Suspense>
+    </div>
+  );
 }
