@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { archivo, inter, notoSansSinhala } from "@/lib/fonts";
+import { I18nProvider } from "@/i18n/client";
+import { getCurrentLanguage } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,16 +16,26 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Noto Sans Sinhala is loaded (variable available) but not applied yet —
-  // it switches on later when lang="si". Body uses Inter (var --font-inter).
+  // Language is resolved server-side (signed-in user's preference, else 'en') so
+  // <html lang>, the Sinhala font, and the client i18n instance all agree with
+  // no hydration flash. Noto Sans Sinhala applies only when lang="si".
+  const language = await getCurrentLanguage();
+
   return (
-    <html lang="en" className={`${archivo.variable} ${inter.variable} ${notoSansSinhala.variable}`}>
-      <body className="bg-bg text-ink min-h-dvh antialiased">{children}</body>
+    <html
+      lang={language}
+      className={`${archivo.variable} ${inter.variable} ${notoSansSinhala.variable}`}
+    >
+      <body
+        className={`bg-bg text-ink min-h-dvh antialiased ${language === "si" ? "font-sinhala" : ""}`}
+      >
+        <I18nProvider language={language}>{children}</I18nProvider>
+      </body>
     </html>
   );
 }

@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// Supabase origins the browser must reach: the REST/Auth HTTPS origin plus its
+// realtime wss:// origin (connect-src), and Storage for images (img-src).
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseWs = supabaseUrl.replace(/^https:/, "wss:");
+const supabaseConnect = [supabaseUrl, supabaseWs].filter(Boolean).join(" ");
+
 /**
  * Content-Security-Policy.
  *
@@ -11,18 +17,15 @@ const isDev = process.env.NODE_ENV !== "production";
  * - script-src 'unsafe-eval' (dev only): required by Turbopack/React Fast Refresh.
  * - style-src 'unsafe-inline': Next.js and CSS-var-driven inline styles.
  * - img-src data:/blob:: monogram/skeleton placeholders and future uploaded images.
- *
- * To add when Supabase lands:
- * - connect-src: <NEXT_PUBLIC_SUPABASE_URL> and its realtime wss:// origin.
- * - img-src: the Supabase Storage origin (logos / item images).
+ * - connect-src / img-src <supabase>: Auth + Data API, realtime, and Storage.
  */
 const csp = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob:`,
+  `img-src 'self' data: blob:${supabaseUrl ? ` ${supabaseUrl}` : ""}`,
   `font-src 'self'`,
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
+  `connect-src 'self'${supabaseConnect ? ` ${supabaseConnect}` : ""}${isDev ? " ws:" : ""}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
@@ -49,6 +52,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Enables forbidden()/unauthorized() + app/forbidden.tsx for server-side role
+  // gating (lib/auth.requireRole → real HTTP 403). CLAUDE.md §5, §7.5.
+  experimental: {
+    authInterrupts: true,
+  },
   async headers() {
     return [
       {

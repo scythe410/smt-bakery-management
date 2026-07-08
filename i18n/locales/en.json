@@ -1,0 +1,33 @@
+{
+  "appName": "Samantha's Bakery",
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Welcome back. Sign in to manage your bakery.",
+    "email": "Email",
+    "emailPlaceholder": "you@bakery.lk",
+    "password": "Password",
+    "passwordPlaceholder": "Your password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "errorMissing": "Enter your email and password to sign in.",
+    "errorInvalid": "That email and password don't match. Check them and try again.",
+    "errorGeneric": "Couldn't sign you in. Check your connection and try again."
+  },
+  "shell": {
+    "greeting": "Hi, {{name}}",
+    "signOut": "Sign out"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "comingSoon": "Your dashboard lands in an upcoming step."
+  },
+  "settings": {
+    "title": "Settings",
+    "comingSoon": "Settings land in an upcoming step."
+  },
+  "forbidden": {
+    "title": "You don't have access to this page.",
+    "body": "Your role doesn't include this area. Ask an owner or manager if you need it.",
+    "back": "Back to dashboard"
+  }
+}
