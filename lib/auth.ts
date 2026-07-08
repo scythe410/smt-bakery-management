@@ -16,49 +16,15 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import { toLanguage, type Language } from "@/i18n/config";
+import type { AppRole } from "@/lib/access";
 
-export type AppRole = Database["public"]["Enums"]["app_role"];
+// The role → section access matrix lives in lib/access.ts (client-safe) so the
+// server gate here and the client nav share one source of truth. Re-exported for
+// existing server callers that import these from "@/lib/auth".
+export { SECTION_ROLES, rolesFor, canAccess, type Section, type AppRole } from "@/lib/access";
+
 export type Profile = Database["public"]["Tables"]["profile"]["Row"];
 export type Business = Database["public"]["Tables"]["business"]["Row"];
-
-// Role → section access matrix (CLAUDE.md §5). Single source of truth for BOTH
-// server gating (requireRole) and UI nav gating (later steps import this).
-const ALL_ROLES: readonly AppRole[] = ["owner", "manager", "staff"];
-const OWNER_MANAGER: readonly AppRole[] = ["owner", "manager"];
-const OWNER_ONLY: readonly AppRole[] = ["owner"];
-
-export type Section =
-  | "dashboard"
-  | "orders"
-  | "inventory"
-  | "menu"
-  | "bookings"
-  | "finance"
-  | "reports"
-  | "employees"
-  | "settings";
-
-export const SECTION_ROLES: Record<Section, readonly AppRole[]> = {
-  dashboard: ALL_ROLES,
-  orders: ALL_ROLES,
-  inventory: ALL_ROLES,
-  menu: ALL_ROLES,
-  bookings: ALL_ROLES,
-  finance: OWNER_MANAGER,
-  reports: OWNER_MANAGER,
-  employees: OWNER_MANAGER,
-  settings: OWNER_ONLY, // business/billing config — owner only
-};
-
-/** Roles allowed into a section — for both requireRole() and UI nav gating. */
-export function rolesFor(section: Section): readonly AppRole[] {
-  return SECTION_ROLES[section];
-}
-
-/** Does this role have access to the given section? (UI gating helper.) */
-export function canAccess(role: AppRole, section: Section): boolean {
-  return SECTION_ROLES[section].includes(role);
-}
 
 /** The authenticated auth.users row, revalidated against the auth server, or null. */
 export const getUser = cache(async (): Promise<User | null> => {

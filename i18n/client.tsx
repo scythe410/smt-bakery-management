@@ -49,6 +49,12 @@ export function I18nProvider({
     if (instance.language !== lng) {
       void instance.changeLanguage(lng);
     }
+    // Keep <html lang> and the Sinhala body font in sync when the language
+    // changes client-side (e.g. the header toggle), so the swap is immediate and
+    // doesn't wait on a full reload. The root layout sets these correctly on the
+    // server for the initial paint; this only mirrors later changes.
+    document.documentElement.lang = lng;
+    document.body.classList.toggle("font-sinhala", lng === "si");
   }, [instance, lng]);
 
   return <I18nextProvider i18n={instance}>{children}</I18nextProvider>;

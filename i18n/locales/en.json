@@ -15,7 +15,25 @@
   },
   "shell": {
     "greeting": "Hi, {{name}}",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "notifications": "Notifications",
+    "unread": "{{count}} unread",
+    "changeLanguage": "Change language",
+    "langEn": "EN",
+    "langSi": "සිං",
+    "comingSoon": "This screen lands in an upcoming step."
+  },
+  "nav": {
+    "label": "Main navigation",
+    "dashboard": "Dashboard",
+    "finance": "Finance",
+    "inventory": "Inventory",
+    "menu": "Menu",
+    "orders": "Orders",
+    "bookings": "Bookings",
+    "employees": "Employees",
+    "reports": "Reports",
+    "settings": "Settings"
   },
   "dashboard": {
     "title": "Dashboard",

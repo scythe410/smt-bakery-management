@@ -15,7 +15,25 @@
   },
   "shell": {
     "greeting": "ආයුබෝවන්, {{name}}",
-    "signOut": "පිටවෙන්න"
+    "signOut": "පිටවෙන්න",
+    "notifications": "දැනුම්දීම්",
+    "unread": "නොකියවූ {{count}}",
+    "changeLanguage": "භාෂාව වෙනස් කරන්න",
+    "langEn": "EN",
+    "langSi": "සිං",
+    "comingSoon": "මෙම තිරය ඉදිරි පියවරකදී පැමිණේ."
+  },
+  "nav": {
+    "label": "ප්‍රධාන සංචලනය",
+    "dashboard": "උපකරණ පුවරුව",
+    "finance": "මූල්‍ය",
+    "inventory": "තොග",
+    "menu": "මෙනුව",
+    "orders": "ඇණවුම්",
+    "bookings": "වෙන්කිරීම්",
+    "employees": "සේවකයෝ",
+    "reports": "වාර්තා",
+    "settings": "සැකසුම්"
   },
   "dashboard": {
     "title": "උපකරණ පුවරුව",

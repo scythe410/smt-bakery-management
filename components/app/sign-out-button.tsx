@@ -1,9 +1,10 @@
 "use client";
 
 // Sign-out control. Posts to the signOut server action (cookie wipe + redirect).
-// Label is passed in already-translated from the server header so this stays a
-// thin client wrapper around the action.
+// Compact icon button for the shell header cluster; the label is passed in
+// already-translated and used as the accessible name.
 
+import { LogOut } from "lucide-react";
 import { signOut } from "@/app/(app)/actions";
 
 export function SignOutButton({ label }: { label: string }) {
@@ -11,9 +12,11 @@ export function SignOutButton({ label }: { label: string }) {
     <form action={signOut}>
       <button
         type="submit"
-        className="text-label text-muted hover:text-ink focus-visible:ring-brand/40 rounded-[var(--radius)] px-2 py-1 outline-none transition-colors focus-visible:ring-2"
+        aria-label={label}
+        title={label}
+        className="text-ink hover:bg-surface-2 focus-visible:ring-brand/40 flex size-11 items-center justify-center rounded-[var(--radius)] outline-none transition-colors focus-visible:ring-2"
       >
-        {label}
+        <LogOut className="size-5" aria-hidden />
       </button>
     </form>
   );
