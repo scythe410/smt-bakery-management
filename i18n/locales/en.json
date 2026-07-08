@@ -70,6 +70,77 @@
       "retry": "Retry"
     }
   },
+  "finance": {
+    "title": "Finance",
+    "tabs": {
+      "overview": "Overview",
+      "expenses": "Expenses",
+      "platformEarnings": "Platform Earnings"
+    },
+    "period": {
+      "label": "Period",
+      "today": "Today",
+      "week": "This Week",
+      "month": "This Month",
+      "custom": "Custom",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply"
+    },
+    "overview": {
+      "totalIncome": "Total Income",
+      "bookingRevenue": "Booking Revenue",
+      "totalExpenses": "Total Expenses",
+      "netProfit": "Net Profit",
+      "estimated": "Est.",
+      "totalOrders": "Total Orders",
+      "revenueByDay": "Revenue by Day",
+      "noRevenue": "No revenue in this period yet."
+    },
+    "expenses": {
+      "total": "Total Expenses",
+      "add": "Add Expense",
+      "allCategories": "All categories",
+      "searchPlaceholder": "Search expenses",
+      "date": "Date",
+      "category": "Category",
+      "amount": "Amount",
+      "note": "Note",
+      "notePlaceholder": "Optional note",
+      "save": "Save expense",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "empty": "No expenses recorded for this period. Add the first one.",
+      "noMatch": "No expenses match your filters.",
+      "showing": "Showing {{shown}} of {{total}}",
+      "addError": "Couldn't save that expense. Check the fields and try again."
+    },
+    "platform": {
+      "subtitle": "Commission taken per order source, from your commission rules.",
+      "total": "Total Platform Earnings",
+      "source": "Source",
+      "orders": "Orders",
+      "gross": "Revenue",
+      "rate": "Rate",
+      "commission": "Commission",
+      "ordersCount_one": "{{count}} order",
+      "ordersCount_other": "{{count}} orders",
+      "empty": "No platform commission in this period."
+    },
+    "error": {
+      "title": "Couldn't load Finance.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
+  "source": {
+    "dine_in": "Dine-in",
+    "walk_in": "Walk-in",
+    "whatsapp": "WhatsApp",
+    "online": "Online",
+    "pickme_food": "PickMe Food",
+    "uber_eats": "Uber Eats"
+  },
   "settings": {
     "title": "Settings",
     "comingSoon": "Settings land in an upcoming step."

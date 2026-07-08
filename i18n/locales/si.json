@@ -70,6 +70,77 @@
       "retry": "නැවත උත්සාහ කරන්න"
     }
   },
+  "finance": {
+    "title": "මූල්‍ය",
+    "tabs": {
+      "overview": "දළ විශ්ලේෂණය",
+      "expenses": "වියදම්",
+      "platformEarnings": "වේදිකා ඉපැයීම්"
+    },
+    "period": {
+      "label": "කාල පරාසය",
+      "today": "අද",
+      "week": "මෙම සතිය",
+      "month": "මෙම මාසය",
+      "custom": "අභිරුචි",
+      "from": "සිට",
+      "to": "දක්වා",
+      "apply": "යොදන්න"
+    },
+    "overview": {
+      "totalIncome": "මුළු ආදායම",
+      "bookingRevenue": "වෙන්කිරීම් ආදායම",
+      "totalExpenses": "මුළු වියදම්",
+      "netProfit": "ශුද්ධ ලාභය",
+      "estimated": "ඇස්ත.",
+      "totalOrders": "මුළු ඇණවුම්",
+      "revenueByDay": "දිනකට ආදායම",
+      "noRevenue": "මෙම කාල පරාසය තුළ තවම ආදායමක් නැත."
+    },
+    "expenses": {
+      "total": "මුළු වියදම්",
+      "add": "වියදමක් එක් කරන්න",
+      "allCategories": "සියලු ප්‍රවර්ග",
+      "searchPlaceholder": "වියදම් සොයන්න",
+      "date": "දිනය",
+      "category": "ප්‍රවර්ගය",
+      "amount": "මුදල",
+      "note": "සටහන",
+      "notePlaceholder": "අමතර සටහන",
+      "save": "වියදම සුරකින්න",
+      "saving": "සුරකිමින්…",
+      "cancel": "අවලංගු කරන්න",
+      "empty": "මෙම කාල පරාසය සඳහා වියදම් වාර්තා නැත. පළමුවැන්න එක් කරන්න.",
+      "noMatch": "ඔබේ පෙරහන් වලට ගැළපෙන වියදම් නැත.",
+      "showing": "{{total}} න් {{shown}} ක් පෙන්වයි",
+      "addError": "එම වියදම සුරැකිය නොහැකි විය. ක්ෂේත්‍ර පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "platform": {
+      "subtitle": "ඔබේ කොමිස් නීති අනුව, එක් එක් ඇණවුම් මූලාශ්‍රයෙන් ගන්නා කොමිසම.",
+      "total": "මුළු වේදිකා ඉපැයීම්",
+      "source": "මූලාශ්‍රය",
+      "orders": "ඇණවුම්",
+      "gross": "ආදායම",
+      "rate": "අනුපාතය",
+      "commission": "කොමිසම",
+      "ordersCount_one": "ඇණවුම් {{count}}",
+      "ordersCount_other": "ඇණවුම් {{count}}",
+      "empty": "මෙම කාල පරාසය තුළ වේදිකා කොමිසමක් නැත."
+    },
+    "error": {
+      "title": "මූල්‍ය පූරණය කළ නොහැකි විය.",
+      "body": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "retry": "නැවත උත්සාහ කරන්න"
+    }
+  },
+  "source": {
+    "dine_in": "අවන්හලේ",
+    "walk_in": "පැමිණ",
+    "whatsapp": "WhatsApp",
+    "online": "ඔන්ලයින්",
+    "pickme_food": "PickMe Food",
+    "uber_eats": "Uber Eats"
+  },
   "settings": {
     "title": "සැකසුම්",
     "comingSoon": "සැකසුම් ඉදිරි පියවරකදී පැමිණේ."

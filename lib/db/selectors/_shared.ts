@@ -32,6 +32,7 @@ import { zonedDateKey } from "@/lib/db/period";
 type OrderSource = Database["public"]["Enums"]["order_source"];
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
+type BookingStatus = Database["public"]["Enums"]["booking_status"];
 
 /** The single order status that counts as realized revenue. */
 export const REALIZED_STATUS: OrderStatus = "completed";
@@ -206,6 +207,25 @@ export function countByStatus(orders: { status: OrderStatus }[]): StatusCounts {
 /** Sum of operating expense rows, integer cents. */
 export function totalExpensesCents(expenses: { amount_cents: number }[]): number {
   return sum(expenses.map((e) => e.amount_cents));
+}
+
+/**
+ * Booking revenue = committed value of the tenant's bookings (Finance §3.2),
+ * integer cents. A booking's value is deposit + balance (its full order value —
+ * for custom orders both are set; reservations carry neither, so they add 0).
+ * Cancelled bookings are excluded (no revenue). This is *committed/pipeline*
+ * revenue — pre-orders not yet delivered — so it is deliberately NOT folded into
+ * realized order revenue or the Est. Net Profit figure (which stays order-based,
+ * reconciling with the Dashboard).
+ */
+export function bookingRevenueCents(
+  bookings: { status: BookingStatus; deposit_cents: number | null; balance_cents: number | null }[],
+): number {
+  return sum(
+    bookings
+      .filter((b) => b.status !== "cancelled")
+      .map((b) => (b.deposit_cents ?? 0) + (b.balance_cents ?? 0)),
+  );
 }
 
 /**

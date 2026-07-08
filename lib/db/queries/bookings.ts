@@ -4,8 +4,28 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import type { Period } from "@/lib/db/period";
 
 export type BookingRow = Database["public"]["Tables"]["booking"]["Row"];
+
+/**
+ * Bookings whose `date` falls within the period's inclusive LOCAL calendar
+ * bounds (`booking.date` is a plain `date`). Ordered by date/time. Powers
+ * Finance "Booking Revenue".
+ */
+export async function listBookingsInRange(period: Period): Promise<BookingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("booking")
+    .select("*")
+    .gte("date", period.startDate)
+    .lte("date", period.endDate)
+    .order("date", { ascending: true })
+    .order("time", { ascending: true, nullsFirst: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
 
 /**
  * Bookings on a single LOCAL calendar day (`booking.date` is a plain `date`, so
