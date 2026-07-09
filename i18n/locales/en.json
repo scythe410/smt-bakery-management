@@ -245,6 +245,52 @@
       "retry": "Retry"
     }
   },
+  "reports": {
+    "type": {
+      "label": "Report",
+      "daily_sales": "Daily Sales"
+    },
+    "date": {
+      "label": "Date"
+    },
+    "stats": {
+      "revenue": "Revenue",
+      "commission": "Commission",
+      "netRevenue": "Net Revenue",
+      "orders": "Orders"
+    },
+    "breakdown": {
+      "bySource": "By Source",
+      "byPayment": "By Payment",
+      "noMethod": "No method",
+      "ordersCount_one": "{{count}} order",
+      "ordersCount_other": "{{count}} orders",
+      "empty": "No sales in this period yet."
+    },
+    "detail": {
+      "title": "Orders",
+      "time": "Time",
+      "source": "Source",
+      "customer": "Customer",
+      "items": "Items",
+      "total": "Total",
+      "payment": "Payment",
+      "paymentStatus": "Payment status",
+      "status": "Status",
+      "none": "—",
+      "empty": "No orders on this day."
+    },
+    "actions": {
+      "exportCsv": "Export CSV",
+      "print": "Print / PDF"
+    },
+    "note": "Revenue, commission and net revenue count completed orders only.",
+    "error": {
+      "title": "Couldn't load Reports.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
   "source": {
     "dine_in": "Dine-in",
     "walk_in": "Walk-in",

@@ -127,6 +127,12 @@ export function zonedDateKey(instant: Date | string, timeZone: string): string {
   return toDateStr(p.year, p.month, p.day);
 }
 
+/** Local 24-hour wall-clock time (`HH:mm`) that `instant` reads in `timeZone`. */
+export function zonedClockTime(instant: Date | string, timeZone: string): string {
+  const p = partsInZone(typeof instant === "string" ? new Date(instant) : instant, timeZone);
+  return `${pad(p.hour)}:${pad(p.minute)}`;
+}
+
 // --- Local-date string helpers (labels only; no timezone involved) ----------
 
 function pad(n: number): string {
