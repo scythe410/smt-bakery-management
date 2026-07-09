@@ -392,11 +392,119 @@
       "description": "Choose the language for this app. Your choice is saved to your profile.",
       "en": "English",
       "si": "සිංහල"
+    },
+    "business": {
+      "title": "Business Profile",
+      "logo": "Logo",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "logoHint": "PNG, JPG, WebP or SVG, up to 2 MB.",
+      "logoSaved": "Logo updated.",
+      "name": "Business name",
+      "timezone": "Timezone",
+      "defaultLanguage": "Default language",
+      "saved": "Business profile saved.",
+      "saving": "Saving…",
+      "save": "Save changes",
+      "error": "Couldn't save. Check the details and retry."
+    },
+    "logo": {
+      "error": "Couldn't upload the logo. Retry.",
+      "errorEmpty": "Choose an image to upload.",
+      "errorSize": "That image is too large (max 2 MB).",
+      "errorType": "Use a PNG, JPG, WebP or SVG image."
+    },
+    "tax": {
+      "title": "Tax & Currency",
+      "currency": "Currency",
+      "currencyFixed": "Fixed to LKR for this build.",
+      "vatRate": "VAT rate (%)",
+      "registered": "VAT / tax registered",
+      "taxId": "Tax registration number",
+      "saved": "Tax settings saved.",
+      "saving": "Saving…",
+      "save": "Save changes",
+      "error": "Couldn't save. Check the details and retry."
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "description": "Choose which alerts this business wants to receive.",
+      "low_stock": "Low stock alerts",
+      "low_stockHint": "When an item reaches its low-stock threshold.",
+      "new_orders": "New orders",
+      "new_ordersHint": "When an order is placed.",
+      "new_bookings": "New bookings",
+      "new_bookingsHint": "When a reservation or custom order comes in.",
+      "daily_summary": "Daily summary",
+      "daily_summaryHint": "An end-of-day sales digest.",
+      "saved": "Preferences saved.",
+      "saving": "Saving…",
+      "save": "Save changes",
+      "error": "Couldn't save. Retry."
+    },
+    "role": {
+      "owner": "Owner",
+      "manager": "Manager",
+      "staff": "Staff"
+    },
+    "users": {
+      "title": "User Accounts",
+      "description": "People who can sign in to this business.",
+      "you": "You",
+      "manageNote": "Inviting and removing users is not included in this build."
+    },
+    "integrations": {
+      "title": "Integrations",
+      "whatsapp": "WhatsApp Business API",
+      "whatsappDescription": "Send order and booking updates over WhatsApp.",
+      "notConnected": "Not connected",
+      "connect": "Connect",
+      "comingSoon": "Connecting the WhatsApp Business API is not included in this build."
+    },
+    "error": {
+      "title": "Couldn't load settings",
+      "body": "Check your connection and retry.",
+      "retry": "Retry"
     }
   },
   "forbidden": {
     "title": "You don't have access to this page.",
     "body": "Your role doesn't include this area. Ask an owner or manager if you need it.",
     "back": "Back to dashboard"
+  },
+  "employees": {
+    "empty": "No team members yet.",
+    "count": "{{count}} team members",
+    "roleUnset": "No role set",
+    "hasLogin": "Login",
+    "permissions": "Permissions",
+    "noPermissions": "No permissions set",
+    "permission": {
+      "all": "Full access",
+      "orders": "Orders",
+      "inventory": "Inventory",
+      "menu": "Menu",
+      "bookings": "Bookings",
+      "reports": "Reports",
+      "finance": "Finance",
+      "settings": "Settings"
+    },
+    "shift": "Shift schedule",
+    "noShift": "No shift set",
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "scopeNote": "Directory view only. Payroll and attendance are not included in this build.",
+    "error": {
+      "title": "Couldn't load employees",
+      "body": "Check your connection and retry.",
+      "retry": "Retry"
+    }
   }
 }

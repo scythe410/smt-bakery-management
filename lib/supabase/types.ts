@@ -97,6 +97,7 @@ export type Database = {
           locale_default: Database["public"]["Enums"]["app_language"]
           logo_url: string | null
           name: string
+          notification_preferences: Json
           tax_config: Json
           timezone: string
           updated_at: string
@@ -108,6 +109,7 @@ export type Database = {
           locale_default?: Database["public"]["Enums"]["app_language"]
           logo_url?: string | null
           name: string
+          notification_preferences?: Json
           tax_config?: Json
           timezone?: string
           updated_at?: string
@@ -119,6 +121,7 @@ export type Database = {
           locale_default?: Database["public"]["Enums"]["app_language"]
           logo_url?: string | null
           name?: string
+          notification_preferences?: Json
           tax_config?: Json
           timezone?: string
           updated_at?: string

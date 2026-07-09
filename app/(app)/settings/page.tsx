@@ -1,18 +1,25 @@
-// Settings — owner-only (business/billing config, CLAUDE.md §5). The server gate
-// (requireRole → real 403 for manager/staff via app/forbidden.tsx) is the point;
-// the screen title is rendered by the shell header. The Language section (SPEC
-// §5.2) ships now — it persists to the caller's own profile.language_pref; the
-// rest of the business/billing settings land in a later step.
+// Settings (SPEC §4.4) — owner-only (business/billing config, CLAUDE.md §5). The
+// server gate (requireRole → real 403 for manager/staff via app/forbidden.tsx)
+// is defence-in-depth over RLS (the business UPDATE + tenant profile-read
+// policies are also owner/manager-scoped). Sections stream behind a Suspense
+// boundary after a shape-matched skeleton (DESIGN.md §6).
+//
+// Baseline pending client confirmation: business profile (+ logo upload to
+// Storage), tax/currency config, notification preferences, user accounts
+// (read-only), a WhatsApp Business API integration placeholder, and the default
+// language. The per-user language switcher (P14) lives on this screen too.
 
+import { Suspense } from "react";
 import { requireRole, rolesFor } from "@/lib/auth";
-import { LanguageSetting } from "@/components/settings/language-setting";
+import { SettingsData } from "@/components/settings/settings-data";
+import { SettingsSkeleton } from "@/components/settings/settings-skeleton";
 
 export default async function SettingsPage() {
   await requireRole(rolesFor("settings"));
 
   return (
-    <div className="flex flex-col gap-4">
-      <LanguageSetting />
-    </div>
+    <Suspense fallback={<SettingsSkeleton />}>
+      <SettingsData />
+    </Suspense>
   );
 }
