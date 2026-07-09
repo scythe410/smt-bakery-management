@@ -10,14 +10,22 @@
 // Scope of THIS step: session refresh only. Route protection / role-gated
 // redirects are wired in the auth step; keep this pure so it never accidentally
 // blocks a route.
+//
+// `requestHeaders` is the (cloned) set of headers the caller wants forwarded to
+// the app — the root middleware uses it to carry the per-request CSP nonce so
+// Next can stamp it onto its own <script> tags (see middleware.ts). We forward
+// exactly those headers, so the session refresh and the nonce cooperate.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/types";
 import { env } from "@/lib/env";
 
-export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  let response = NextResponse.next({ request });
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders: Headers,
+): Promise<NextResponse> {
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient<Database>(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     cookies: {
@@ -26,9 +34,10 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       },
       setAll(cookiesToSet) {
         // Mirror refreshed cookies onto BOTH the request (so downstream reads in
-        // this same pass see them) and a fresh response (what the browser gets).
+        // this same pass see them) and a fresh response (what the browser gets),
+        // preserving the forwarded headers (the nonce) on the rebuilt response.
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = NextResponse.next({ request: { headers: requestHeaders } });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );

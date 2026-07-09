@@ -6,6 +6,11 @@
 -- cannot see or mutate the other tenant, and cannot escalate their own role or
 -- hop tenants. Results are collected into a temp table and returned at the end.
 --
+-- The synthetic tenant/user UUIDs (f1111111…, 22222222…, aaaa…, bbbb…) are chosen
+-- to NOT collide with any seed row, so this runs cleanly against the live seeded
+-- demo DB as well as a fresh reset. Assertions on admin-visible tables are scoped
+-- to the test rows for the same reason.
+--
 -- Run: supabase db query --linked -f supabase/tests/rls_tenant_isolation.sql
 -- Every row should read pass = true.
 
@@ -16,25 +21,29 @@ grant insert, select on _t to authenticated;
 
 -- Two tenants
 insert into public.business (id, name) values
-  ('11111111-1111-1111-1111-111111111111', 'Tenant A'),
+  ('f1111111-1111-1111-1111-111111111111', 'Tenant A'),
   ('22222222-2222-2222-2222-222222222222', 'Tenant B');
 
 -- Two users, each provisioned to a tenant via app_metadata (fires the trigger).
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'authenticated', 'authenticated', 'alice@a.test',
-     jsonb_build_object('business_id', '11111111-1111-1111-1111-111111111111', 'role', 'staff'),
+     jsonb_build_object('business_id', 'f1111111-1111-1111-1111-111111111111', 'role', 'staff'),
      jsonb_build_object('name', 'Alice'), now(), now()),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'authenticated', 'authenticated', 'bob@b.test',
      jsonb_build_object('business_id', '22222222-2222-2222-2222-222222222222', 'role', 'owner'),
      jsonb_build_object('name', 'Bob'), now(), now());
 
--- The signup trigger should have created two profiles with server-set fields.
+-- The signup trigger should have created a profile for each new user with
+-- server-set fields. Scope the count to the two test users so the assertion is
+-- robust when run against a seeded DB (which already has its own profiles).
 insert into _t
-select 'trigger creates profiles', count(*) = 2, 'count=' || count(*) from public.profile;
+select 'trigger creates test profiles', count(*) = 2, 'count=' || count(*)
+from public.profile
+where id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
 insert into _t
 select 'alice profile server-set correctly',
-       bool_and(business_id = '11111111-1111-1111-1111-111111111111' and role = 'staff' and name = 'Alice'),
+       bool_and(business_id = 'f1111111-1111-1111-1111-111111111111' and role = 'staff' and name = 'Alice'),
        'role/business_id came from app_metadata'
 from public.profile where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -75,7 +84,7 @@ with upd as (
 )
 insert into _t
 select 'alice cannot escalate role / hop tenant',
-       bool_and(role = 'staff' and business_id = '11111111-1111-1111-1111-111111111111' and name = 'Alice-edited'),
+       bool_and(role = 'staff' and business_id = 'f1111111-1111-1111-1111-111111111111' and name = 'Alice-edited'),
        'role/business frozen, name editable'
 from upd;
 

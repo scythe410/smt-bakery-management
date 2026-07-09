@@ -24,10 +24,11 @@
   --text-muted: #71717a; /* labels, captions, secondary */
   --text-faint: #a1a1aa; /* placeholders, disabled */
 
-  /* Semantic (status chips) */
-  --success: #1b873f; /* completed, positive net */
+  /* Semantic (status chips). Success/warning are tuned to clear WCAG AA (4.5:1)
+   * as 11px pill text on their own tint background AND on white — see DESIGN.md §2. */
+  --success: #197c3a; /* completed, positive net — AA on white (5.3:1) + tint (4.7:1) */
   --success-bg: #e7f4ec;
-  --warning: #b4690e; /* pending */
+  --warning: #9e5c0c; /* pending — AA on white (5.3:1) + tint (4.7:1) */
   --warning-bg: #fbf0e1;
   --danger: #a00c30; /* cancelled / destructive — Ember, distinct from primary red */
   --danger-bg: #fbe9ee;
@@ -58,6 +59,21 @@
   /* Tabular numerals for money/tables (DESIGN.md §3). */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Global keyboard-focus indicator (DESIGN.md §6: "visible keyboard focus
+   * everywhere"). A brand-red outline with an offset gap so it reads on any
+   * background — including on the red primary buttons (the offset shows the
+   * white page between the button edge and the ring). This is the baseline for
+   * every focusable element; components may layer a `focus-visible:ring-*` on
+   * top, but none can be left with no visible focus. Only shows for keyboard
+   * focus (`:focus-visible`), never on mouse click.
+   */
+  :focus-visible {
+    outline: 2px solid var(--brand-red);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -4,6 +4,10 @@
 -- Seeds two tenants and, in tenant A, three users (owner/manager/staff) plus an
 -- owner in tenant B, then asserts the access matrix and tenant isolation.
 --
+-- Synthetic UUIDs (f1111111…, 22222222…, a0/a1/a2/b0…) are chosen to NOT collide
+-- with seed rows; per-role reads are RLS-scoped to the test tenant, so this runs
+-- cleanly against the live seeded demo DB as well as a fresh reset.
+--
 -- Run: supabase db query --linked -f supabase/tests/rls_domain_access.sql
 -- Every row should read pass = true.
 
@@ -14,34 +18,34 @@ grant insert, select on _t to authenticated;
 
 -- Tenants
 insert into public.business (id, name) values
-  ('11111111-1111-1111-1111-111111111111', 'Tenant A'),
+  ('f1111111-1111-1111-1111-111111111111', 'Tenant A'),
   ('22222222-2222-2222-2222-222222222222', 'Tenant B');
 
 -- Users (app_metadata drives the on-signup trigger -> profile role/business_id)
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('a0000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@a.test',
-     '{"business_id":"11111111-1111-1111-1111-111111111111","role":"owner"}','{"name":"A-Owner"}', now(), now()),
+     '{"business_id":"f1111111-1111-1111-1111-111111111111","role":"owner"}','{"name":"A-Owner"}', now(), now()),
   ('a1111111-1111-1111-1111-111111111111','authenticated','authenticated','manager@a.test',
-     '{"business_id":"11111111-1111-1111-1111-111111111111","role":"manager"}','{"name":"A-Manager"}', now(), now()),
+     '{"business_id":"f1111111-1111-1111-1111-111111111111","role":"manager"}','{"name":"A-Manager"}', now(), now()),
   ('a2222222-2222-2222-2222-222222222222','authenticated','authenticated','staff@a.test',
-     '{"business_id":"11111111-1111-1111-1111-111111111111","role":"staff"}','{"name":"A-Staff"}', now(), now()),
+     '{"business_id":"f1111111-1111-1111-1111-111111111111","role":"staff"}','{"name":"A-Staff"}', now(), now()),
   ('b0000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@b.test',
      '{"business_id":"22222222-2222-2222-2222-222222222222","role":"owner"}','{"name":"B-Owner"}', now(), now());
 
 -- Seed data as admin (RLS bypassed). business_id kept as given (auth.uid() null).
 insert into public.customer (id, business_id, name) values
-  ('c0000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','A Cust'),
+  ('c0000000-0000-0000-0000-00000000000a','f1111111-1111-1111-1111-111111111111','A Cust'),
   ('c0000000-0000-0000-0000-00000000000b','22222222-2222-2222-2222-222222222222','B Cust');
 insert into public.menu_item (business_id, name, price_cents) values
-  ('11111111-1111-1111-1111-111111111111','Flat White', 65000);
+  ('f1111111-1111-1111-1111-111111111111','Flat White', 65000);
 insert into public.expense (business_id, category, amount_cents) values
-  ('11111111-1111-1111-1111-111111111111','rent', 25000000),
+  ('f1111111-1111-1111-1111-111111111111','rent', 25000000),
   ('22222222-2222-2222-2222-222222222222','rent', 30000000);
 insert into public.commission_rule (business_id, source, rate_bps) values
-  ('11111111-1111-1111-1111-111111111111','pickme_food', 1500);
+  ('f1111111-1111-1111-1111-111111111111','pickme_food', 1500);
 insert into public.employee (business_id, name, role) values
-  ('11111111-1111-1111-1111-111111111111','Nimal','Baker');
+  ('f1111111-1111-1111-1111-111111111111','Nimal','Baker');
 
 -- ===== Act as STAFF (tenant A) ============================================
 set local role authenticated;
@@ -69,7 +73,7 @@ with ins as (
   returning business_id, id
 )
 insert into _t select 'insert stamps business_id from session (not client)',
-  business_id = '11111111-1111-1111-1111-111111111111', 'stamped=' || business_id
+  business_id = 'f1111111-1111-1111-1111-111111111111', 'stamped=' || business_id
   from ins;
 
 -- freeze on update: staff tries to move their own customer to Tenant B.
@@ -79,7 +83,7 @@ with upd as (
   returning business_id, name
 )
 insert into _t select 'update freezes business_id (name still editable)',
-  business_id = '11111111-1111-1111-1111-111111111111' and name = 'renamed',
+  business_id = 'f1111111-1111-1111-1111-111111111111' and name = 'renamed',
   'business=' || business_id
   from upd;
 

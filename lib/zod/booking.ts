@@ -18,26 +18,32 @@ const shared = {
   customerPhone: z.string().trim().max(40).optional(),
 };
 
-const reservationSchema = z.object({
-  type: z.literal("reservation"),
-  ...shared,
-  // Reservations are always dated (they feed Today's Bookings); time optional.
-  date: z.string().regex(DATE_RE),
-  time: z.string().regex(TIME_RE).optional(),
-  partySize: z.coerce.number().int().min(1).max(1000),
-});
+// Each union member is `.strict()` so unknown fields are rejected — including a
+// reservation field smuggled into a custom order or vice-versa (CLAUDE.md §7.6).
+const reservationSchema = z
+  .object({
+    type: z.literal("reservation"),
+    ...shared,
+    // Reservations are always dated (they feed Today's Bookings); time optional.
+    date: z.string().regex(DATE_RE),
+    time: z.string().regex(TIME_RE).optional(),
+    partySize: z.coerce.number().int().min(1).max(1000),
+  })
+  .strict();
 
-const customOrderSchema = z.object({
-  type: z.literal("custom_order"),
-  ...shared,
-  itemDescription: z.string().trim().min(1).max(500),
-  // The pickup day drives when the order appears on the dashboard.
-  pickupDate: z.string().regex(DATE_RE),
-  pickupTime: z.string().regex(TIME_RE).optional(),
-  // Major-unit amounts (rupees) → cents in the action. Balance = total − deposit.
-  totalMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
-  depositMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
-});
+const customOrderSchema = z
+  .object({
+    type: z.literal("custom_order"),
+    ...shared,
+    itemDescription: z.string().trim().min(1).max(500),
+    // The pickup day drives when the order appears on the dashboard.
+    pickupDate: z.string().regex(DATE_RE),
+    pickupTime: z.string().regex(TIME_RE).optional(),
+    // Major-unit amounts (rupees) → cents in the action. Balance = total − deposit.
+    totalMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+    depositMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+  })
+  .strict();
 
 export const newBookingSchema = z.discriminatedUnion("type", [
   reservationSchema,

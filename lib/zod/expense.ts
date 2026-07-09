@@ -6,13 +6,16 @@
 
 import { z } from "zod";
 
-export const addExpenseSchema = z.object({
-  // Local calendar date `YYYY-MM-DD`.
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  category: z.string().trim().min(1).max(60),
-  // Major-unit amount (rupees). Coerced from the form string; must be positive.
-  amountMajor: z.coerce.number().positive().finite().max(1_000_000_000),
-  note: z.string().trim().max(500).optional(),
-});
+export const addExpenseSchema = z
+  .object({
+    // Local calendar date `YYYY-MM-DD`.
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    category: z.string().trim().min(1).max(60),
+    // Major-unit amount (rupees). Coerced from the form string; must be positive.
+    amountMajor: z.coerce.number().positive().finite().max(1_000_000_000),
+    note: z.string().trim().max(500).optional(),
+  })
+  // Reject unknown fields (CLAUDE.md §7.6).
+  .strict();
 
 export type AddExpenseInput = z.infer<typeof addExpenseSchema>;

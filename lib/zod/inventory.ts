@@ -8,21 +8,24 @@
 import { z } from "zod";
 import { INVENTORY_CATEGORIES, INVENTORY_KINDS } from "@/lib/inventory-config";
 
-export const addInventoryItemSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  kind: z.enum(INVENTORY_KINDS as unknown as [string, ...string[]]),
-  category: z.enum(INVENTORY_CATEGORIES as unknown as [string, ...string[]]),
-  // Quantity + threshold are non-negative decimals (numeric(12,3) in the DB).
-  qtyOnHand: z.coerce.number().min(0).finite().max(1_000_000_000),
-  unit: z.string().trim().min(1).max(20),
-  // Major-unit unit cost (rupees) → cents in the action.
-  unitCostMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
-  lowStockThreshold: z.coerce.number().min(0).finite().max(1_000_000_000),
-  // Optional scanned/typed barcode. Stored verbatim (an empty value is coerced to
-  // undefined by the action → NULL, so the partial unique index isn't hit for
-  // barcode-less items). Kept generous (≤64) so a QR-encoded SKU also fits.
-  barcode: z.string().trim().min(1).max(64).optional(),
-});
+export const addInventoryItemSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    kind: z.enum(INVENTORY_KINDS as unknown as [string, ...string[]]),
+    category: z.enum(INVENTORY_CATEGORIES as unknown as [string, ...string[]]),
+    // Quantity + threshold are non-negative decimals (numeric(12,3) in the DB).
+    qtyOnHand: z.coerce.number().min(0).finite().max(1_000_000_000),
+    unit: z.string().trim().min(1).max(20),
+    // Major-unit unit cost (rupees) → cents in the action.
+    unitCostMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+    lowStockThreshold: z.coerce.number().min(0).finite().max(1_000_000_000),
+    // Optional scanned/typed barcode. Stored verbatim (an empty value is coerced to
+    // undefined by the action → NULL, so the partial unique index isn't hit for
+    // barcode-less items). Kept generous (≤64) so a QR-encoded SKU also fits.
+    barcode: z.string().trim().min(1).max(64).optional(),
+  })
+  // Reject unknown fields (CLAUDE.md §7.6).
+  .strict();
 
 export type AddInventoryItemInput = z.infer<typeof addInventoryItemSchema>;
 
