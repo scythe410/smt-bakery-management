@@ -41,3 +41,10 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# internal working docs — kept local, not published to the public repo
+CLAUDE.md
+DESIGN.md
+LOG.md
+SPEC.pdf
+/.claude
