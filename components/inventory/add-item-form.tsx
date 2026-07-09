@@ -12,11 +12,20 @@ import { useActionState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { addInventoryItem, type AddInventoryItemState } from "@/app/(app)/inventory/actions";
 import { INVENTORY_CATEGORIES, INVENTORY_KINDS } from "@/lib/inventory-config";
+import type { InventoryCategory, InventoryKind } from "@/lib/inventory-config";
 
 const FIELD_CLASS =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
-export function AddItemForm({ onDone }: { onDone: () => void }) {
+/** Prefill from a barcode scan (SPEC §5.1). Any field may be absent → blank. */
+export type AddItemPrefill = {
+  name?: string;
+  category?: InventoryCategory;
+  kind?: InventoryKind;
+  barcode?: string;
+};
+
+export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?: AddItemPrefill }) {
   const { t } = useTranslation();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<AddInventoryItemState, FormData>(
@@ -33,15 +42,36 @@ export function AddItemForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-3">
+      {/* Carries the scanned code through to the insert so re-scans match it. */}
+      {prefill?.barcode ? <input type="hidden" name="barcode" value={prefill.barcode} /> : null}
+
+      {prefill?.barcode ? (
+        <div className="bg-surface-2 border-border flex items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2">
+          <span className="text-caption text-muted">{t("inventory.add.barcode")}</span>
+          <span className="text-label text-ink font-medium tabular-nums">{prefill.barcode}</span>
+        </div>
+      ) : null}
+
       <label className="flex flex-col gap-1">
         <span className="text-caption text-muted">{t("inventory.add.name")}</span>
-        <input type="text" name="name" required maxLength={120} className={FIELD_CLASS} />
+        <input
+          type="text"
+          name="name"
+          required
+          maxLength={120}
+          defaultValue={prefill?.name ?? ""}
+          className={FIELD_CLASS}
+        />
       </label>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("inventory.add.kind")}</span>
-          <select name="kind" defaultValue={INVENTORY_KINDS[0]} className={FIELD_CLASS}>
+          <select
+            name="kind"
+            defaultValue={prefill?.kind ?? INVENTORY_KINDS[0]}
+            className={FIELD_CLASS}
+          >
             {INVENTORY_KINDS.map((k) => (
               <option key={k} value={k}>
                 {t(`inventory.kind.${k}`)}
@@ -51,7 +81,11 @@ export function AddItemForm({ onDone }: { onDone: () => void }) {
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("inventory.add.category")}</span>
-          <select name="category" defaultValue={INVENTORY_CATEGORIES[0]} className={FIELD_CLASS}>
+          <select
+            name="category"
+            defaultValue={prefill?.category ?? INVENTORY_CATEGORIES[0]}
+            className={FIELD_CLASS}
+          >
             {INVENTORY_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {t(`inventory.category.${c}`)}

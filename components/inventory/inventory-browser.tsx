@@ -1,14 +1,14 @@
 "use client";
 
-// Inventory browser (SPEC §3.3). Client component over the already-fetched
+// Inventory browser (SPEC §3.3, §5.1). Client component over the already-fetched
 // tenant list: the "Low Stock" pill (live count, toggles the list to low-stock
 // items only), a "Search ingredients…" box, a category filter (All + the
-// categories actually present), the "+ Add Item" primary action, and a
-// "Scan to Add" entry point stubbed for the P15 barcode flow. Rows render as
-// stacked list-rows (DESIGN.md §4 tables→mobile), never a wide table. Filtering
-// is client-side over the fetched rows; the Low-Stock count stays the true tenant
-// count so it matches the nav badge. Item names are business data, shown as
-// entered — not translated (CLAUDE.md §3).
+// categories actually present), the "+ Add Item" primary action, and the
+// "Scan to Add" camera flow. Rows render as stacked list-rows (DESIGN.md §4
+// tables→mobile), never a wide table. Filtering is client-side over the fetched
+// rows; the Low-Stock count stays the true tenant count so it matches the nav
+// badge. Item names are business data, shown as entered — not translated
+// (CLAUDE.md §3).
 
 import { useMemo, useState } from "react";
 import { Plus, ScanLine, AlertTriangle } from "lucide-react";
@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AddItemForm } from "@/components/inventory/add-item-form";
+import { ScanToAdd } from "@/components/inventory/scan-to-add";
 import type { InventoryListItem } from "@/lib/db/selectors/inventory";
 import type { InventoryCategory } from "@/lib/inventory-config";
 
@@ -34,10 +35,17 @@ export function InventoryBrowser({
 }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
-  const [scanNote, setScanNote] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [category, setCategory] = useState<InventoryCategory | "">("");
   const [query, setQuery] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
+
+  // code → existing item name, so a re-scan is recognised as already stocked.
+  const barcodeIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const it of items) if (it.barcode) map.set(it.barcode, it.name);
+    return map;
+  }, [items]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -82,7 +90,10 @@ export function InventoryBrowser({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setAdding((v) => !v)}
+          onClick={() => {
+            setScanning(false);
+            setAdding((v) => !v);
+          }}
           aria-expanded={adding}
           className="bg-brand text-brand-white text-label hover:bg-brand-ember flex h-10 flex-1 items-center justify-center gap-1 rounded-[var(--radius)] font-semibold transition-colors"
         >
@@ -91,8 +102,11 @@ export function InventoryBrowser({
         </button>
         <button
           type="button"
-          onClick={() => setScanNote((v) => !v)}
-          aria-expanded={scanNote}
+          onClick={() => {
+            setAdding(false);
+            setScanning((v) => !v);
+          }}
+          aria-expanded={scanning}
           className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-1 rounded-[var(--radius)] border px-3 font-medium transition-colors"
         >
           <ScanLine className="size-4" aria-hidden />
@@ -100,10 +114,10 @@ export function InventoryBrowser({
         </button>
       </div>
 
-      {scanNote ? (
-        <p className="text-caption text-muted -mt-1" role="status">
-          {t("inventory.scan.soon")}
-        </p>
+      {scanning ? (
+        <Card>
+          <ScanToAdd barcodeIndex={barcodeIndex} onClose={() => setScanning(false)} />
+        </Card>
       ) : null}
 
       {adding ? (

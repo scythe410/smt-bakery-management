@@ -30,6 +30,8 @@ export type InventoryListItem = {
   /** qty_on_hand <= low_stock_threshold (only meaningful when qty is set). */
   isLowStock: boolean;
   unitCostCents: number;
+  /** Stored barcode (GTIN/QR), or null — lets the scanner spot a re-scan. */
+  barcode: string | null;
 };
 
 export type InventoryList = {
@@ -63,6 +65,7 @@ async function loadInventoryList(): Promise<InventoryList> {
       lowStockThreshold,
       isLowStock: qtyOnHand !== null && qtyOnHand <= lowStockThreshold,
       unitCostCents: r.unit_cost_cents,
+      barcode: r.barcode,
     };
   });
 

@@ -158,10 +158,33 @@
     },
     "scan": {
       "action": "Scan to Add",
-      "soon": "Barcode scanning arrives in a later step."
+      "title": "Scan to Add",
+      "close": "Close scanner",
+      "hint": "Point the camera at a barcode or QR code.",
+      "viewfinderLabel": "Camera viewfinder",
+      "lookingUp": "Looking up product…",
+      "matched": "Product found. Review the details and save.",
+      "noMatch": "No product match. Fill in the details and save.",
+      "enterManually": "Enter code manually",
+      "manualLabel": "Barcode",
+      "manualPlaceholder": "e.g. 4791234567890",
+      "lookup": "Look up",
+      "retryCamera": "Try camera again",
+      "scanAgain": "Scan another",
+      "done": "Done",
+      "duplicate": "That barcode is already on another item.",
+      "duplicateNamed": "Already in inventory: {{name}}",
+      "error": {
+        "denied": "Camera access was blocked.",
+        "no_camera": "No camera was found on this device.",
+        "insecure": "The camera needs a secure (https) connection.",
+        "generic": "Couldn't start the camera.",
+        "useManual": "Enter the barcode manually instead."
+      }
     },
     "add": {
       "action": "Add Item",
+      "barcode": "Barcode",
       "name": "Name",
       "kind": "Type",
       "category": "Category",
