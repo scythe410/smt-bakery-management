@@ -180,6 +180,71 @@
       "retry": "නැවත උත්සාහ කරන්න"
     }
   },
+  "orders": {
+    "tabs": {
+      "active": "සක්‍රීය",
+      "archived": "සංරක්ෂිත"
+    },
+    "searchPlaceholder": "හැඳුනුම හෝ පාරිභෝගිකයා අනුව සොයන්න",
+    "itemsCount_one": "අයිතම {{count}}",
+    "itemsCount_other": "අයිතම {{count}}",
+    "showing": "{{total}} න් {{shown}} ක් පෙන්වයි",
+    "noMatch": "ඔබේ පෙරහන් වලට ගැළපෙන ඇණවුම් නැත.",
+    "empty": {
+      "active": "සක්‍රීය ඇණවුම් නැත. පළමු ඇණවුම සාදන්න.",
+      "archived": "තවම සංරක්ෂිත ඇණවුම් නැත."
+    },
+    "filter": {
+      "source": "මූලාශ්‍රය",
+      "allSources": "සියලු මූලාශ්‍ර",
+      "status": "තත්ත්වය",
+      "allStatuses": "සියලු තත්ත්ව",
+      "payment": "ගෙවීම",
+      "allPayments": "සියලු ගෙවීම්",
+      "date": "දිනය"
+    },
+    "status": {
+      "pending": "පොරොත්තුවෙන්",
+      "completed": "සම්පූර්ණයි",
+      "cancelled": "අවලංගුයි"
+    },
+    "payment": {
+      "cash": "මුදල්",
+      "card": "කාඩ්පත",
+      "online": "ඔන්ලයින්",
+      "wallet": "පසුම්බිය"
+    },
+    "paymentStatus": {
+      "unpaid": "නොගෙවූ",
+      "paid": "ගෙවා ඇත",
+      "refunded": "ආපසු ගෙවා ඇත"
+    },
+    "new": {
+      "action": "නව ඇණවුම",
+      "source": "මූලාශ්‍රය",
+      "customer": "පාරිභෝගිකයා",
+      "customerPlaceholder": "නම (විකල්ප)",
+      "paymentMethod": "ගෙවීම් ක්‍රමය",
+      "paymentStatus": "ගෙවීම් තත්ත්වය",
+      "items": "අයිතම",
+      "noMenu": "මෙනු අයිතම නොමැත. පළමුව මෙනුවේ එකක් එක් කරන්න.",
+      "decrease": "{{name}} එකක් ඉවත් කරන්න",
+      "increase": "{{name}} එකක් එක් කරන්න",
+      "estTotal": "ඇස්තමේන්තුගත එකතුව",
+      "itemsCount_one": "අයිතම {{count}}",
+      "itemsCount_other": "අයිතම {{count}}",
+      "save": "ඇණවුම සාදන්න",
+      "saving": "සාදමින්…",
+      "cancel": "අවලංගු කරන්න",
+      "error": "එම ඇණවුම සෑදිය නොහැකි විය. ක්ෂේත්‍ර පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "invalidItem": "එම අයිතමයක් තවදුරටත් නොමැත. එය ඉවත් කර නැවත උත්සාහ කරන්න."
+    },
+    "error": {
+      "title": "ඇණවුම් පූරණය කළ නොහැකි විය.",
+      "body": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "retry": "නැවත උත්සාහ කරන්න"
+    }
+  },
   "source": {
     "dine_in": "අවන්හලේ",
     "walk_in": "පැමිණ",

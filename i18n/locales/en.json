@@ -180,6 +180,71 @@
       "retry": "Retry"
     }
   },
+  "orders": {
+    "tabs": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "searchPlaceholder": "Search by ID or customer",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
+    "showing": "Showing {{shown}} of {{total}}",
+    "noMatch": "No orders match your filters.",
+    "empty": {
+      "active": "No active orders. Create the first order.",
+      "archived": "No archived orders yet."
+    },
+    "filter": {
+      "source": "Source",
+      "allSources": "All Sources",
+      "status": "Status",
+      "allStatuses": "All Statuses",
+      "payment": "Payment",
+      "allPayments": "All Payments",
+      "date": "Date"
+    },
+    "status": {
+      "pending": "Pending",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "payment": {
+      "cash": "Cash",
+      "card": "Card",
+      "online": "Online",
+      "wallet": "Wallet"
+    },
+    "paymentStatus": {
+      "unpaid": "Unpaid",
+      "paid": "Paid",
+      "refunded": "Refunded"
+    },
+    "new": {
+      "action": "New Order",
+      "source": "Source",
+      "customer": "Customer",
+      "customerPlaceholder": "Name (optional)",
+      "paymentMethod": "Payment method",
+      "paymentStatus": "Payment status",
+      "items": "Items",
+      "noMenu": "No menu items available. Add one in Menu first.",
+      "decrease": "Remove one {{name}}",
+      "increase": "Add one {{name}}",
+      "estTotal": "Estimated total",
+      "itemsCount_one": "{{count}} item",
+      "itemsCount_other": "{{count}} items",
+      "save": "Create order",
+      "saving": "Creating…",
+      "cancel": "Cancel",
+      "error": "Couldn't create that order. Check the fields and try again.",
+      "invalidItem": "One of those items is no longer available. Remove it and try again."
+    },
+    "error": {
+      "title": "Couldn't load orders.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
   "source": {
     "dine_in": "Dine-in",
     "walk_in": "Walk-in",

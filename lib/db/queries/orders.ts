@@ -33,3 +33,33 @@ export async function listOrdersWithItems(period: Period): Promise<OrderWithItem
   if (error) throw error;
   return (data ?? []) as OrderWithItems[];
 }
+
+/**
+ * Every order for this tenant (newest first), each with its line items — the
+ * Orders screen's source data (SPEC §3.4). The screen's Active/Archived tabs +
+ * source/status/payment/date filters run over this set client-side; the read
+ * itself is RLS-scoped, so it is always this tenant's orders.
+ */
+export async function listAllOrdersWithItems(): Promise<OrderWithItems[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("order")
+    .select("*, order_item(*)")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as OrderWithItems[];
+}
+
+/**
+ * All existing `order_no` values for the tenant. Used to mint the next
+ * human-friendly number on order creation (parsed + max'd in the action rather
+ * than lexically, so numbering stays correct past 4 digits). RLS-scoped, so it
+ * only ever sees this tenant's numbers (numbers are per-business unique).
+ */
+export async function listOrderNos(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("order").select("order_no");
+  if (error) throw error;
+  return (data ?? []).map((r) => r.order_no);
+}
