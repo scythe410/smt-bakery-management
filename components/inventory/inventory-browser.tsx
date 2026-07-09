@@ -1,0 +1,200 @@
+"use client";
+
+// Inventory browser (SPEC §3.3). Client component over the already-fetched
+// tenant list: the "Low Stock" pill (live count, toggles the list to low-stock
+// items only), a "Search ingredients…" box, a category filter (All + the
+// categories actually present), the "+ Add Item" primary action, and a
+// "Scan to Add" entry point stubbed for the P15 barcode flow. Rows render as
+// stacked list-rows (DESIGN.md §4 tables→mobile), never a wide table. Filtering
+// is client-side over the fetched rows; the Low-Stock count stays the true tenant
+// count so it matches the nav badge. Item names are business data, shown as
+// entered — not translated (CLAUDE.md §3).
+
+import { useMemo, useState } from "react";
+import { Plus, ScanLine, AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Card } from "@/components/ui/card";
+import { StatusPill } from "@/components/ui/status-pill";
+import { AddItemForm } from "@/components/inventory/add-item-form";
+import type { InventoryListItem } from "@/lib/db/selectors/inventory";
+import type { InventoryCategory } from "@/lib/inventory-config";
+
+function formatQty(qty: number): string {
+  return qty.toLocaleString("en-US", { maximumFractionDigits: 3 });
+}
+
+export function InventoryBrowser({
+  items,
+  lowStockCount,
+  categories,
+}: {
+  items: InventoryListItem[];
+  lowStockCount: number;
+  categories: InventoryCategory[];
+}) {
+  const { t } = useTranslation();
+  const [adding, setAdding] = useState(false);
+  const [scanNote, setScanNote] = useState(false);
+  const [category, setCategory] = useState<InventoryCategory | "">("");
+  const [query, setQuery] = useState("");
+  const [lowOnly, setLowOnly] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((it) => {
+      if (lowOnly && !it.isLowStock) return false;
+      if (category && it.category !== category) return false;
+      if (q && !it.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [items, lowOnly, category, query]);
+
+  const isFiltered = lowOnly || category !== "" || query.trim() !== "";
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Low Stock pill — live count, toggles the low-stock-only filter */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setLowOnly((v) => !v)}
+          aria-pressed={lowOnly}
+          disabled={lowStockCount === 0}
+          className={`rounded-pill text-label focus-visible:ring-brand/40 inline-flex h-8 items-center gap-1.5 border px-3 font-medium outline-none transition-colors focus-visible:ring-2 disabled:opacity-50 ${
+            lowOnly
+              ? "border-brand bg-[var(--red-tint)] text-brand"
+              : "border-border-strong text-ink hover:bg-surface-2"
+          }`}
+        >
+          <AlertTriangle className="size-4" aria-hidden />
+          {t("inventory.lowStock")}
+          <span
+            className={`rounded-pill inline-flex min-w-5 items-center justify-center px-1.5 text-[11px] font-semibold tabular-nums ${
+              lowOnly ? "bg-brand text-brand-white" : "bg-danger-bg text-danger"
+            }`}
+          >
+            {lowStockCount}
+          </span>
+        </button>
+      </div>
+
+      {/* Primary + scan actions */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          aria-expanded={adding}
+          className="bg-brand text-brand-white text-label hover:bg-brand-ember flex h-10 flex-1 items-center justify-center gap-1 rounded-[var(--radius)] font-semibold transition-colors"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t("inventory.add.action")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setScanNote((v) => !v)}
+          aria-expanded={scanNote}
+          className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-1 rounded-[var(--radius)] border px-3 font-medium transition-colors"
+        >
+          <ScanLine className="size-4" aria-hidden />
+          {t("inventory.scan.action")}
+        </button>
+      </div>
+
+      {scanNote ? (
+        <p className="text-caption text-muted -mt-1" role="status">
+          {t("inventory.scan.soon")}
+        </p>
+      ) : null}
+
+      {adding ? (
+        <Card>
+          <AddItemForm onDone={() => setAdding(false)} />
+        </Card>
+      ) : null}
+
+      {/* Category filter + search */}
+      <div className="flex gap-2">
+        <select
+          aria-label={t("inventory.filter.category")}
+          value={category}
+          onChange={(e) => setCategory(e.target.value as InventoryCategory | "")}
+          className="border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 rounded-[var(--radius)] border px-2 outline-none focus-visible:ring-2"
+        >
+          <option value="">{t("inventory.filter.allCategories")}</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {t(`inventory.category.${c}`)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("inventory.searchPlaceholder")}
+          className="border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 min-w-0 flex-1 rounded-[var(--radius)] border px-2 outline-none focus-visible:ring-2"
+        />
+      </div>
+
+      {/* List */}
+      <Card className="flex flex-col gap-3">
+        {items.length === 0 ? (
+          <p className="text-body text-muted py-2">{t("inventory.empty")}</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-body text-muted py-2">{t("inventory.noMatch")}</p>
+        ) : (
+          <>
+            <ul className="flex flex-col">
+              {filtered.map((it) => (
+                <li
+                  key={it.id}
+                  className="border-border flex items-start justify-between gap-3 border-b py-3 last:border-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-label text-ink truncate font-semibold">{it.name}</span>
+                      {it.isLowStock ? (
+                        <StatusPill tone="danger" label={t("inventory.lowBadge")} />
+                      ) : null}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-caption text-muted">
+                        {t(`inventory.category.${it.category}`)}
+                      </span>
+                      <span className="text-faint" aria-hidden>
+                        ·
+                      </span>
+                      <StatusPill
+                        tone={it.kind === "merchandise" ? "info" : "neutral"}
+                        label={t(`inventory.kind.${it.kind}`)}
+                      />
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {it.qtyOnHand === null ? (
+                      <span className="text-caption text-faint italic">
+                        {t("inventory.notSet")}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-label text-ink font-semibold tabular-nums">
+                          {formatQty(it.qtyOnHand)}
+                        </span>{" "}
+                        <span className="text-caption text-muted">{it.unit}</span>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {isFiltered ? (
+              <p className="text-caption text-faint">
+                {t("inventory.showing", { shown: filtered.length, total: items.length })}
+              </p>
+            ) : null}
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}

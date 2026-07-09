@@ -1,10 +1,18 @@
-// Inventory — accessible to all roles. Screen title from the shell header; full
-// build lands in a later step.
+// Inventory (SPEC §3.3) — accessible to all roles (RLS: inventory is CRUD for
+// owner/manager/staff, CLAUDE.md §5). The screen title lives in the shell header.
+// The list is fetched behind a Suspense boundary so it streams in after a
+// shape-matched skeleton (DESIGN.md §6).
 
+import { Suspense } from "react";
 import { requireProfile } from "@/lib/auth";
-import { ComingSoon } from "@/components/app/coming-soon";
+import { InventoryList } from "@/components/inventory/inventory-list";
+import { InventorySkeleton } from "@/components/inventory/inventory-skeleton";
 
 export default async function InventoryPage() {
   await requireProfile();
-  return <ComingSoon />;
+  return (
+    <Suspense fallback={<InventorySkeleton />}>
+      <InventoryList />
+    </Suspense>
+  );
 }

@@ -133,6 +133,53 @@
       "retry": "Retry"
     }
   },
+  "inventory": {
+    "lowStock": "Low Stock",
+    "lowBadge": "Low",
+    "searchPlaceholder": "Search ingredients…",
+    "notSet": "Not set",
+    "showing": "Showing {{shown}} of {{total}}",
+    "empty": "No inventory items yet. Add your first item.",
+    "noMatch": "No items match your filters.",
+    "filter": {
+      "category": "Category",
+      "allCategories": "All categories"
+    },
+    "category": {
+      "baking": "Baking",
+      "beverages": "Beverages",
+      "syrups_toppings": "Syrups & Toppings",
+      "merch": "Merch",
+      "other": "Other"
+    },
+    "kind": {
+      "ingredient": "Ingredient",
+      "merchandise": "Merchandise"
+    },
+    "scan": {
+      "action": "Scan to Add",
+      "soon": "Barcode scanning arrives in a later step."
+    },
+    "add": {
+      "action": "Add Item",
+      "name": "Name",
+      "kind": "Type",
+      "category": "Category",
+      "qty": "Quantity",
+      "unit": "Unit",
+      "unitCost": "Unit cost",
+      "lowStockThreshold": "Low-stock threshold",
+      "save": "Save item",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Couldn't save that item. Check the fields and try again."
+    },
+    "error": {
+      "title": "Couldn't load inventory.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
   "source": {
     "dine_in": "Dine-in",
     "walk_in": "Walk-in",
