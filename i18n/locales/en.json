@@ -301,7 +301,12 @@
   },
   "settings": {
     "title": "Settings",
-    "comingSoon": "Settings land in an upcoming step."
+    "language": {
+      "title": "Language",
+      "description": "Choose the language for this app. Your choice is saved to your profile.",
+      "en": "English",
+      "si": "සිංහල"
+    }
   },
   "forbidden": {
     "title": "You don't have access to this page.",
