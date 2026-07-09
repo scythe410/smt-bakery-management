@@ -133,6 +133,28 @@ export function zonedClockTime(instant: Date | string, timeZone: string): string
   return `${pad(p.hour)}:${pad(p.minute)}`;
 }
 
+/**
+ * The UTC instant (ISO) at which the wall clock in `timeZone` reads the given
+ * local `YYYY-MM-DD` and optional `HH:mm` (defaults to midnight). Lets a caller
+ * persist a local pickup date/time as a correct `timestamptz` without touching
+ * offset math itself.
+ */
+export function zonedWallTimeToUtcIso(
+  dateStr: string,
+  timeStr: string | null,
+  timeZone: string,
+): string {
+  const { y, m, d } = parseDateStr(dateStr);
+  let h = 0;
+  let mi = 0;
+  if (timeStr) {
+    const [hh, mm] = timeStr.split(":").map(Number);
+    if (Number.isFinite(hh)) h = hh;
+    if (Number.isFinite(mm)) mi = mm;
+  }
+  return zonedWallTimeToUtc(y, m, d, h, mi, 0, timeZone).toISOString();
+}
+
 // --- Local-date string helpers (labels only; no timezone involved) ----------
 
 function pad(n: number): string {

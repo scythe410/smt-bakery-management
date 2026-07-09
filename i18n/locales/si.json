@@ -268,6 +268,69 @@
       "retry": "නැවත උත්සාහ කරන්න"
     }
   },
+  "bookings": {
+    "segment": {
+      "reservation": "වෙන්කිරීම්",
+      "custom_order": "විශේෂ ඇණවුම්"
+    },
+    "type": {
+      "reservation": "වෙන්කිරීම",
+      "custom_order": "විශේෂ ඇණවුම"
+    },
+    "status": {
+      "pending": "පොරොත්තුවෙන්",
+      "confirmed": "තහවුරුයි",
+      "completed": "සම්පූර්ණයි",
+      "cancelled": "අවලංගුයි"
+    },
+    "search": "පාරිභෝගිකයා හෝ දුරකථනය අනුව සොයන්න",
+    "filter": {
+      "status": "තත්ත්වය",
+      "allStatuses": "සියලු තත්ත්ව",
+      "date": "දිනය"
+    },
+    "guest": "අමුත්තා",
+    "pickup": "බාරගැනීම",
+    "partyOf": "පිරිස {{count}} දෙනෙක්",
+    "balanceDue": "ගෙවිය යුතු ශේෂය",
+    "unscheduled": "දිනයක් නැත",
+    "showing": "{{total}} න් {{shown}} ක් පෙන්වයි",
+    "noMatch": "ඔබේ පෙරහන් වලට ගැළපෙන වෙන්කිරීම් නැත.",
+    "empty": {
+      "reservation": "තවම වෙන්කිරීම් නැත. පළමු වෙන්කිරීම එක් කරන්න.",
+      "custom_order": "තවම විශේෂ ඇණවුම් නැත. පළමු ඇණවුම එක් කරන්න."
+    },
+    "new": {
+      "reservationAction": "නව වෙන්කිරීම",
+      "customOrderAction": "නව විශේෂ ඇණවුම",
+      "customer": "පාරිභෝගිකයා",
+      "customerPlaceholder": "නම",
+      "phone": "දුරකථනය",
+      "phonePlaceholder": "07X XXX XXXX",
+      "date": "දිනය",
+      "time": "වේලාව",
+      "partySize": "පිරිස ප්‍රමාණය",
+      "source": "මූලාශ්‍රය",
+      "status": "තත්ත්වය",
+      "itemDescription": "අයිතම විස්තරය",
+      "itemDescriptionPlaceholder": "උදා: 1 kg චොකලට් කේක් — 'Happy Birthday'",
+      "pickupDate": "බාරගන්නා දිනය",
+      "pickupTime": "බාරගන්නා වේලාව",
+      "total": "ඇණවුම් එකතුව",
+      "deposit": "ගෙවූ අත්තිකාරම",
+      "balanceHint": "ගෙවිය යුතු ශේෂය යනු ඇණවුම් එකතුවෙන් අත්තිකාරම අඩු කළ අගයයි.",
+      "save": "වෙන්කිරීම සුරකින්න",
+      "saving": "සුරකිමින්…",
+      "cancel": "අවලංගු කරන්න",
+      "invalid": "අවශ්‍ය ක්ෂේත්‍ර සම්පූර්ණ කරන්න.",
+      "error": "වෙන්කිරීම සුරැකිය නොහැකි විය. විස්තර පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "error": {
+      "title": "වෙන්කිරීම් පූරණය කළ නොහැකි විය.",
+      "body": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "retry": "නැවත උත්සාහ කරන්න"
+    }
+  },
   "reports": {
     "type": {
       "label": "වාර්තාව",

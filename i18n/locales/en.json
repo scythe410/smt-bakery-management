@@ -268,6 +268,69 @@
       "retry": "Retry"
     }
   },
+  "bookings": {
+    "segment": {
+      "reservation": "Reservations",
+      "custom_order": "Custom Orders"
+    },
+    "type": {
+      "reservation": "Reservation",
+      "custom_order": "Custom order"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "search": "Search by customer or phone",
+    "filter": {
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "date": "Date"
+    },
+    "guest": "Guest",
+    "pickup": "Pickup",
+    "partyOf": "Party of {{count}}",
+    "balanceDue": "Balance due",
+    "unscheduled": "No date set",
+    "showing": "Showing {{shown}} of {{total}}",
+    "noMatch": "No bookings match your filters.",
+    "empty": {
+      "reservation": "No reservations yet. Add the first reservation.",
+      "custom_order": "No custom orders yet. Add the first custom order."
+    },
+    "new": {
+      "reservationAction": "New Reservation",
+      "customOrderAction": "New Custom Order",
+      "customer": "Customer",
+      "customerPlaceholder": "Name",
+      "phone": "Phone",
+      "phonePlaceholder": "07X XXX XXXX",
+      "date": "Date",
+      "time": "Time",
+      "partySize": "Party size",
+      "source": "Source",
+      "status": "Status",
+      "itemDescription": "Item description",
+      "itemDescriptionPlaceholder": "e.g. 1 kg chocolate cake — 'Happy Birthday'",
+      "pickupDate": "Pickup date",
+      "pickupTime": "Pickup time",
+      "total": "Order total",
+      "deposit": "Deposit paid",
+      "balanceHint": "Balance due is the order total minus the deposit.",
+      "save": "Save booking",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "invalid": "Please complete the required fields.",
+      "error": "Couldn't save the booking. Check the details and try again."
+    },
+    "error": {
+      "title": "Couldn't load bookings",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
   "reports": {
     "type": {
       "label": "Report",

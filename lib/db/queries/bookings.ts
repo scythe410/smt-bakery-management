@@ -28,6 +28,23 @@ export async function listBookingsInRange(period: Period): Promise<BookingRow[]>
 }
 
 /**
+ * Every booking for the current tenant, newest date first (undated last), then
+ * by time. Powers the Bookings screen list (SPEC §4.2). RLS scopes it to the
+ * caller's business; no `business_id` filter to spoof.
+ */
+export async function listAllBookings(): Promise<BookingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("booking")
+    .select("*")
+    .order("date", { ascending: false, nullsFirst: false })
+    .order("time", { ascending: true, nullsFirst: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
  * Bookings on a single LOCAL calendar day (`booking.date` is a plain `date`, so
  * it is matched against a `YYYY-MM-DD` string, not a UTC instant). Ordered by
  * time so the caller can render the day's schedule top to bottom.
