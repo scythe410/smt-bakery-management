@@ -48,7 +48,20 @@ export async function updateSession(
   // Revalidate the user against the auth server. This is the call that triggers
   // a token refresh when needed. Do NOT insert logic between createServerClient
   // and this line — the docs warn it can cause hard-to-debug session drops.
-  await supabase.auth.getUser();
+  //
+  // A stale or already-rotated refresh token makes this THROW an AuthApiError
+  // (`refresh_token_not_found`). Refresh tokens rotate on use, so a page load and
+  // a near-simultaneous server-action POST can race on the same token — one wins,
+  // the other throws. Left uncaught, that 500s the request; because middleware
+  // runs on every matched request, it silently breaks mutations (e.g. creating an
+  // order) even though the DB/RLS are fine. Swallow it: a failed refresh just
+  // means "no valid session" — clear the client's stale cookies and let the auth
+  // gate redirect to /login on the next hop instead of erroring the whole request.
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  }
 
   return response;
 }

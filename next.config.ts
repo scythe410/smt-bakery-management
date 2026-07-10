@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
   // gating (lib/auth.requireRole → real HTTP 403). CLAUDE.md §5, §7.5.
   experimental: {
     authInterrupts: true,
+    // Logo upload (Settings) posts the image through a Server Action. The app
+    // allows up to 2MB (LOGO_MAX_BYTES, matching the 'logos' bucket), but Next's
+    // default Server Action body limit is 1MB — a valid logo was rejected at the
+    // transport layer ("Body exceeded 1 MB limit") before the action's own size
+    // check ran. Raise it to cover 2MB + multipart/form overhead.
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
   },
   async headers() {
     return [
