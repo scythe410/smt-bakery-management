@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Pre-commit secret scan — blocks a commit whose STAGED changes contain
+# credentials (JWTs, API keys, private keys, secret-shaped assignments).
+#
+# Wired via core.hooksPath=.githooks, which the "prepare" npm script sets on
+# `npm install`. Uses gitleaks when installed (full ruleset); ALWAYS also runs a
+# self-contained regex fallback, so the guard holds even without gitleaks.
+#
+# Bypass (only when you are certain a hit is a false positive): git commit --no-verify
+set -eu
+
+fail() {
+  printf '\033[31m✖ pre-commit: potential secret detected — commit blocked\033[0m\n'
+  printf '%s\n' "$1"
+  printf 'If this is genuinely a false positive, verify the file(s), then: git commit --no-verify\n'
+  exit 1
+}
+
+# Nothing staged (added/copied/modified) → allow.
+if git diff --cached --quiet --diff-filter=ACM; then
+  exit 0
+fi
+
+# 1) gitleaks (preferred) — scans the staged snapshot with its full ruleset.
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --no-banner >/dev/null 2>&1; then
+    gitleaks protect --staged --redact --no-banner || true   # show which rule fired (redacted)
+    fail "gitleaks flagged staged content (values redacted above)."
+  fi
+fi
+
+# 2) Regex fallback — matches secret SHAPES, not mere keyword mentions.
+JWT='eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+PRIVKEY='-----BEGIN [A-Z ]*PRIVATE KEY-----'
+KEYVAL='(SERVICE_ROLE_KEY|ANON_KEY|API[_-]?KEY|SECRET|PASSWORD|ACCESS[_-]?TOKEN)[[:space:]]*[:=][[:space:]]*.?[A-Za-z0-9._+/-]{16,}'
+PLACEHOLDER='your[-_ ]|example|placeholder|changeme|dummy|<[a-z_]+>|=[[:space:]]*"?"?$'
+
+hits=''
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  case "$f" in
+    .githooks/*|.gitleaks.toml) continue ;;   # the scanner's own files carry patterns
+  esac
+  staged="$(git show ":$f" 2>/dev/null || true)"
+  [ -n "$staged" ] || continue
+
+  if printf '%s' "$staged" | grep -Eq "$JWT|$PRIVKEY"; then
+    hits="$hits
+  $f (JWT / private-key shape)"
+  fi
+  if printf '%s' "$staged" | grep -Ei "$KEYVAL" | grep -qviE "$PLACEHOLDER"; then
+    hits="$hits
+  $f (secret-looking assignment)"
+  fi
+done <<EOF
+$(git diff --cached --name-only --diff-filter=ACM)
+EOF
+
+[ -n "$hits" ] && fail "Staged files with suspected secrets:$hits"
+exit 0

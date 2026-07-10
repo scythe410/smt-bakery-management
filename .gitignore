@@ -48,3 +48,6 @@ DESIGN.md
 LOG.md
 SPEC.pdf
 /.claude
+
+# QA / internal reports — kept local, never committed
+implementation_plan_smt.md

@@ -1,0 +1,20 @@
+# gitleaks config for the pre-commit secret scan (.githooks/pre-commit).
+# Extends gitleaks' bundled ruleset and allowlists non-secret files + the
+# documented placeholder values in .env.example.
+title = "smt-bakery secret scan"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder/example files and the scanner's own pattern files"
+paths = [
+  '''\.env\.example$''',
+  '''\.githooks/''',
+  '''\.gitleaks\.toml$''',
+]
+regexes = [
+  '''your[-_ ]?(anon|service|api|secret)''',
+  '''example\.com''',
+  '''placeholder''',
+]
