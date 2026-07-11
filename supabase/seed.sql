@@ -397,6 +397,17 @@ begin
 end;
 $$;
 
+-- Advance the per-tenant order counter past the seeded numbers, so the first
+-- app-created order (via public.create_order) continues from ORD-<max+1> instead
+-- of colliding with seeded ORD-1001..ORD-1190. Mirrors the migration's backfill.
+update public.business b
+set order_seq = coalesce((
+  select max((regexp_replace(o.order_no, '[^0-9]', '', 'g'))::bigint)
+  from public."order" o
+  where o.business_id = b.id
+    and o.order_no ~ '[0-9]'
+), order_seq);
+
 -- ---------------------------------------------------------------------------
 -- 9. Expenses across categories (relative dates so Finance "this month" is live).
 -- ---------------------------------------------------------------------------

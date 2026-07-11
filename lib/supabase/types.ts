@@ -98,6 +98,7 @@ export type Database = {
           logo_url: string | null
           name: string
           notification_preferences: Json
+          order_seq: number
           tax_config: Json
           timezone: string
           updated_at: string
@@ -110,6 +111,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           notification_preferences?: Json
+          order_seq?: number
           tax_config?: Json
           timezone?: string
           updated_at?: string
@@ -122,6 +124,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           notification_preferences?: Json
+          order_seq?: number
           tax_config?: Json
           timezone?: string
           updated_at?: string
@@ -663,7 +666,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_order: {
+        Args: {
+          p_customer_name: string
+          p_items: Json
+          p_payment_method: Database["public"]["Enums"]["payment_method"]
+          p_payment_status: Database["public"]["Enums"]["payment_status"]
+          p_source: Database["public"]["Enums"]["order_source"]
+        }
+        Returns: {
+          business_id: string
+          commission_cents: number
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          id: string
+          order_no: string
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          source: Database["public"]["Enums"]["order_source"]
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal_cents: number
+          total_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_language: "en" | "si"

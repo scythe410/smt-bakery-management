@@ -50,16 +50,3 @@ export async function listAllOrdersWithItems(): Promise<OrderWithItems[]> {
   if (error) throw error;
   return (data ?? []) as OrderWithItems[];
 }
-
-/**
- * All existing `order_no` values for the tenant. Used to mint the next
- * human-friendly number on order creation (parsed + max'd in the action rather
- * than lexically, so numbering stays correct past 4 digits). RLS-scoped, so it
- * only ever sees this tenant's numbers (numbers are per-business unique).
- */
-export async function listOrderNos(): Promise<string[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("order").select("order_no");
-  if (error) throw error;
-  return (data ?? []).map((r) => r.order_no);
-}
