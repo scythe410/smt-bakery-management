@@ -46,11 +46,13 @@ export const notificationPreferencesSchema = z
 export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
 
 // Logo upload. The file itself is validated in the action (mime/size against the
-// bucket allow-list); here we only bound what an image may be.
+// bucket allow-list); here we only bound what an image may be. SVG is excluded
+// on purpose: it can carry embedded <script>, so an SVG logo served back is a
+// stored-XSS vector — only raster formats are accepted (mirrors the bucket's
+// allowed_mime_types; see migration 006).
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024; // matches the 'logos' bucket limit
 export const LOGO_MIME_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
-  "image/svg+xml": "svg",
 };

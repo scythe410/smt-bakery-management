@@ -15,6 +15,7 @@ import { Download, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
+import { csvRow } from "@/lib/csv";
 import { formatLKR } from "@/lib/format";
 import { toMajor } from "@/lib/money";
 import type { ReportRow } from "@/lib/db/selectors/reports";
@@ -31,11 +32,6 @@ const PAYMENT_STATUS_TONE: Record<PaymentStatus, Tone> = {
   unpaid: "warning",
   refunded: "danger",
 };
-
-/** RFC-4180-ish CSV cell: wrap in quotes, double any embedded quote. */
-function csvCell(value: string | number): string {
-  return `"${String(value).replace(/"/g, '""')}"`;
-}
 
 export function ReportDetail({
   rows,
@@ -66,7 +62,7 @@ export function ReportDetail({
       t("reports.detail.status"),
     ];
     const body = rows.map((r) =>
-      [
+      csvRow([
         r.time,
         t(`source.${r.source}`),
         r.customerName ?? "",
@@ -75,11 +71,9 @@ export function ReportDetail({
         paymentLabel(r.paymentMethod),
         t(`orders.paymentStatus.${r.paymentStatus}`),
         t(`orders.status.${r.status}`),
-      ]
-        .map(csvCell)
-        .join(","),
+      ]),
     );
-    const csv = [headers.map(csvCell).join(","), ...body].join("\r\n");
+    const csv = [csvRow(headers), ...body].join("\r\n");
 
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
