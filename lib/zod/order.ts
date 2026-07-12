@@ -18,7 +18,13 @@ export const newOrderSchema = z
       .array(
         z
           .object({
-            menuItemId: z.string().uuid(),
+            // GUID (any 8-4-4-4-12 hex), NOT z.uuid(): the latter enforces an
+            // RFC-9562 version/variant, which our seed/vanity ids (e.g.
+            // eeeeeeee-0000-0000-0000-000000000004) do not carry — z.uuid() would
+            // reject every seeded menu id and fail the whole order. Format is only
+            // a shape guard anyway: create_order re-validates each id belongs to
+            // this tenant's AVAILABLE menu server-side (CLAUDE.md §7.7).
+            menuItemId: z.guid(),
             qty: z.number().int().min(1).max(999),
           })
           .strict(),
