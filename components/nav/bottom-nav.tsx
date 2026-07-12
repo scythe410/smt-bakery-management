@@ -29,7 +29,7 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
   return (
     <nav
       aria-label={t("nav.label")}
-      className="border-border bg-surface fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[430px] border-t pb-[env(safe-area-inset-bottom)]"
+      className="border-border bg-surface fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[430px] border-t pb-[env(safe-area-inset-bottom)] print:hidden"
     >
       <ul className="flex items-stretch overflow-x-auto">
         {items.map((item) => {

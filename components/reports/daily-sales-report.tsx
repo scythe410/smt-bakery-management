@@ -9,6 +9,9 @@
 
 import { getDailyReport } from "@/lib/db/selectors/reports";
 import { singleDayPeriod, type ReportType } from "@/lib/reports/report-params";
+import { getBusiness, getCurrentLanguage } from "@/lib/auth";
+import { getT } from "@/i18n/server";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { StatCard } from "@/components/ui/stat-card";
 import { ReportBreakdowns } from "@/components/reports/report-breakdowns";
 import { ReportDetail } from "@/components/reports/report-detail";
@@ -22,9 +25,23 @@ export async function DailySalesReport({
   date: string;
 }) {
   const report = await getDailyReport(singleDayPeriod(date));
+  const business = await getBusiness();
+  const { t } = await getT(await getCurrentLanguage());
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Branded header for the printed bill/report — only shown when printing
+          (the app chrome is print:hidden), so the PDF/print reads as a document. */}
+      <div className="hidden items-center gap-3 border-b border-black/10 pb-3 print:flex">
+        <BrandLogo alt={business?.name ?? t("appName")} className="h-12" />
+        <div className="flex flex-col">
+          <span className="font-display text-h2 text-ink">{business?.name ?? t("appName")}</span>
+          <span className="text-caption text-muted">
+            {t(`reports.type.${reportType}`)} · {date}
+          </span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <StatCard labelKey="reports.stats.revenue" cents={report.revenueCents} tone="ink" />
         <StatCard labelKey="reports.stats.commission" cents={report.commissionCents} tone="ember" />

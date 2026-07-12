@@ -32,7 +32,7 @@ export function ReportControls({
     "border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 flex-1 rounded-[var(--radius)] border px-2 outline-none focus-visible:ring-2";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 print:hidden">
       <div className="flex items-center gap-2">
         <label
           htmlFor="report-type"
