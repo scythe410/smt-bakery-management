@@ -36,11 +36,11 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
           const active = isActive(pathname, item.href);
           const count = item.badge ? badges[item.badge] : 0;
           return (
-            <li key={item.section} className="min-w-[44px] flex-1">
+            <li key={item.section} className="min-w-[44px] shrink-0 grow">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`focus-visible:ring-brand/40 relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 px-1 py-1.5 outline-none focus-visible:ring-2 ${
+                className={`focus-visible:ring-brand/40 relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 px-2 py-1.5 outline-none focus-visible:ring-2 ${
                   active ? "text-brand" : "text-muted hover:text-ink"
                 }`}
               >
@@ -48,7 +48,9 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
                   <item.Icon className="size-5" strokeWidth={active ? 2.25 : 2} aria-hidden />
                   <CountBadge count={count} className="absolute -top-1.5 -right-2.5" />
                 </span>
-                <span className="text-[11px] leading-none font-medium">{t(item.labelKey)}</span>
+                <span className="text-[11px] leading-none font-medium whitespace-nowrap">
+                  {t(item.labelKey)}
+                </span>
               </Link>
             </li>
           );
