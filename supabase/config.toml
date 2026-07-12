@@ -150,10 +150,12 @@ max_indexes = 5
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "http://127.0.0.1:3000"
+# in emails (confirmation / recovery links). `config push` syncs this to the hosted project, so it
+# must be the PRODUCTION URL — otherwise auth emails would link to localhost. Local dev uses the same
+# hosted project (no local Supabase), and localhost stays allow-listed below for any local redirects.
+site_url = "https://smt-bakery-management.vercel.app"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = ["https://smt-bakery-management.vercel.app", "http://127.0.0.1:3000", "http://localhost:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -166,16 +168,20 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# HARDENED (CLAUDE.md §7): no public registration — users are provisioned by an
+# admin (service_role / Admin API), which is also how business_id/role are set.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# HARDENED (CLAUDE.md §7): 12-char minimum.
+minimum_password_length = 12
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
-password_requirements = ""
+# HARDENED (CLAUDE.md §7): require lower + upper + digits.
+password_requirements = "lower_upper_letters_digits"
 
 # Configure passkey sign-ins.
 # [auth.passkey]
@@ -208,14 +214,20 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
+# MUST stay true: this is the email PROVIDER switch (maps to EXTERNAL_EMAIL_ENABLED)
+# — setting it false disables email/password SIGN-IN for everyone, not just signups.
+# Public registration is blocked by the master [auth].enable_signup = false above
+# (DISABLE_SIGNUP), which still lets existing/admin-provisioned users sign in.
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# HARDENED (CLAUDE.md §7): verify email before first sign-in.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
-secure_password_change = false
+# HARDENED (CLAUDE.md §7): require a recent login to change password.
+secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
