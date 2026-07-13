@@ -16,6 +16,7 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile, getBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents, subtract } from "@/lib/money";
 import { zonedWallTimeToUtcIso } from "@/lib/db/period";
 import { newBookingSchema } from "@/lib/zod/booking";
@@ -107,8 +108,10 @@ export async function createBooking(
   const { error } = await supabase.from("booking").insert(insert);
   if (error) return { error: "bookings.new.error" };
 
-  // Refresh the list and the dashboard's Today's Bookings section.
+  // Refresh the list and the dashboard's Today's Bookings section, plus Finance's
+  // booking-revenue figure via the data cache.
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
+  revalidateBusinessTags(profile.business_id, ["bookings"]);
   return { ok: true };
 }

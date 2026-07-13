@@ -5,24 +5,31 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import type { Period } from "@/lib/db/period";
+import type { DbScope } from "@/lib/db/cache";
 
 export type BookingRow = Database["public"]["Tables"]["booking"]["Row"];
 
 /**
  * Bookings whose `date` falls within the period's inclusive LOCAL calendar
  * bounds (`booking.date` is a plain `date`). Ordered by date/time. Powers
- * Finance "Booking Revenue".
+ * Finance "Booking Revenue". `scope` → cached service read (explicit business_id);
+ * omitted → RLS server client (see lib/db/cache.ts).
  */
-export async function listBookingsInRange(period: Period): Promise<BookingRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+export async function listBookingsInRange(
+  period: Period,
+  scope?: DbScope,
+): Promise<BookingRow[]> {
+  const supabase = scope?.client ?? (await createClient());
+  let query = supabase
     .from("booking")
     .select("*")
     .gte("date", period.startDate)
     .lte("date", period.endDate)
     .order("date", { ascending: true })
     .order("time", { ascending: true, nullsFirst: false });
+  if (scope) query = query.eq("business_id", scope.businessId);
 
+  const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
 }

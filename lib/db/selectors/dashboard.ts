@@ -8,11 +8,14 @@
 
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { listOrdersWithItems } from "@/lib/db/queries/orders";
 import { listExpenses } from "@/lib/db/queries/expenses";
 import { listCommissionRules, listRecipeCostLines } from "@/lib/db/queries/pricing";
-import { resolveTenantPeriod } from "@/lib/db/selectors/context";
-import type { PeriodInput } from "@/lib/db/period";
+import { resolveTenantPeriodScope, periodCacheKey } from "@/lib/db/selectors/context";
+import type { Period, PeriodInput } from "@/lib/db/period";
+import { createServiceClient } from "@/lib/supabase/service";
+import { businessTags, type DbScope } from "@/lib/db/cache";
 import {
   aggregateOrders,
   commissionRateMap,
@@ -52,22 +55,16 @@ export type DashboardSummary = {
   };
 };
 
-async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummary> {
-  const period = await resolveTenantPeriod(input);
-
-  const [orders, expenses, rules, recipeLines] = await Promise.all([
-    listOrdersWithItems(period),
-    listExpenses(period),
-    listCommissionRules(),
-    listRecipeCostLines(),
-  ]);
-
-  const agg = aggregateOrders(
-    orders,
-    commissionRateMap(rules),
-    unitCogsMap(recipeLines),
-    period.timezone,
-  );
+// Pure derivation (no I/O) — the single place the Dashboard figures are shaped,
+// reused by both the fetched path and the empty-tenant guard.
+function summarizeDashboard(
+  orders: Awaited<ReturnType<typeof listOrdersWithItems>>,
+  expenses: Awaited<ReturnType<typeof listExpenses>>,
+  rules: Awaited<ReturnType<typeof listCommissionRules>>,
+  recipeLines: Awaited<ReturnType<typeof listRecipeCostLines>>,
+  timezone: string,
+): DashboardSummary {
+  const agg = aggregateOrders(orders, commissionRateMap(rules), unitCogsMap(recipeLines), timezone);
   const expensesCents = totalExpensesCents(expenses);
   const estNet = estNetProfitCents({
     netCents: agg.netCents,
@@ -90,6 +87,42 @@ async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummar
       expensesCents: agg.commissionCents + agg.cogsCents + expensesCents,
     },
   };
+}
+
+/** Fetch this tenant's period rows (cached, service-scoped) and derive the summary. */
+async function computeDashboardSummary(
+  period: Period,
+  businessId: string,
+): Promise<DashboardSummary> {
+  const scope: DbScope = { client: createServiceClient(), businessId };
+  const [orders, expenses, rules, recipeLines] = await Promise.all([
+    listOrdersWithItems(period, scope),
+    listExpenses(period, scope),
+    listCommissionRules(scope),
+    listRecipeCostLines(scope),
+  ]);
+  return summarizeDashboard(orders, expenses, rules, recipeLines, period.timezone);
+}
+
+async function loadDashboardSummary(input: PeriodInput): Promise<DashboardSummary> {
+  const { period, businessId } = await resolveTenantPeriodScope(input);
+  // Signed-out / unassigned (unreachable behind the auth gate): zeroed figures.
+  if (!businessId) return summarizeDashboard([], [], [], [], period.timezone);
+
+  // Data cache: keyed by tenant + resolved period; invalidated by the order /
+  // expense / pricing tags whenever those rows change (see lib/db/cache.ts).
+  return unstable_cache(
+    () => computeDashboardSummary(period, businessId),
+    ["dashboard-summary", businessId, periodCacheKey(period)],
+    {
+      tags: [
+        businessTags.orders(businessId),
+        businessTags.expenses(businessId),
+        businessTags.pricing(businessId),
+      ],
+      revalidate: 3600,
+    },
+  )();
 }
 
 /**

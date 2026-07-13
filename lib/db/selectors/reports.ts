@@ -9,10 +9,13 @@
 
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { listOrdersWithItems } from "@/lib/db/queries/orders";
 import { listCommissionRules } from "@/lib/db/queries/pricing";
-import { resolveTenantPeriod } from "@/lib/db/selectors/context";
-import { zonedClockTime, type PeriodInput } from "@/lib/db/period";
+import { resolveTenantPeriodScope, periodCacheKey } from "@/lib/db/selectors/context";
+import { zonedClockTime, type Period, type PeriodInput } from "@/lib/db/period";
+import { createServiceClient } from "@/lib/supabase/service";
+import { businessTags, type DbScope } from "@/lib/db/cache";
 import {
   aggregateOrders,
   commissionRateMap,
@@ -66,11 +69,12 @@ export type DailyReport = {
   rows: ReportRow[];
 };
 
-async function loadDailyReport(input: PeriodInput): Promise<DailyReport> {
-  const period = await resolveTenantPeriod(input);
-
-  const [orders, rules] = await Promise.all([listOrdersWithItems(period), listCommissionRules()]);
-
+// Pure derivation (no I/O) — reused by the fetched path and the empty guard.
+function summarizeDailyReport(
+  orders: Awaited<ReturnType<typeof listOrdersWithItems>>,
+  rules: Awaited<ReturnType<typeof listCommissionRules>>,
+  period: Period,
+): DailyReport {
   // COGS is not part of the report totals; an empty cost map keeps it out while
   // reusing the one aggregate so revenue/commission match the other screens.
   const agg = aggregateOrders(orders, commissionRateMap(rules), new Map(), period.timezone);
@@ -99,6 +103,29 @@ async function loadDailyReport(input: PeriodInput): Promise<DailyReport> {
     byPayment: agg.byPayment,
     rows,
   };
+}
+
+async function computeDailyReport(period: Period, businessId: string): Promise<DailyReport> {
+  const scope: DbScope = { client: createServiceClient(), businessId };
+  const [orders, rules] = await Promise.all([
+    listOrdersWithItems(period, scope),
+    listCommissionRules(scope),
+  ]);
+  return summarizeDailyReport(orders, rules, period);
+}
+
+async function loadDailyReport(input: PeriodInput): Promise<DailyReport> {
+  const { period, businessId } = await resolveTenantPeriodScope(input);
+  if (!businessId) return summarizeDailyReport([], [], period);
+
+  return unstable_cache(
+    () => computeDailyReport(period, businessId),
+    ["daily-report", businessId, periodCacheKey(period)],
+    {
+      tags: [businessTags.orders(businessId), businessTags.pricing(businessId)],
+      revalidate: 3600,
+    },
+  )();
 }
 
 /** Daily report for the period (default: Today). React-`cache()`d. */

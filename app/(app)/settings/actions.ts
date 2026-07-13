@@ -10,6 +10,7 @@
 import { revalidatePath } from "next/cache";
 import { getBusiness, requireRole, rolesFor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateBusinessTags } from "@/lib/db/cache";
 import {
   businessProfileSchema,
   taxConfigSchema,
@@ -22,10 +23,16 @@ import type { Database, Json } from "@/lib/supabase/types";
 
 export type SettingsActionState = { ok?: boolean; error?: string };
 
-/** Refresh the Settings screen and the shell layout (business name/logo live there). */
-function revalidateSettings() {
+/**
+ * Refresh the Settings screen and the shell layout (business name/logo live
+ * there), and invalidate the cached business row so the new name/logo/timezone/
+ * tax config is served everywhere (a timezone change also reshapes every period,
+ * which the `business` tag flows through — see lib/db/cache.ts).
+ */
+function revalidateSettings(businessId: string) {
   revalidatePath("/settings");
   revalidatePath("/", "layout");
+  revalidateBusinessTags(businessId, ["business"]);
 }
 
 // --- Business profile: name, timezone, tenant default language ---------------
@@ -55,7 +62,7 @@ export async function updateBusinessProfile(
     .eq("id", profile.business_id);
   if (error) return { error: "settings.business.error" };
 
-  revalidateSettings();
+  revalidateSettings(profile.business_id);
   return { ok: true };
 }
 
@@ -98,7 +105,7 @@ export async function uploadLogo(
     await supabase.storage.from("logos").remove([previous]);
   }
 
-  revalidateSettings();
+  revalidateSettings(profile.business_id);
   return { ok: true };
 }
 
@@ -133,7 +140,7 @@ export async function updateTaxConfig(
     .eq("id", profile.business_id);
   if (error) return { error: "settings.tax.error" };
 
-  revalidateSettings();
+  revalidateSettings(profile.business_id);
   return { ok: true };
 }
 
@@ -167,6 +174,6 @@ export async function updateNotificationPreferences(
     .eq("id", profile.business_id);
   if (error) return { error: "settings.notifications.error" };
 
-  revalidateSettings();
+  revalidateSettings(profile.business_id);
   return { ok: true };
 }

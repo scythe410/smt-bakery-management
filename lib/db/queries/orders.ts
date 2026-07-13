@@ -9,6 +9,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import type { Period } from "@/lib/db/period";
+import type { DbScope } from "@/lib/db/cache";
 
 export type OrderRow = Database["public"]["Tables"]["order"]["Row"];
 export type OrderItemRow = Database["public"]["Tables"]["order_item"]["Row"];
@@ -21,15 +22,23 @@ export type OrderWithItems = OrderRow & { order_item: OrderItemRow[] };
  * instant range, each with its line items embedded. The window is the tenant's
  * wall-clock day (see lib/db/period.ts), so "today" means today for the shop.
  */
-export async function listOrdersWithItems(period: Period): Promise<OrderWithItems[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+// `scope` is passed by cached selectors: a service client + business_id, which
+// bypasses RLS, so we filter business_id explicitly (see lib/db/cache.ts). Without
+// it, the RLS server client scopes the tenant automatically (the uncached path).
+export async function listOrdersWithItems(
+  period: Period,
+  scope?: DbScope,
+): Promise<OrderWithItems[]> {
+  const supabase = scope?.client ?? (await createClient());
+  let query = supabase
     .from("order")
     .select("*, order_item(*)")
     .gte("created_at", period.startUtc)
     .lt("created_at", period.endUtc)
     .order("created_at", { ascending: true });
+  if (scope) query = query.eq("business_id", scope.businessId);
 
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as OrderWithItems[];
 }

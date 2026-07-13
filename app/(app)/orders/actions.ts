@@ -18,6 +18,7 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateBusinessTags } from "@/lib/db/cache";
 import { newOrderSchema } from "@/lib/zod/order";
 import type { Database } from "@/lib/supabase/types";
 
@@ -64,6 +65,9 @@ export async function createOrder(
   // all surface as a generic error (don't leak specifics to the client).
   if (error || !data) return { error: "orders.new.error" };
 
+  // Refresh the Orders screen (uncached) + the tenant's order-derived figures
+  // (Dashboard / Finance / Reports) via the data cache.
   revalidatePath("/orders");
+  revalidateBusinessTags(profile.business_id, ["orders"]);
   return { ok: true, orderNo: data.order_no };
 }

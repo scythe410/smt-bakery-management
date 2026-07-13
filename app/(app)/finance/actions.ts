@@ -11,6 +11,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole, rolesFor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents } from "@/lib/money";
 import { addExpenseSchema } from "@/lib/zod/expense";
 
@@ -42,7 +43,9 @@ export async function addExpense(
   });
   if (error) return { error: "finance.expenses.addError" };
 
-  // Refresh the ledger + Overview so the new row and totals appear.
+  // Refresh the ledger + Overview so the new row and totals appear (the Overview /
+  // Dashboard figures come from the data cache).
   revalidatePath("/finance");
+  revalidateBusinessTags(profile.business_id, ["expenses"]);
   return { ok: true };
 }

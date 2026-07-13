@@ -9,12 +9,15 @@
 
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { listOrdersWithItems } from "@/lib/db/queries/orders";
 import { listExpenses } from "@/lib/db/queries/expenses";
 import { listBookingsInRange } from "@/lib/db/queries/bookings";
 import { listCommissionRules, listRecipeCostLines } from "@/lib/db/queries/pricing";
-import { resolveTenantPeriod } from "@/lib/db/selectors/context";
-import type { PeriodInput } from "@/lib/db/period";
+import { resolveTenantPeriodScope, periodCacheKey } from "@/lib/db/selectors/context";
+import type { Period, PeriodInput } from "@/lib/db/period";
+import { createServiceClient } from "@/lib/supabase/service";
+import { businessTags, type DbScope } from "@/lib/db/cache";
 import type { Database } from "@/lib/supabase/types";
 import {
   aggregateOrders,
@@ -53,17 +56,15 @@ export type FinanceOverview = {
   revenueByDay: RevenueDay[];
 };
 
-async function loadFinanceOverview(input: PeriodInput): Promise<FinanceOverview> {
-  const period = await resolveTenantPeriod(input);
-
-  const [orders, expenses, bookings, rules, recipeLines] = await Promise.all([
-    listOrdersWithItems(period),
-    listExpenses(period),
-    listBookingsInRange(period),
-    listCommissionRules(),
-    listRecipeCostLines(),
-  ]);
-
+// Pure derivation (no I/O) — reused by the fetched path and the empty guard.
+function summarizeFinanceOverview(
+  orders: Awaited<ReturnType<typeof listOrdersWithItems>>,
+  expenses: Awaited<ReturnType<typeof listExpenses>>,
+  bookings: Awaited<ReturnType<typeof listBookingsInRange>>,
+  rules: Awaited<ReturnType<typeof listCommissionRules>>,
+  recipeLines: Awaited<ReturnType<typeof listRecipeCostLines>>,
+  period: Period,
+): FinanceOverview {
   const agg = aggregateOrders(
     orders,
     commissionRateMap(rules),
@@ -91,6 +92,37 @@ async function loadFinanceOverview(input: PeriodInput): Promise<FinanceOverview>
   };
 }
 
+async function computeFinanceOverview(period: Period, businessId: string): Promise<FinanceOverview> {
+  const scope: DbScope = { client: createServiceClient(), businessId };
+  const [orders, expenses, bookings, rules, recipeLines] = await Promise.all([
+    listOrdersWithItems(period, scope),
+    listExpenses(period, scope),
+    listBookingsInRange(period, scope),
+    listCommissionRules(scope),
+    listRecipeCostLines(scope),
+  ]);
+  return summarizeFinanceOverview(orders, expenses, bookings, rules, recipeLines, period);
+}
+
+async function loadFinanceOverview(input: PeriodInput): Promise<FinanceOverview> {
+  const { period, businessId } = await resolveTenantPeriodScope(input);
+  if (!businessId) return summarizeFinanceOverview([], [], [], [], [], period);
+
+  return unstable_cache(
+    () => computeFinanceOverview(period, businessId),
+    ["finance-overview", businessId, periodCacheKey(period)],
+    {
+      tags: [
+        businessTags.orders(businessId),
+        businessTags.expenses(businessId),
+        businessTags.bookings(businessId),
+        businessTags.pricing(businessId),
+      ],
+      revalidate: 3600,
+    },
+  )();
+}
+
 /** Finance overview for the period (default: This Month). React-`cache()`d. */
 export const getFinanceOverview = cache(
   (input: PeriodInput = { kind: "month" }): Promise<FinanceOverview> => loadFinanceOverview(input),
@@ -116,14 +148,15 @@ export type PlatformEarnings = {
   totalCommissionCents: number;
 };
 
-async function loadPlatformEarnings(input: PeriodInput): Promise<PlatformEarnings> {
-  const period = await resolveTenantPeriod(input);
-
-  const [orders, rules] = await Promise.all([listOrdersWithItems(period), listCommissionRules()]);
-
+// Pure derivation (no I/O) — reused by the fetched path and the empty guard.
+function summarizePlatformEarnings(
+  orders: Awaited<ReturnType<typeof listOrdersWithItems>>,
+  rules: Awaited<ReturnType<typeof listCommissionRules>>,
+  timezone: string,
+): PlatformEarnings {
   const rates = commissionRateMap(rules);
   // COGS irrelevant here; empty map keeps commission/gross identical to Overview.
-  const agg = aggregateOrders(orders, rates, new Map(), period.timezone);
+  const agg = aggregateOrders(orders, rates, new Map(), timezone);
 
   const rows: PlatformEarningRow[] = agg.bySource.map((s) => ({
     source: s.source,
@@ -140,6 +173,29 @@ async function loadPlatformEarnings(input: PeriodInput): Promise<PlatformEarning
     totalGrossCents: agg.grossCents,
     totalCommissionCents: agg.commissionCents,
   };
+}
+
+async function computePlatformEarnings(period: Period, businessId: string): Promise<PlatformEarnings> {
+  const scope: DbScope = { client: createServiceClient(), businessId };
+  const [orders, rules] = await Promise.all([
+    listOrdersWithItems(period, scope),
+    listCommissionRules(scope),
+  ]);
+  return summarizePlatformEarnings(orders, rules, period.timezone);
+}
+
+async function loadPlatformEarnings(input: PeriodInput): Promise<PlatformEarnings> {
+  const { period, businessId } = await resolveTenantPeriodScope(input);
+  if (!businessId) return summarizePlatformEarnings([], [], period.timezone);
+
+  return unstable_cache(
+    () => computePlatformEarnings(period, businessId),
+    ["platform-earnings", businessId, periodCacheKey(period)],
+    {
+      tags: [businessTags.orders(businessId), businessTags.pricing(businessId)],
+      revalidate: 3600,
+    },
+  )();
 }
 
 /**

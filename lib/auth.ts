@@ -14,6 +14,7 @@ import { cache } from "react";
 import { forbidden, redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedBusinessRow } from "@/lib/db/queries/business";
 import type { Database } from "@/lib/supabase/types";
 import { toLanguage, type Language } from "@/i18n/config";
 import type { AppRole } from "@/lib/access";
@@ -44,17 +45,17 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
   return data;
 });
 
-/** The caller's tenant, or null when signed out / not yet assigned a business. */
+/**
+ * The caller's tenant, or null when signed out / not yet assigned a business.
+ * Identity (the business_id) is resolved from the caller's own profile (RLS);
+ * the row itself is served from a per-tenant data cache (invalidated on a
+ * Settings write) so the shell + every period resolution don't re-read it across
+ * the region gap on each load. React `cache()` dedupes within a request.
+ */
 export const getBusiness = cache(async (): Promise<Business | null> => {
   const profile = await getProfile();
   if (!profile?.business_id) return null;
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("business")
-    .select("*")
-    .eq("id", profile.business_id)
-    .maybeSingle();
-  return data;
+  return getCachedBusinessRow(profile.business_id);
 });
 
 /** Active UI language: the caller's preference, else the default. Safe pre-auth. */

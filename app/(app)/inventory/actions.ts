@@ -14,6 +14,7 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents } from "@/lib/money";
 import { addInventoryItemSchema, barcodeLookupSchema } from "@/lib/zod/inventory";
 import { lookupProduct, type ProductLookupResult } from "@/lib/inventory/product-lookup";
@@ -65,8 +66,9 @@ export async function addInventoryItem(
     return { error: "inventory.add.error" };
   }
 
-  // Refresh the list + low-stock counts (list row, pill, nav badge).
+  // Refresh the list + low-stock counts (list row, pill, nav badge → shell cache).
   revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
   return { ok: true };
 }
 

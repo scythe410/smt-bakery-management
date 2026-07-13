@@ -6,13 +6,20 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import type { DbScope } from "@/lib/db/cache";
 
 export type CommissionRuleRow = Database["public"]["Tables"]["commission_rule"]["Row"];
 
-/** Every commission rule for the tenant (one per order source). */
-export async function listCommissionRules(): Promise<CommissionRuleRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("commission_rule").select("*");
+/**
+ * Every commission rule for the tenant (one per order source). `scope` → cached
+ * service read (explicit business_id); omitted → RLS server client.
+ */
+export async function listCommissionRules(scope?: DbScope): Promise<CommissionRuleRow[]> {
+  const supabase = scope?.client ?? (await createClient());
+  let query = supabase.from("commission_rule").select("*");
+  if (scope) query = query.eq("business_id", scope.businessId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
 }
@@ -31,12 +38,16 @@ export type RecipeCostLine = {
  * raw (one row per BOM line); the selector rolls these up per menu item and
  * rounds to whole cents. Both tables are small and per-tenant.
  */
-export async function listRecipeCostLines(): Promise<RecipeCostLine[]> {
-  const supabase = await createClient();
+export async function listRecipeCostLines(scope?: DbScope): Promise<RecipeCostLine[]> {
+  const supabase = scope?.client ?? (await createClient());
 
+  // Both reads must be business-scoped when using the service client; the RLS
+  // client scopes them itself. (join-by-id below is intra-tenant either way.)
+  const recipeQuery = supabase.from("recipe_line").select("menu_item_id, inventory_item_id, qty");
+  const inventoryQuery = supabase.from("inventory_item").select("id, unit_cost_cents");
   const [recipes, inventory] = await Promise.all([
-    supabase.from("recipe_line").select("menu_item_id, inventory_item_id, qty"),
-    supabase.from("inventory_item").select("id, unit_cost_cents"),
+    scope ? recipeQuery.eq("business_id", scope.businessId) : recipeQuery,
+    scope ? inventoryQuery.eq("business_id", scope.businessId) : inventoryQuery,
   ]);
 
   if (recipes.error) throw recipes.error;
