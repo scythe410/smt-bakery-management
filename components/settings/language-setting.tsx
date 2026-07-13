@@ -16,6 +16,7 @@ import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { setLanguage } from "@/app/(app)/actions";
 import { Card } from "@/components/ui/card";
+import { changeLanguage } from "@/i18n/client";
 import { languages, toLanguage, type Language } from "@/i18n/config";
 
 export function LanguageSetting() {
@@ -44,7 +45,8 @@ export function LanguageSetting() {
               aria-checked={active}
               onClick={() => {
                 if (active) return;
-                void i18n.changeLanguage(lang);
+                // Loads the target locale's chunk on demand, then switches (HIGH-4).
+                void changeLanguage(i18n, lang);
                 void setLanguage(lang).catch(() => {});
               }}
               className={`focus-visible:ring-brand/40 flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius)] border px-3 outline-none transition-colors focus-visible:ring-2 ${

@@ -16,6 +16,16 @@ const resources = {
   si: { [namespace]: si },
 } as const;
 
+/**
+ * The active language's translation bundle, for the root layout to hand to the
+ * client provider (i18n/client.I18nProvider) as serialized data. This keeps the
+ * JSON out of the client JS bundle: server components import it here, but a
+ * "use client" module must never import these locale files statically. (HIGH-4.)
+ */
+export function getLocaleBundle(language?: string): Record<string, unknown> {
+  return toLanguage(language) === "si" ? si : en;
+}
+
 export async function getT(language?: string) {
   const lng = toLanguage(language);
   const instance = createInstance();

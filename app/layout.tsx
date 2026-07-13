@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { archivo, inter, notoSansSinhala } from "@/lib/fonts";
 import { I18nProvider } from "@/i18n/client";
+import { getLocaleBundle } from "@/i18n/server";
 import { getCurrentLanguage } from "@/lib/auth";
 import "./globals.css";
 
@@ -25,6 +26,9 @@ export default async function RootLayout({
   // <html lang>, the Sinhala font, and the client i18n instance all agree with
   // no hydration flash. Noto Sans Sinhala applies only when lang="si".
   const language = await getCurrentLanguage();
+  // Ship only the active language's strings to the client (as serialized data,
+  // not JS); the other language is dynamic-imported on switch (i18n/client).
+  const localeBundle = getLocaleBundle(language);
 
   return (
     <html
@@ -34,7 +38,9 @@ export default async function RootLayout({
       <body
         className={`bg-bg text-ink min-h-dvh antialiased ${language === "si" ? "font-sinhala" : ""}`}
       >
-        <I18nProvider language={language}>{children}</I18nProvider>
+        <I18nProvider language={language} resources={localeBundle}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

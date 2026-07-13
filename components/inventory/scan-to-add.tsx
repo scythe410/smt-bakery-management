@@ -15,8 +15,7 @@
 // background.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
+import type { IScannerControls } from "@zxing/browser";
 import { Camera, Keyboard, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AddItemForm, type AddItemPrefill } from "@/components/inventory/add-item-form";
@@ -24,22 +23,6 @@ import { lookupBarcode } from "@/app/(app)/inventory/actions";
 
 type Phase = "scanning" | "looking_up" | "form" | "duplicate";
 type CamError = "denied" | "no_camera" | "insecure" | "generic";
-
-// Restrict decoding to the retail formats we care about (SPEC §5.1) — fewer
-// formats means faster, steadier reads.
-const HINTS = new Map<DecodeHintType, unknown>([
-  [
-    DecodeHintType.POSSIBLE_FORMATS,
-    [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.QR_CODE,
-      BarcodeFormat.CODE_128,
-    ],
-  ],
-]);
 
 function classifyError(err: unknown): CamError {
   const name = err instanceof Error ? err.name : "";
@@ -117,7 +100,6 @@ export function ScanToAdd({
   useEffect(() => {
     if (phase !== "scanning") return;
     handledRef.current = false;
-    const reader = new BrowserMultiFormatReader(HINTS);
     let cancelled = false;
 
     const start = async () => {
@@ -127,6 +109,32 @@ export function ScanToAdd({
         if (!cancelled) setCamError("insecure");
         return;
       }
+      // @zxing (~195 KB) is loaded here, inside the scan effect, so it ships as a
+      // separate chunk fetched only when a scan actually starts — never on
+      // Inventory page load (Antigravity HIGH-3).
+      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+        import("@zxing/browser"),
+        import("@zxing/library"),
+      ]);
+      if (cancelled) return;
+
+      // Restrict decoding to the retail formats we care about (SPEC §5.1) — fewer
+      // formats means faster, steadier reads.
+      const hints = new Map([
+        [
+          DecodeHintType.POSSIBLE_FORMATS,
+          [
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E,
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.CODE_128,
+          ],
+        ],
+      ]);
+      const reader = new BrowserMultiFormatReader(hints);
+
       try {
         const controls = await reader.decodeFromConstraints(
           { video: { facingMode: "environment" } },

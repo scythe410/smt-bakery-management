@@ -10,6 +10,7 @@
 
 import { useTranslation } from "react-i18next";
 import { setLanguage } from "@/app/(app)/actions";
+import { changeLanguage } from "@/i18n/client";
 import { toLanguage } from "@/i18n/config";
 
 export function LanguageToggle() {
@@ -24,7 +25,8 @@ export function LanguageToggle() {
       type="button"
       aria-label={t("shell.changeLanguage")}
       onClick={() => {
-        void i18n.changeLanguage(next);
+        // Loads the target locale's chunk on demand, then switches (HIGH-4).
+        void changeLanguage(i18n, next);
         void setLanguage(next).catch(() => {});
       }}
       className="text-ink hover:bg-surface-2 focus-visible:ring-brand/40 font-sinhala flex size-11 items-center justify-center rounded-[var(--radius)] text-label font-semibold outline-none transition-colors focus-visible:ring-2"
