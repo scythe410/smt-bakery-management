@@ -5,18 +5,68 @@
 // Active item in brand red; others muted. Live badges on Inventory (low-stock)
 // and Menu, rendered only when > 0. Nine items are tight at ~390px, so the row
 // scrolls horizontally rather than dropping items, with a 44px min tap target.
+//
+// Pending feedback (DESIGN.md §4/§7): on tap, the target item lights up in brand
+// red immediately and its icon becomes a spinner for the duration of the
+// navigation (Next `useLinkStatus`), so a tap never reads as a freeze on a slow
+// hop. Motion is restrained + reduced-motion aware: under prefers-reduced-motion
+// the spinner is suppressed (globals.css zeroes animations) and the instant
+// colour change carries the feedback on its own.
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import { Loader2 } from "lucide-react";
 import { useAppContext } from "@/components/app/app-provider";
 import { CountBadge } from "@/components/ui/count-badge";
 import { canAccess } from "@/lib/access";
 import type { ShellBadges } from "@/lib/db/selectors/shell";
-import { NAV_ITEMS } from "@/components/nav/nav-items";
+import { NAV_ITEMS, type NavItem } from "@/components/nav/nav-items";
 
 function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+// Inner content of a nav <Link>. Lives in its own component so it can read
+// `useLinkStatus()` — the pending state of the nearest parent Link — and react
+// to a tap before the destination's skeleton mounts.
+function NavItemContent({
+  item,
+  active,
+  count,
+  label,
+}: {
+  item: NavItem;
+  active: boolean;
+  count: number;
+  label: string;
+}) {
+  const { pending } = useLinkStatus();
+  const lit = active || pending;
+
+  return (
+    <span
+      aria-busy={pending || undefined}
+      className={`flex flex-col items-center justify-center gap-0.5 transition-colors ${
+        lit ? "text-brand" : "text-muted group-hover:text-ink"
+      }`}
+    >
+      <span className="relative inline-flex">
+        {/* While pending, the icon yields to a spinner (motion) or stays put
+            under reduced motion, where the spinner is hidden. */}
+        <item.Icon
+          className={`size-5 ${pending ? "opacity-0 motion-reduce:opacity-100" : ""}`}
+          strokeWidth={active ? 2.25 : 2}
+          aria-hidden
+        />
+        {pending ? (
+          <Loader2 className="absolute inset-0 size-5 animate-spin motion-reduce:hidden" aria-hidden />
+        ) : null}
+        <CountBadge count={count} className="absolute -top-1.5 -right-2.5" />
+      </span>
+      <span className="text-[11px] leading-none font-medium whitespace-nowrap">{label}</span>
+    </span>
+  );
 }
 
 export function BottomNav({ badges }: { badges: ShellBadges }) {
@@ -40,17 +90,14 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`focus-visible:ring-brand/40 relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 px-2 py-1.5 outline-none focus-visible:ring-2 ${
-                  active ? "text-brand" : "text-muted hover:text-ink"
-                }`}
+                className="group focus-visible:ring-brand/40 relative flex min-h-[52px] items-stretch justify-center px-2 py-1.5 outline-none focus-visible:ring-2"
               >
-                <span className="relative">
-                  <item.Icon className="size-5" strokeWidth={active ? 2.25 : 2} aria-hidden />
-                  <CountBadge count={count} className="absolute -top-1.5 -right-2.5" />
-                </span>
-                <span className="text-[11px] leading-none font-medium whitespace-nowrap">
-                  {t(item.labelKey)}
-                </span>
+                <NavItemContent
+                  item={item}
+                  active={active}
+                  count={count}
+                  label={t(item.labelKey)}
+                />
               </Link>
             </li>
           );
