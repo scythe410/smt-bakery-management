@@ -4,9 +4,12 @@
 // react-i18next instance so any Client Component can call `useTranslation`.
 //
 // The active language is passed in from the server (root layout →
-// getCurrentLanguage), so the client renders the same language the server did —
-// no flash, no hydration mismatch. When the prop changes (e.g. after a language
-// switch lands), we call changeLanguage on the existing instance.
+// getCurrentLanguage) for first paint, so the client renders the same language
+// the server did — no flash, no hydration mismatch. AFTER that, switching is
+// client-only: the header toggle / Settings call `i18n.changeLanguage` directly
+// (no navigation, no server re-render), and the `languageChanged` listener below
+// keeps <html lang> + the Sinhala body font in step. The persisted preference
+// only drives the NEXT server render (first paint on a later load).
 
 import { createInstance, type i18n as I18nInstance } from "i18next";
 import { useEffect, useState } from "react";
@@ -45,16 +48,29 @@ export function I18nProvider({
   // Create exactly one instance for the lifetime of the provider (lazy init).
   const [instance] = useState<I18nInstance>(() => createI18n(lng));
 
+  // Sync <html lang> + the Sinhala body font to the ACTIVE language on every
+  // change — crucially including client-side switches (header toggle / Settings),
+  // which don't re-render the server layout. SSR sets both correctly for first
+  // paint; this keeps them in step for interaction, with no server round trip.
+  useEffect(() => {
+    const sync = (next: string) => {
+      const active = toLanguage(next);
+      document.documentElement.lang = active;
+      document.body.classList.toggle("font-sinhala", active === "si");
+    };
+    instance.on("languageChanged", sync);
+    return () => {
+      instance.off("languageChanged", sync);
+    };
+  }, [instance]);
+
+  // If the server ever re-renders with a different language prop (e.g. first
+  // paint after a fresh load with a persisted preference), follow it. The
+  // changeLanguage fires 'languageChanged', so the effect above syncs the chrome.
   useEffect(() => {
     if (instance.language !== lng) {
       void instance.changeLanguage(lng);
     }
-    // Keep <html lang> and the Sinhala body font in sync when the language
-    // changes client-side (e.g. the header toggle), so the swap is immediate and
-    // doesn't wait on a full reload. The root layout sets these correctly on the
-    // server for the initial paint; this only mirrors later changes.
-    document.documentElement.lang = lng;
-    document.body.classList.toggle("font-sinhala", lng === "si");
   }, [instance, lng]);
 
   return <I18nextProvider i18n={instance}>{children}</I18nextProvider>;

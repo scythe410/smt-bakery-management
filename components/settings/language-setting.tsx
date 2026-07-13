@@ -2,16 +2,16 @@
 
 // Settings › Language (SPEC §5.2, CLAUDE.md §3). The canonical place to choose
 // the interface language; the header toggle is the quick per-device shortcut,
-// this is the labelled control. Both call the same setLanguage server action,
-// which persists to profile.language_pref (per user) and revalidates the layout
-// so <html lang>, the Sinhala font, and the i18n instance all follow — no reload.
+// this is the labelled control. Both switch INSTANTLY client-side via
+// i18n.changeLanguage (no reload, no server re-render), then persist to
+// profile.language_pref in the background (fire-and-forget) for the next fresh
+// load's first paint.
 //
 // Each option is shown by its OWN endonym (English / සිංහල), so it reads in its
 // native script whatever the active UI language is — the standard language-picker
 // convention. Endonyms live in i18n (identical in both locales) rather than being
 // hardcoded, keeping to "no hardcoded UI strings".
 
-import { useTransition } from "react";
 import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { setLanguage } from "@/app/(app)/actions";
@@ -20,7 +20,6 @@ import { languages, toLanguage, type Language } from "@/i18n/config";
 
 export function LanguageSetting() {
   const { t, i18n } = useTranslation();
-  const [pending, startTransition] = useTransition();
   const current = toLanguage(i18n.language);
 
   return (
@@ -43,11 +42,12 @@ export function LanguageSetting() {
               type="button"
               role="radio"
               aria-checked={active}
-              disabled={pending}
               onClick={() => {
-                if (!active) startTransition(() => setLanguage(lang));
+                if (active) return;
+                void i18n.changeLanguage(lang);
+                void setLanguage(lang).catch(() => {});
               }}
-              className={`focus-visible:ring-brand/40 flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius)] border px-3 outline-none transition-colors focus-visible:ring-2 disabled:opacity-60 ${
+              className={`focus-visible:ring-brand/40 flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius)] border px-3 outline-none transition-colors focus-visible:ring-2 ${
                 active
                   ? "border-brand bg-red-tint text-ink"
                   : "border-border text-muted hover:border-border-strong hover:text-ink"
