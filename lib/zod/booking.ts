@@ -6,7 +6,7 @@
 // action (lib/money.toCents) — no float money is ever stored (CLAUDE.md §3).
 
 import { z } from "zod";
-import { BOOKING_STATUSES, BOOKING_SOURCES } from "@/lib/bookings/booking-config";
+import { BOOKING_STATUSES, BOOKING_SOURCES, BOOKING_TYPES } from "@/lib/bookings/booking-config";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
 const TIME_RE = /^\d{2}:\d{2}$/; // HH:mm
@@ -51,3 +51,20 @@ export const newBookingSchema = z.discriminatedUnion("type", [
 ]);
 
 export type NewBookingInput = z.infer<typeof newBookingSchema>;
+
+// Zod schema for the Bookings list READ query (the fetchBookings action). A read,
+// but the input crosses the client→server boundary, so it's validated and unknown
+// fields rejected — the segment/filters/page become DB predicates server-side.
+// Every filter is optional; `nullable` because the client sends `null` for a
+// cleared filter.
+export const bookingListQuerySchema = z
+  .object({
+    type: z.enum(BOOKING_TYPES as unknown as [string, ...string[]]),
+    status: z.enum(BOOKING_STATUSES as unknown as [string, ...string[]]).nullish(),
+    date: z.string().regex(DATE_RE).nullish(),
+    search: z.string().trim().max(100).nullish(),
+    page: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict();
+
+export type BookingListQuery = z.infer<typeof bookingListQuerySchema>;

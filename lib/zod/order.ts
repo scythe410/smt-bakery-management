@@ -5,7 +5,12 @@
 // (CLAUDE.md §3/§7.7). business_id / customer_id are never client-set either.
 
 import { z } from "zod";
-import { ORDER_SOURCES, PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/orders/order-config";
+import {
+  ORDER_SOURCES,
+  ORDER_STATUSES,
+  PAYMENT_METHODS,
+  PAYMENT_STATUSES,
+} from "@/lib/orders/order-config";
 
 export const newOrderSchema = z
   .object({
@@ -36,3 +41,25 @@ export const newOrderSchema = z
   .strict();
 
 export type NewOrderInput = z.infer<typeof newOrderSchema>;
+
+// Zod schema for the Orders list READ query (the fetchOrders action). It's a
+// read, but the input still crosses the client→server boundary, so it's validated
+// and unknown fields are rejected — the tab/filters/page become DB predicates
+// server-side, never raw SQL. Every filter is optional; `nullable` because the
+// client sends `null` for a cleared filter.
+export const orderListQuerySchema = z
+  .object({
+    tab: z.enum(["active", "archived"]),
+    source: z.enum(ORDER_SOURCES as unknown as [string, ...string[]]).nullish(),
+    status: z.enum(ORDER_STATUSES as unknown as [string, ...string[]]).nullish(),
+    payment: z.enum(PAYMENT_METHODS as unknown as [string, ...string[]]).nullish(),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullish(),
+    search: z.string().trim().max(100).nullish(),
+    page: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict();
+
+export type OrderListQuery = z.infer<typeof orderListQuerySchema>;

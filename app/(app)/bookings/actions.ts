@@ -19,10 +19,32 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents, subtract } from "@/lib/money";
 import { zonedWallTimeToUtcIso } from "@/lib/db/period";
-import { newBookingSchema } from "@/lib/zod/booking";
+import { newBookingSchema, bookingListQuerySchema } from "@/lib/zod/booking";
+import {
+  getBookingsPage,
+  type BookingFilterInput,
+  type BookingsPageResult,
+} from "@/lib/db/selectors/bookings";
 import type { Database } from "@/lib/supabase/types";
 
 const DEFAULT_TIMEZONE = "Asia/Colombo";
+
+const EMPTY_PAGE: BookingsPageResult = { items: [], hasMore: false };
+
+/**
+ * Read one page of the Bookings list for the given type segment + filters (SPEC
+ * §4.2). The client browser calls this on a filter/segment change and on "Load
+ * more"; all filtering + pagination happen in the database (getBookingsPage →
+ * listBookingsPage), so the wire only ever carries one page. Auth is re-asserted
+ * and the input Zod-validated (unknown fields rejected); RLS scopes every row to
+ * the caller's tenant. Invalid input returns an empty page rather than throwing.
+ */
+export async function fetchBookings(input: unknown): Promise<BookingsPageResult> {
+  await requireProfile();
+  const parsed = bookingListQuerySchema.safeParse(input);
+  if (!parsed.success) return EMPTY_PAGE;
+  return getBookingsPage(parsed.data as BookingFilterInput);
+}
 
 export type CreateBookingState = { ok?: boolean; error?: string };
 

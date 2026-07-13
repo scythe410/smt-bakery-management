@@ -37,19 +37,20 @@ function loadShellBadges(businessId: string): Promise<ShellBadges> {
     async (): Promise<ShellBadges> => {
       const supabase = createServiceClient();
 
-      const [notif, inventory, menu] = await Promise.all([
+      const [notif, lowStock, menu] = await Promise.all([
         // head + exact count: no rows transferred, just the number.
         supabase
           .from("notification")
           .select("id", { count: "exact", head: true })
           .eq("business_id", businessId)
           .eq("is_read", false),
-        // Low-stock is a column-to-column comparison PostgREST can't express as a
-        // filter, so we pull just the two numeric columns for this tenant's items
-        // and count in JS. Inventory is a small per-tenant table.
+        // Low-stock (qty_on_hand <= low_stock_threshold) is a column-vs-column
+        // comparison PostgREST can't express as a filter, so it lives in the
+        // inventory_low_stock view; a head count returns just the number — no
+        // per-item rows pulled to JS (MED-4).
         supabase
-          .from("inventory_item")
-          .select("qty_on_hand, low_stock_threshold")
+          .from("inventory_low_stock")
+          .select("id", { count: "exact", head: true })
           .eq("business_id", businessId),
         supabase
           .from("menu_item")
@@ -58,13 +59,9 @@ function loadShellBadges(businessId: string): Promise<ShellBadges> {
           .eq("is_available", false),
       ]);
 
-      const inventoryLowStock = (inventory.data ?? []).filter(
-        (row) => Number(row.qty_on_hand) <= Number(row.low_stock_threshold),
-      ).length;
-
       return {
         notificationsUnread: notif.count ?? 0,
-        inventoryLowStock,
+        inventoryLowStock: lowStock.count ?? 0,
         menuAttention: menu.count ?? 0,
       };
     },

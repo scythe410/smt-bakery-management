@@ -19,10 +19,33 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateBusinessTags } from "@/lib/db/cache";
-import { newOrderSchema } from "@/lib/zod/order";
+import { newOrderSchema, orderListQuerySchema } from "@/lib/zod/order";
+import {
+  getOrdersPage,
+  type OrderFilterInput,
+  type OrdersPageResult,
+} from "@/lib/db/selectors/orders";
 import type { Database } from "@/lib/supabase/types";
 
 type Enums = Database["public"]["Enums"];
+
+const EMPTY_PAGE: OrdersPageResult = { items: [], hasMore: false };
+
+/**
+ * Read one page of the Orders list for the given tab + filters (SPEC §3.4). The
+ * client browser calls this on a filter/tab change and on "Load more"; all the
+ * filtering + pagination happen in the database (getOrdersPage → listOrdersPage),
+ * so the wire only ever carries one page. Auth is re-asserted and the input is
+ * Zod-validated (unknown fields rejected); RLS scopes every row to the caller's
+ * tenant. Invalid input returns an empty page rather than throwing — the UI shows
+ * its no-match/empty state.
+ */
+export async function fetchOrders(input: unknown): Promise<OrdersPageResult> {
+  await requireProfile();
+  const parsed = orderListQuerySchema.safeParse(input);
+  if (!parsed.success) return EMPTY_PAGE;
+  return getOrdersPage(parsed.data as OrderFilterInput);
+}
 
 export type CreateOrderState = { ok?: boolean; error?: string; orderNo?: string };
 

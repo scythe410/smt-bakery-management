@@ -7,8 +7,14 @@
 
 import "server-only";
 import { cache } from "react";
-import { listBookingsOnDate, listAllBookings } from "@/lib/db/queries/bookings";
+import {
+  listBookingsOnDate,
+  listBookingsPage,
+  countBookingsByType,
+  type BookingRow,
+} from "@/lib/db/queries/bookings";
 import { resolveTenantPeriod } from "@/lib/db/selectors/context";
+import { BOOKING_TYPES } from "@/lib/bookings/booking-config";
 import type { Database } from "@/lib/supabase/types";
 
 type BookingType = Database["public"]["Enums"]["booking_type"];
@@ -77,15 +83,8 @@ export type BookingListItem = {
   balanceCents: number | null;
 };
 
-/**
- * All bookings for the current tenant (both types), newest first — the Bookings
- * screen list (SPEC §4.2). The screen segments by `type` client-side. Money stays
- * integer cents; the row component formats and translates at render.
- * React-`cache()`d per request.
- */
-export const getBookingsList = cache(async (): Promise<BookingListItem[]> => {
-  const rows = await listAllBookings();
-  return rows.map((b) => ({
+function toBookingListItem(b: BookingRow): BookingListItem {
+  return {
     id: b.id,
     type: b.type,
     status: b.status,
@@ -98,5 +97,50 @@ export const getBookingsList = cache(async (): Promise<BookingListItem[]> => {
     itemDescription: b.item_description,
     depositCents: b.deposit_cents,
     balanceCents: b.balance_cents,
-  }));
+  };
+}
+
+/** What the Bookings screen asks for: the active type segment + filters + page. */
+export type BookingFilterInput = {
+  type: BookingType;
+  status?: BookingStatus | null;
+  /** Local `YYYY-MM-DD` day filter (matched against booking.date verbatim). */
+  date?: string | null;
+  search?: string | null;
+  /** Zero-based page index. */
+  page?: number;
+};
+
+export type BookingsPageResult = {
+  items: BookingListItem[];
+  /** True when another page exists after this one. */
+  hasMore: boolean;
+};
+
+/**
+ * One page of the Bookings list for a given filter set — filtered and paginated
+ * in the database (see listBookingsPage). NOT React-cached: it's a dynamic,
+ * per-interaction read (the server component seeds page 0; the fetchBookings
+ * action serves later pages and filter changes). Money stays integer cents; the
+ * row component formats and translates at render.
+ */
+export async function getBookingsPage(input: BookingFilterInput): Promise<BookingsPageResult> {
+  const { rows, hasMore } = await listBookingsPage(
+    {
+      type: input.type,
+      status: input.status ?? null,
+      date: input.date ?? null,
+      search: input.search ?? null,
+    },
+    input.page ?? 0,
+  );
+  return { items: rows.map(toBookingListItem), hasMore };
+}
+
+export type BookingTypeCounts = { reservation: number; custom_order: number };
+
+/** Per-type segment badge counts for this tenant. React-`cache()`d per request. */
+export const getBookingTypeCounts = cache(async (): Promise<BookingTypeCounts> => {
+  const counts = await countBookingsByType(BOOKING_TYPES);
+  return { reservation: counts.reservation ?? 0, custom_order: counts.custom_order ?? 0 };
 });

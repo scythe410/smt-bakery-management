@@ -1,24 +1,31 @@
 "use client";
 
-// Bookings browser (SPEC §4.2). Client component over the tenant's fetched
-// bookings: a TYPE SEGMENT (Reservations / Custom Orders — the on-screen toggle,
-// CLAUDE.md §4), a "Search by customer or phone" box, a status filter and a date
-// filter, the "+ New Booking" flow (which opens the form for the active type),
-// and stacked list-rows (DESIGN.md §4 tables→mobile). Filtering is client-side
-// over the fetched set; customer names / item descriptions are business data,
-// shown as entered (not translated, CLAUDE.md §3). Money is pre-computed in the
-// selector and only formatted here.
+// Bookings browser (SPEC §4.2). Client component over the tenant's bookings, but
+// the data is now filtered and PAGINATED IN THE DATABASE (Antigravity MED-2): it
+// holds one page at a time and calls the fetchBookings server action whenever the
+// type segment / search / filters change (page 0) or "Load more" is pressed (next
+// page). The type segment, status filter, date filter, and search are DB
+// predicates, not a client scan of every booking. The first page + segment counts
+// are seeded from the server (props) so first paint has data with no round trip.
+// Customer names / item descriptions are business data, shown as entered (not
+// translated, CLAUDE.md §3). Money is pre-computed in the selector and only
+// formatted here.
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
 import { NewBookingForm } from "@/components/bookings/new-booking-form";
+import { fetchBookings } from "@/app/(app)/bookings/actions";
 import { formatLKR } from "@/lib/format";
 import { BOOKING_TYPES, BOOKING_STATUSES } from "@/lib/bookings/booking-config";
 import type { BookingType, BookingStatus } from "@/lib/bookings/booking-config";
-import type { BookingListItem } from "@/lib/db/selectors/bookings";
+import type {
+  BookingListItem,
+  BookingTypeCounts,
+  BookingsPageResult,
+} from "@/lib/db/selectors/bookings";
 
 const STATUS_TONE: Record<BookingStatus, Tone> = {
   pending: "warning",
@@ -70,36 +77,90 @@ function BookingRow({ booking }: { booking: BookingListItem }) {
   );
 }
 
-export function BookingsBrowser({ bookings }: { bookings: BookingListItem[] }) {
+export function BookingsBrowser({
+  initial,
+  counts,
+}: {
+  initial: BookingsPageResult;
+  counts: BookingTypeCounts;
+}) {
   const { t } = useTranslation();
   const [type, setType] = useState<BookingType>("reservation");
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [status, setStatus] = useState<BookingStatus | "">("");
   const [date, setDate] = useState("");
 
-  const counts = useMemo(() => {
-    const c: Record<BookingType, number> = { reservation: 0, custom_order: 0 };
-    for (const b of bookings) c[b.type] += 1;
-    return c;
-  }, [bookings]);
+  const [items, setItems] = useState<BookingListItem[]>(initial.items);
+  const [hasMore, setHasMore] = useState(initial.hasMore);
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  const inType = useMemo(() => bookings.filter((b) => b.type === type), [bookings, type]);
+  // A later fetch supersedes an earlier one (discard out-of-order responses).
+  const reqRef = useRef(0);
+  // The seeded first page already matches the default query → skip the first run.
+  const firstRun = useRef(true);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return inType.filter((b) => {
-      if (status && b.status !== status) return false;
-      if (date && b.date !== date) return false;
-      if (q) {
-        const hay = `${b.customerName ?? ""} ${b.customerPhone ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [inType, status, date, query]);
+  const isFiltered = debouncedQuery.trim() !== "" || status !== "" || date !== "";
 
-  const isFiltered = query.trim() !== "" || status !== "" || date !== "";
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  // Segment/filter change → reload page 0 from the database.
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    const reqId = ++reqRef.current;
+    setLoading(true);
+    fetchBookings({
+      type,
+      status: status || null,
+      date: date || null,
+      search: debouncedQuery.trim() || null,
+      page: 0,
+    })
+      .then((res) => {
+        if (reqId !== reqRef.current) return;
+        setItems(res.items);
+        setHasMore(res.hasMore);
+        setPage(0);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (reqId === reqRef.current) setLoading(false);
+      });
+  }, [type, status, date, debouncedQuery, reloadToken]);
+
+  function loadMore() {
+    const nextPage = page + 1;
+    const reqId = ++reqRef.current;
+    setLoading(true);
+    fetchBookings({
+      type,
+      status: status || null,
+      date: date || null,
+      search: debouncedQuery.trim() || null,
+      page: nextPage,
+    })
+      .then((res) => {
+        if (reqId !== reqRef.current) return;
+        setItems((prev) => [...prev, ...res.items]);
+        setHasMore(res.hasMore);
+        setPage(nextPage);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (reqId === reqRef.current) setLoading(false);
+      });
+  }
+
+  const typeTotal = type === "reservation" ? counts.reservation : counts.custom_order;
 
   const selectClass =
     "border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 min-w-0 rounded-[var(--radius)] border px-2 outline-none focus-visible:ring-2";
@@ -129,7 +190,9 @@ export function BookingsBrowser({ bookings }: { bookings: BookingListItem[] }) {
               }`}
             >
               {t(`bookings.segment.${key}`)}
-              <span className="text-caption text-faint tabular-nums">{counts[key]}</span>
+              <span className="text-caption text-faint tabular-nums">
+                {key === "reservation" ? counts.reservation : counts.custom_order}
+              </span>
             </button>
           );
         })}
@@ -148,7 +211,14 @@ export function BookingsBrowser({ bookings }: { bookings: BookingListItem[] }) {
 
       {creating ? (
         <Card>
-          <NewBookingForm type={type} onDone={() => setCreating(false)} />
+          <NewBookingForm
+            type={type}
+            onDone={() => {
+              setCreating(false);
+              // Reload page 0 so the new booking appears in its segment.
+              setReloadToken((n) => n + 1);
+            }}
+          />
         </Card>
       ) : null}
 
@@ -187,21 +257,32 @@ export function BookingsBrowser({ bookings }: { bookings: BookingListItem[] }) {
 
       {/* List */}
       <Card className="flex flex-col gap-3">
-        {inType.length === 0 ? (
-          <p className="text-body text-muted py-2">{t(`bookings.empty.${type}`)}</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-body text-muted py-2">{t("bookings.noMatch")}</p>
+        {items.length === 0 ? (
+          loading ? (
+            <p className="text-body text-muted py-2" role="status">
+              {t("bookings.loading")}
+            </p>
+          ) : typeTotal === 0 && !isFiltered ? (
+            <p className="text-body text-muted py-2">{t(`bookings.empty.${type}`)}</p>
+          ) : (
+            <p className="text-body text-muted py-2">{t("bookings.noMatch")}</p>
+          )
         ) : (
           <>
-            <ul className="flex flex-col">
-              {filtered.map((b) => (
+            <ul className="flex flex-col" aria-busy={loading}>
+              {items.map((b) => (
                 <BookingRow key={b.id} booking={b} />
               ))}
             </ul>
-            {isFiltered ? (
-              <p className="text-caption text-faint">
-                {t("bookings.showing", { shown: filtered.length, total: inType.length })}
-              </p>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loading}
+                className="border-border-strong text-ink text-label hover:bg-surface-2 h-10 rounded-[var(--radius)] border font-medium transition-colors disabled:opacity-50"
+              >
+                {loading ? t("bookings.loading") : t("bookings.loadMore")}
+              </button>
             ) : null}
           </>
         )}

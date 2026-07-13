@@ -9,10 +9,14 @@
 import "server-only";
 import { cache } from "react";
 import { getBusiness } from "@/lib/auth";
-import { listAllOrdersWithItems } from "@/lib/db/queries/orders";
+import {
+  countOrdersByStatuses,
+  listOrdersPage,
+  type OrderWithItems,
+} from "@/lib/db/queries/orders";
 import { listAvailableMenuItems } from "@/lib/db/queries/menu";
-import { zonedDateKey } from "@/lib/db/period";
-import { tabForStatus } from "@/lib/orders/order-config";
+import { zonedDateKey, zonedWallTimeToUtcIso } from "@/lib/db/period";
+import { ACTIVE_STATUSES, ARCHIVED_STATUSES, tabForStatus } from "@/lib/orders/order-config";
 import type {
   OrderSource,
   OrderStatus,
@@ -22,6 +26,12 @@ import type {
 } from "@/lib/orders/order-config";
 
 const DEFAULT_TIMEZONE = "Asia/Colombo";
+
+/** The status set backing each tab (CLAUDE.md §4 — status drives Active/Archived). */
+const TAB_STATUSES: Record<OrderTab, readonly OrderStatus[]> = {
+  active: ACTIVE_STATUSES,
+  archived: ARCHIVED_STATUSES,
+};
 
 export type OrderListItem = {
   id: string;
@@ -40,11 +50,8 @@ export type OrderListItem = {
   dateKey: string;
 };
 
-async function loadOrdersList(): Promise<OrderListItem[]> {
-  const [business, orders] = await Promise.all([getBusiness(), listAllOrdersWithItems()]);
-  const timezone = business?.timezone || DEFAULT_TIMEZONE;
-
-  return orders.map((o) => ({
+function toListItem(o: OrderWithItems, timezone: string): OrderListItem {
+  return {
     id: o.id,
     orderNo: o.order_no,
     source: o.source,
@@ -56,11 +63,81 @@ async function loadOrdersList(): Promise<OrderListItem[]> {
     status: o.status,
     tab: tabForStatus(o.status),
     dateKey: zonedDateKey(o.created_at, timezone),
-  }));
+  };
 }
 
-/** The Orders list for this tenant, newest first. React-`cache()`d per request. */
-export const getOrdersList = cache((): Promise<OrderListItem[]> => loadOrdersList());
+/** Next local calendar day after `YYYY-MM-DD` (pure label arithmetic, UTC math). */
+function nextLocalDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + 1));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+}
+
+/** What the Orders screen asks for: the active tab + optional filters + page. */
+export type OrderFilterInput = {
+  tab: OrderTab;
+  source?: OrderSource | null;
+  status?: OrderStatus | null;
+  payment?: PaymentMethod | null;
+  /** Local `YYYY-MM-DD` day filter (tenant timezone). */
+  date?: string | null;
+  search?: string | null;
+  /** Zero-based page index. */
+  page?: number;
+};
+
+export type OrdersPageResult = {
+  items: OrderListItem[];
+  /** True when another page exists after this one. */
+  hasMore: boolean;
+};
+
+/**
+ * One page of the Orders list for a given filter set — filtered and paginated in
+ * the database (see listOrdersPage). The local `date` filter is resolved to a
+ * half-open UTC instant range in the tenant timezone so it matches the same
+ * wall-clock day the row's `dateKey` shows. NOT React-cached: it's a dynamic,
+ * per-interaction read (the server component seeds page 0; the fetchOrders action
+ * serves later pages and filter changes).
+ */
+export async function getOrdersPage(input: OrderFilterInput): Promise<OrdersPageResult> {
+  const business = await getBusiness();
+  const timezone = business?.timezone || DEFAULT_TIMEZONE;
+
+  let dateStartUtc: string | null = null;
+  let dateEndUtc: string | null = null;
+  if (input.date) {
+    dateStartUtc = zonedWallTimeToUtcIso(input.date, null, timezone);
+    dateEndUtc = zonedWallTimeToUtcIso(nextLocalDay(input.date), null, timezone);
+  }
+
+  const { rows, hasMore } = await listOrdersPage(
+    {
+      statuses: TAB_STATUSES[input.tab],
+      source: input.source ?? null,
+      status: input.status ?? null,
+      payment: input.payment ?? null,
+      dateStartUtc,
+      dateEndUtc,
+      search: input.search ?? null,
+    },
+    input.page ?? 0,
+  );
+
+  return { items: rows.map((o) => toListItem(o, timezone)), hasMore };
+}
+
+export type OrderTabCounts = { active: number; archived: number };
+
+/** Active/Archived tab badge counts for this tenant. React-`cache()`d per request. */
+export const getOrderTabCounts = cache(async (): Promise<OrderTabCounts> => {
+  const counts = await countOrdersByStatuses({
+    active: ACTIVE_STATUSES,
+    archived: ARCHIVED_STATUSES,
+  });
+  return { active: counts.active ?? 0, archived: counts.archived ?? 0 };
+});
 
 export type NewOrderMenuItem = {
   id: string;

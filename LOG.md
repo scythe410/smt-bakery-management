@@ -5,6 +5,71 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-14 — PF7: bound list queries + push filtering into the database
+
+Four unbounded/inefficient reads flagged by Antigravity. Each pulled rows only to reduce/filter them
+in app code; all four now let Postgres do the work and return only what's needed. **No figure changes**
+— the period-scoped cached selectors (PF2) are untouched; these were the *screen list* reads and two
+*derived* reads, all made to reconcile identically.
+
+### What changed
+- **Orders — bounded + DB-filtered (HIGH-1).** `listAllOrdersWithItems()` (every order + items, no
+  limit; tabs/filters run client-side) is replaced by `listOrdersPage(filters, page)`: the
+  Active/Archived tab (→ status set), plus source/status/payment/date/search, are **SQL predicates**;
+  the window is `.range()`d (fetch `PAGE_SIZE+1` to detect a further page). The local `date` filter is
+  resolved to a half-open UTC instant range in the tenant timezone so it matches the row's `dateKey`
+  day. New `fetchOrders` **server action** (auth re-asserted, Zod-validated, RLS-scoped) serves filter
+  changes + "Load more"; the server component seeds page 0 + tab counts. `OrdersBrowser` is now
+  server-driven (one page at a time, monotonic-request-id guard against out-of-order responses).
+- **Bookings — bounded + DB-filtered (MED-2).** Symmetric: `listAllBookings()` → `listBookingsPage`
+  with type/status/date/search predicates + `.range()`; `fetchBookings` action; `getBookingTypeCounts`
+  for the segment badges; `BookingsBrowser` server-driven with "Load more". (`booking.date` is a plain
+  local date, so the date filter is a verbatim `.eq` — no tz conversion.)
+- **Low-stock badge (MED-4).** `qty_on_hand <= low_stock_threshold` is a column-vs-column comparison
+  PostgREST can't express, so `shell.ts` pulled every item's two numeric columns and counted in JS. New
+  **`public.inventory_low_stock`** view (security_invoker); the badge is now a head `count: 'exact'` —
+  **no rows transferred**. Scoped by the caller's server-resolved `business_id` (service client), never
+  `auth.uid()`.
+- **Recipe COGS (MED-7).** `listRecipeCostLines` read `recipe_line` + `inventory_item` separately and
+  joined in JS. New **`public.recipe_cost_line`** view does the join in the DB (one round trip). It
+  **LEFT JOINs + coalesces to 0**, reproducing the old JS semantics *exactly* (a line whose ingredient
+  is missing contributes 0, not a dropped row), so COGS / Est. Net Profit reconcile unchanged.
+
+### Pagination & security notes
+- **Page size 20** (`lib/db/list.ts`), **offset/range** pagination (the brief allowed "cursor or range
+  on created_at"). Chose range over keyset because bookings sort by a *nullable* `date` (keyset there is
+  awkward); orders order by `(created_at desc, id desc)` for a stable total order. Range bounds the
+  transferred set — the actual defect — and the existing `(business_id, created_at desc)` /
+  `(business_id, date)` indexes cover the ORDER BY. Keyset is a future option if a tenant's history
+  grows into deep pages.
+- Both views are **`security_invoker = on`** (PG17): an authenticated caller sees only its own tenant's
+  rows (base-table RLS evaluated as the querier); service-role cached callers bypass RLS and still
+  filter `business_id` explicitly — exactly as with the base tables. Views open no cross-tenant path.
+- Search terms are sanitised (`sanitizeSearch`) before interpolation into the PostgREST `ilike`/`.or()`
+  grammar (strips `%_,()*"\`), so a term can't break out of the filter. Read actions are still
+  Zod-validated with `.strict()` (unknown fields rejected), matching §7.6.
+- New i18n keys (`orders.loadMore`/`loading`, `bookings.loadMore`/`loading`) in **both** en + si
+  (parity 384/384).
+
+### Verification
+- `tsc` + `eslint` + `next build` all green; locale parity confirmed.
+- **Migration applied to the hosted project** (`fixyqbmdqvyiukdliijo`, samanthas-bakery / Singapore) via
+  `supabase db push` — no local Docker in this environment, so it went straight to the linked cloud DB.
+  Registered remotely as `20260714090000`. Verified over the REST API: both views return 200; service
+  role sees rows (`inventory_low_stock` count 11 across tenants; `recipe_cost_line` returns joined
+  cost rows), and the **anon key sees `[]` for both** — the `security_invoker` RLS gate holds, so the
+  views leak nothing cross-tenant. `lib/supabase/types.ts` Views were reconciled against
+  `supabase gen types --linked` (Row shapes matched; added the generator's Insert/Update + FK
+  Relationships).
+
+### Open questions
+- Range pagination can skip/duplicate a row if the underlying set shifts mid-scroll (concurrent
+  create/cancel). Negligible for this app's write rate; switch to keyset if it ever matters.
+- Tab/segment counts are unfiltered per-tab totals (as before). If the client later wants "N of M for
+  the current filter", that's one extra head count per fetch.
+
+---
+
 ## 2026-07-13 — PF6: code-split charts, scanner, and locales
 
 Antigravity flagged three heavy client dependencies loaded on routes that don't always use them:

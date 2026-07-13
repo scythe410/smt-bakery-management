@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import type { Period } from "@/lib/db/period";
 import type { DbScope } from "@/lib/db/cache";
+import { LIST_PAGE_SIZE, sanitizeSearch } from "@/lib/db/list";
+import type { BookingType, BookingStatus } from "@/lib/bookings/booking-config";
 
 export type BookingRow = Database["public"]["Tables"]["booking"]["Row"];
 
@@ -35,20 +37,83 @@ export async function listBookingsInRange(
 }
 
 /**
- * Every booking for the current tenant, newest date first (undated last), then
- * by time. Powers the Bookings screen list (SPEC §4.2). RLS scopes it to the
- * caller's business; no `business_id` filter to spoof.
+ * The Bookings screen's type segment + status/date/search filters, resolved to
+ * database predicates (SPEC §4.2). `date` matches `booking.date` directly (it's a
+ * plain local `date`, so no timezone conversion). All optional ⇒ default list.
  */
-export async function listAllBookings(): Promise<BookingRow[]> {
+export type BookingListFilters = {
+  type?: BookingType | null;
+  status?: BookingStatus | null;
+  /** Local `YYYY-MM-DD` — matched against booking.date verbatim. */
+  date?: string | null;
+  search?: string | null;
+};
+
+export type BookingsPage = {
+  rows: BookingRow[];
+  /** True when at least one more page exists after this one. */
+  hasMore: boolean;
+};
+
+/**
+ * One bounded page of the tenant's bookings — newest date first (undated last),
+ * then by time. Filtering + pagination run in the DATABASE (Antigravity MED-2):
+ * the type/status/date/search filters are SQL predicates and the window is
+ * `.range()`d, so the transferred set is always ≤ one page instead of every
+ * booking. RLS scopes it to the caller's business; no `business_id` to spoof.
+ */
+export async function listBookingsPage(
+  filters: BookingListFilters,
+  page: number,
+  pageSize: number = LIST_PAGE_SIZE,
+): Promise<BookingsPage> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const from = Math.max(0, page) * pageSize;
+
+  let query = supabase
     .from("booking")
     .select("*")
     .order("date", { ascending: false, nullsFirst: false })
-    .order("time", { ascending: true, nullsFirst: false });
+    .order("time", { ascending: true, nullsFirst: false })
+    .order("id", { ascending: false });
 
+  if (filters.type) query = query.eq("type", filters.type);
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.date) query = query.eq("date", filters.date);
+
+  const search = filters.search ? sanitizeSearch(filters.search) : "";
+  if (search) {
+    query = query.or(`customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query.range(from, from + pageSize);
   if (error) throw error;
-  return data ?? [];
+
+  const rows = data ?? [];
+  const hasMore = rows.length > pageSize;
+  return { rows: hasMore ? rows.slice(0, pageSize) : rows, hasMore };
+}
+
+/**
+ * Exact counts of this tenant's bookings per type — the type-segment badges.
+ * Head-only `count: 'exact'` per type: no rows transferred. RLS-scoped.
+ */
+export async function countBookingsByType(
+  types: readonly BookingType[],
+): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const results = await Promise.all(
+    types.map((type) =>
+      supabase.from("booking").select("id", { count: "exact", head: true }).eq("type", type),
+    ),
+  );
+  const out: Record<string, number> = {};
+  types.forEach((type, i) => {
+    const { count, error } = results[i];
+    if (error) throw error;
+    out[type] = count ?? 0;
+  });
+  return out;
 }
 
 /**

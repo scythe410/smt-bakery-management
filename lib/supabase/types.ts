@@ -663,7 +663,53 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      inventory_low_stock: {
+        Row: {
+          business_id: string | null
+          id: string | null
+        }
+        Insert: {
+          business_id?: string | null
+          id?: string | null
+        }
+        Update: {
+          business_id?: string | null
+          id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_item_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_cost_line: {
+        Row: {
+          business_id: string | null
+          menu_item_id: string | null
+          qty: number | null
+          unit_cost_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_line_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_line_menu_item_id_business_id_fkey"
+            columns: ["menu_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_item"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_order: {

@@ -212,6 +212,8 @@
     "itemsCount_one": "{{count}} item",
     "itemsCount_other": "{{count}} items",
     "showing": "Showing {{shown}} of {{total}}",
+    "loadMore": "Load more",
+    "loading": "Loading…",
     "noMatch": "No orders match your filters.",
     "empty": {
       "active": "No active orders. Create the first order.",
@@ -295,6 +297,8 @@
     "balanceDue": "Balance due",
     "unscheduled": "No date set",
     "showing": "Showing {{shown}} of {{total}}",
+    "loadMore": "Load more",
+    "loading": "Loading…",
     "noMatch": "No bookings match your filters.",
     "empty": {
       "reservation": "No reservations yet. Add the first reservation.",
