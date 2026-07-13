@@ -29,7 +29,7 @@ export function AppHeader({ unreadCount }: { unreadCount: number }) {
     <header className="border-border bg-surface sticky top-0 z-20 flex items-center justify-between gap-2 border-b px-4 py-2 print:hidden">
       <div className="flex min-w-0 items-center gap-2">
         <Link href="/dashboard" aria-label={t("appName")} className="shrink-0">
-          <BrandLogo alt={t("appName")} className="h-7" priority />
+          <BrandLogo alt={t("appName")} className="h-7" sizes="40px" />
         </Link>
         <h1 className="font-display text-h1 text-ink truncate">{t(titleKeyFor(pathname))}</h1>
       </div>
