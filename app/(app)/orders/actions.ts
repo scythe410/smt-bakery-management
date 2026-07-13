@@ -89,8 +89,11 @@ export async function createOrder(
   if (error || !data) return { error: "orders.new.error" };
 
   // Refresh the Orders screen (uncached) + the tenant's order-derived figures
-  // (Dashboard / Finance / Reports) via the data cache.
+  // (Dashboard / Finance / Reports) via the data cache. `inventory` because a
+  // realized order deducts ingredients through the stock_movement ledger, moving
+  // qty_on_hand + the low-stock badge (dormant while orders mint as `pending`,
+  // but correct the moment create_order ever mints a completed order).
   revalidatePath("/orders");
-  revalidateBusinessTags(profile.business_id, ["orders"]);
+  revalidateBusinessTags(profile.business_id, ["orders", "inventory"]);
   return { ok: true, orderNo: data.order_no };
 }

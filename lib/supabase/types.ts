@@ -661,6 +661,81 @@ export type Database = {
           },
         ]
       }
+      stock_movement: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          inventory_item_id: string
+          note: string | null
+          reason: Database["public"]["Enums"]["stock_movement_reason"]
+          ref_order_id: string | null
+          ref_stock_day_id: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          inventory_item_id: string
+          note?: string | null
+          reason: Database["public"]["Enums"]["stock_movement_reason"]
+          ref_order_id?: string | null
+          ref_stock_day_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          inventory_item_id?: string
+          note?: string | null
+          reason?: Database["public"]["Enums"]["stock_movement_reason"]
+          ref_order_id?: string | null
+          ref_stock_day_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movement_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movement_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movement_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_item"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_movement_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_movement_ref_order_id_business_id_fkey"
+            columns: ["ref_order_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "order"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
+      }
     }
     Views: {
       inventory_low_stock: {
@@ -766,6 +841,12 @@ export type Database = {
       order_status: "pending" | "completed" | "cancelled"
       payment_method: "cash" | "card" | "online" | "wallet"
       payment_status: "unpaid" | "paid" | "refunded"
+      stock_movement_reason:
+        | "sale"
+        | "sale_reversal"
+        | "restock"
+        | "count_adjust"
+        | "manual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -916,6 +997,13 @@ export const Constants = {
       order_status: ["pending", "completed", "cancelled"],
       payment_method: ["cash", "card", "online", "wallet"],
       payment_status: ["unpaid", "paid", "refunded"],
+      stock_movement_reason: [
+        "sale",
+        "sale_reversal",
+        "restock",
+        "count_adjust",
+        "manual",
+      ],
     },
   },
 } as const
