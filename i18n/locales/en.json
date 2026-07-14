@@ -270,6 +270,21 @@
       "error": "Couldn't create that order. Check the fields and try again.",
       "invalidItem": "One of those items is no longer available. Remove it and try again."
     },
+    "bill": {
+      "printBillFor": "Print bill for {{no}}",
+      "back": "Back",
+      "print": "Print bill",
+      "orderNo": "Order",
+      "dateTime": "Date",
+      "source": "Channel",
+      "customer": "Customer",
+      "walkIn": "Walk-in",
+      "subtotal": "Subtotal",
+      "commission": "Platform fee",
+      "total": "Total",
+      "payment": "Payment",
+      "thankYou": "Thank you for your order!"
+    },
     "error": {
       "title": "Couldn't load orders.",
       "body": "Check your connection and try again.",

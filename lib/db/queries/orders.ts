@@ -116,6 +116,23 @@ export async function listOrdersPage(
 }
 
 /**
+ * A single order with its line items — the bill/receipt data source.
+ * RLS-scoped (anon key), so it will only return orders belonging to the
+ * authenticated user's tenant. Returns null when the id doesn't exist or
+ * belongs to another tenant.
+ */
+export async function getOrderWithItems(orderId: string): Promise<OrderWithItems | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("order")
+    .select("*, order_item(*)")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as OrderWithItems | null;
+}
+
+/**
  * Exact counts of this tenant's orders whose status falls in each given set —
  * the Active/Archived tab badges. Head-only `count: 'exact'` per set: no rows
  * transferred, just the numbers. RLS-scoped.

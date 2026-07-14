@@ -30,12 +30,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <AppProvider value={context}>
       <div className="bg-surface mx-auto flex min-h-dvh max-w-[430px] flex-col">
-        <AppHeader unreadCount={badges.notificationsUnread} />
-        {/* Bottom padding clears the fixed nav (~64px) plus the iOS safe area. */}
-        <main className="flex-1 px-4 py-4 pb-[calc(72px+env(safe-area-inset-bottom))]">
+        {/* print:hidden — only the receipt content prints, not app chrome. */}
+        <div className="print:hidden">
+          <AppHeader unreadCount={badges.notificationsUnread} />
+        </div>
+        {/* Bottom padding clears the fixed nav (~64px) plus the iOS safe area.
+            On print the nav is hidden so print:pb-4 removes the excess gap. */}
+        <main className="flex-1 px-4 py-4 pb-[calc(72px+env(safe-area-inset-bottom))] print:pb-4">
           {children}
         </main>
-        <BottomNav badges={badges} />
+        <div className="print:hidden">
+          <BottomNav badges={badges} />
+        </div>
       </div>
     </AppProvider>
   );

@@ -5,6 +5,59 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: per-order printable bill with heavier receipt text
+
+### What changed
+
+**`lib/db/queries/orders.ts`**
+- Added `getOrderWithItems(orderId)` — single-order fetch with line items, RLS-scoped (anon key; returns null if the id doesn't belong to the authenticated tenant).
+
+**`lib/db/selectors/order-bill.ts`** (new)
+- Defines `OrderBillLine` and `OrderBillData` — the shared data shape consumed by both the web receipt component and the future FT4 react-pdf route. All money and dates are pre-formatted into strings here (`subtotalFmt`, `totalFmt`, `createdAtFmt`) so neither render target needs to import `format.ts`.
+- `getOrderBillData(orderId)` fetches the order + business in parallel, assembles and returns `OrderBillData`. Business identity comes from the authenticated session (`getBusiness()` → profile → business_id); never from the URL.
+
+**`components/orders/order-bill.tsx`** (new)
+- `"use client"` receipt component — uses `useTranslation()` for labels; everything else arrives pre-formatted in props.
+- **Heavier font weights throughout** (client request: legible on printed bills): `font-semibold` (600) as the body floor, `font-bold` (700) for per-line totals and labels, `font-extrabold` (800) for the business name and grand total. Dashed dividers give the receipt texture.
+- The grand total line uses `border-t-2 border-ink` — a solid double-weight rule to separate it from the item lines, matching standard receipt conventions.
+- Tagged `data-bill` so `@media print` CSS can target it precisely.
+- Pre-sorted line items by name for consistent ordering across screen and print.
+
+**`components/orders/print-bill-button.tsx`** (new)
+- Thin `"use client"` wrapper that calls `window.print()`. Kept separate so the bill page is a server component that doesn't pull in a "use client" boundary just for this one button.
+
+**`app/(app)/orders/[id]/bill/page.tsx`** (new)
+- Dynamic server route: calls `getOrderBillData(params.id)`, returns `notFound()` if null (order doesn't exist or belongs to another tenant), otherwise renders `<OrderBill>` + action bar.
+- The action bar (Back link, Print bill button) carries `print:hidden` — only the receipt prints.
+- `generateMetadata` sets the page title to `Bill SB-NNNN` for the browser tab.
+
+**`app/(app)/layout.tsx`**
+- Wrapped `<AppHeader>` and `<BottomNav>` in `<div className="print:hidden">` so they disappear when the browser print dialog fires on any (app) page.
+- Added `print:pb-4` to `<main>` — removes the nav-height bottom padding that would otherwise leave a blank gap at the bottom of the printed receipt.
+
+**`app/globals.css`**
+- Added `@media print` block: forces `font-weight: 600` on the body (heavier receipt text), strips `main` padding to zero, and constrains `[data-bill]` to `max-width: 80mm` (standard thermal roll) centered with `4mm` inline padding. Removes all shadow/border/radius from the receipt card.
+
+**`components/orders/orders-browser.tsx`**
+- Added a Printer icon (`lucide-react`) on each order row — a `<Link href="/orders/{id}/bill">` navigates to the bill page. Icon is muted-colored, hover-darkens, and carries an aria-label (`orders.bill.printBillFor`).
+
+**`i18n/locales/en.json` + `si.json`** — added `orders.bill.*` key tree.
+
+### Decisions
+
+- **Pre-format in the selector, not the component.** `OrderBillData` carries `*Fmt` strings (money, date) so the render component is a pure layout tree and the react-pdf FT4 route can consume the same data without importing `format.ts` or configuring `Intl` in Node.js.
+- **`data-bill` attribute** (not a CSS class) for the print target — attribute selectors in `@media print` are specific without polluting the Tailwind namespace.
+- **`force-dynamic`** on the bill page — this order data must be fresh; no stale-cache risk.
+- **No separate "cashier" field.** The `order` table has no `created_by` column. The receipt shows source + customer instead, which is all the information the printed bill needs.
+- **Lines sorted by name.** Consistent between screen and print; deterministic for react-pdf FT4.
+- **Commission line conditional.** Only rendered when `commissionCents > 0` — own-channel orders (dine_in, walk_in) have no platform fee and the bill shouldn't show a zero line.
+
+### Open questions / deviations
+
+None. Security model: RLS-scoped query, business_id from session only, `getOrderWithItems` returns null for cross-tenant ids.
+
+---
+
 ## 2026-07-15 — feat: POS sizing to reference + quick-add by item code
 
 ### What changed

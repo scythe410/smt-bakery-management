@@ -107,3 +107,38 @@
 .animate-rise {
   animation: rise 150ms ease-out both;
 }
+
+/*
+ * Print receipt (SPEC §3.4 bill / per-order print). Only applies when the
+ * user triggers print from the /orders/[id]/bill page. App chrome is hidden
+ * via Tailwind print:hidden on the header/nav wrappers in (app)/layout.tsx.
+ *
+ * Goals:
+ *  – Receipt fits a standard 80 mm thermal roll or a small column on A4.
+ *  – No background colors wasting ink (force white).
+ *  – Body font bumped to font-weight 600 so the printed bill is legible
+ *    (matches the client's explicit request for heavier receipt text).
+ *  – No card shadows, no border-radius — plain ink on white.
+ */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-weight: 600;
+  }
+
+  /* Strip the app-shell page padding so the receipt sits at the print margin */
+  main {
+    padding: 0 !important;
+  }
+
+  /* The receipt card: no shadow, no rounding, fill the printable area */
+  [data-bill] {
+    max-width: 80mm;
+    margin: 0 auto;
+    padding: 0 4mm;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+}

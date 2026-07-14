@@ -11,7 +11,8 @@
 // translated, CLAUDE.md §3).
 
 import { useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { Plus, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
@@ -282,13 +283,22 @@ export function OrdersBrowser({
                   key={o.id}
                   className="border-border flex flex-col gap-1.5 border-b py-3 last:border-0 last:pb-0"
                 >
-                  <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-label text-ink font-semibold tabular-nums">
                       {o.orderNo}
                     </span>
-                    <span className="text-label text-ink shrink-0 font-semibold tabular-nums">
-                      {formatLKR(o.totalCents)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Link
+                        href={`/orders/${o.id}/bill`}
+                        aria-label={t("orders.bill.printBillFor", { no: o.orderNo })}
+                        className="text-muted hover:text-ink transition-colors"
+                      >
+                        <Printer className="size-4" aria-hidden />
+                      </Link>
+                      <span className="text-label text-ink font-semibold tabular-nums">
+                        {formatLKR(o.totalCents)}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                     <StatusPill tone="neutral" label={t(`source.${o.source}`)} />
