@@ -1,14 +1,6 @@
-// Shell badge counts — the live numbers the chrome shows: the header's unread
-// notification count and the bottom-nav badges (Inventory low-stock, Menu
-// attention). Server-only.
-//
-// Identity is resolved first (getProfile → business_id, uncached RLS read), then
-// the counts are served from a per-tenant data cache keyed by business_id and
-// tagged notifications/inventory/menu, so repeat navigations don't re-query
-// across the region gap. Writes to those tables invalidate the matching tag (see
-// lib/db/cache.ts). The cached read uses the service client, so every query is
-// filtered by the server-resolved business_id (never client input). React
-// `cache()` still dedupes the one call shared by the header and the nav.
+// Shell badge counts — unread notifications (header bell) and nav badges
+// (Inventory low-stock, Menu attention). Served from a per-tenant data cache;
+// React cache() dedupes the one call shared by the header and the nav.
 
 import "server-only";
 import { cache } from "react";

@@ -1,13 +1,7 @@
 "use server";
 
-// Menu server actions (SPEC §4.1).
-//
-// Security (CLAUDE.md §7): all roles may manage menu (access matrix: ALL_ROLES).
-// Each action re-asserts the session (requireProfile) and stamps business_id
-// from the authenticated profile — never from the client (§7.3). All inputs are
-// Zod-validated; unknown fields are rejected (§7.6). Price is converted to
-// integer cents here — no float money is stored (§3). item_code 0 signals
-// "auto-assign", handled by the DB trigger (migration 010).
+// Menu server actions. item_code 0 signals "auto-assign" — handled by the DB
+// trigger (migration 010).
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";

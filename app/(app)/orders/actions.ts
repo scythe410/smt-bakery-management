@@ -31,15 +31,6 @@ type Enums = Database["public"]["Enums"];
 
 const EMPTY_PAGE: OrdersPageResult = { items: [], hasMore: false };
 
-/**
- * Read one page of the Orders list for the given tab + filters (SPEC §3.4). The
- * client browser calls this on a filter/tab change and on "Load more"; all the
- * filtering + pagination happen in the database (getOrdersPage → listOrdersPage),
- * so the wire only ever carries one page. Auth is re-asserted and the input is
- * Zod-validated (unknown fields rejected); RLS scopes every row to the caller's
- * tenant. Invalid input returns an empty page rather than throwing — the UI shows
- * its no-match/empty state.
- */
 export async function fetchOrders(input: unknown): Promise<OrdersPageResult> {
   await requireProfile();
   const parsed = orderListQuerySchema.safeParse(input);
@@ -73,8 +64,6 @@ export async function createOrder(
   });
   if (!parsed.success) return { error: "orders.new.error" };
 
-  // Everything authoritative (prices, totals, commission, numbering, atomicity)
-  // happens server-side inside the RPC — the client sends only ids + quantities.
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_order", {
     p_source: parsed.data.source as Enums["order_source"],
@@ -84,16 +73,11 @@ export async function createOrder(
     p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
   });
 
-  // RPC raises on an invalid/cross-tenant/unavailable item or a missing business;
-  // all surface as a generic error (don't leak specifics to the client).
   if (error || !data) return { error: "orders.new.error" };
 
-  // Refresh the Orders screen (uncached) + the tenant's order-derived figures
-  // (Dashboard / Finance / Reports) via the data cache. `inventory` because a
-  // realized order deducts ingredients through the stock_movement ledger, moving
-  // qty_on_hand + the low-stock badge (dormant while orders mint as `pending`,
-  // but correct the moment create_order ever mints a completed order).
   revalidatePath("/orders");
+  // "inventory" because a realized order deducts stock via the movement ledger,
+  // updating qty_on_hand and the low-stock nav badge.
   revalidateBusinessTags(profile.business_id, ["orders", "inventory"]);
   return { ok: true, orderNo: data.order_no };
 }

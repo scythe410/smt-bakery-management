@@ -12,17 +12,9 @@ export async function signOut(): Promise<void> {
   redirect("/login");
 }
 
-/**
- * Persist the caller's language preference to profile.language_pref. Input is
- * validated server-side; RLS + the freeze trigger ensure a user can only ever
- * change their OWN language (never role/business_id). CLAUDE.md §3.
- *
- * The UI switches CLIENT-SIDE the instant the user taps (i18n.changeLanguage);
- * this action is called fire-and-forget purely to persist the choice for the
- * next fresh load's first paint. It deliberately does NOT revalidate — a layout
- * revalidation would re-render the whole shell + current route across the region
- * gap, which is exactly the cost we're removing. So no navigation, no refetch.
- */
+// Fire-and-forget: the UI switches client-side instantly; this just persists the
+// choice for the next fresh load. No revalidatePath — a layout revalidation would
+// re-render the whole shell, which defeats the point of the instant-switch.
 export async function setLanguage(next: string): Promise<void> {
   const parsed = languagePrefSchema.safeParse(next);
   if (!parsed.success) return;

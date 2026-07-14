@@ -45,6 +45,42 @@ Full demo-readiness audit pass. `npm run lint` clean (was 3 issues → 0); `tsc 
 
 ---
 
+## 2026-07-15 — chore: remove dead code, files, and comment noise
+
+`npm run lint`, `tsc --noEmit`, `next build` all clean after changes. i18n parity 527/527.
+
+### Removed
+
+- **`components/app/coming-soon.tsx`** — zero importers (all placeholder screens were
+  replaced with real implementations in earlier steps). Deleted.
+- **`shell.comingSoon` i18n key** — only referenced from the now-deleted component.
+  Removed from both `en.json` and `si.json` (527 keys each, parity maintained).
+
+### Trimmed comment noise
+
+Verbose security/architecture cross-reference paragraphs removed from action file headers
+where the code was self-documenting (function names + Zod + requireProfile/requireRole
+already say what the comments were narrating). Non-obvious "why" kept in all cases:
+
+| File | What was removed |
+|---|---|
+| `inventory/actions.ts` | 8-line security narration paragraph; 7-line `lookupBarcode` docstring |
+| `menu/actions.ts` | 7-line security narration paragraph |
+| `finance/actions.ts` | 6-line security narration paragraph |
+| `bookings/actions.ts` | 12-line security paragraph; 8-line `fetchBookings` docstring |
+| `orders/actions.ts` | 8-line `fetchOrders` docstring; inline narration of what the RPC does (header says it) |
+| `settings/actions.ts` | 6-line security narration paragraph |
+| `employees/actions.ts` | 6-line security paragraph; 2-line function docstring |
+| `app/(app)/actions.ts` | 10-line `setLanguage` docstring → 3-line inline comment keeping the non-obvious "fire-and-forget, no revalidatePath" rationale |
+| `lib/db/selectors/shell.ts` | 9-line caching/identity paragraph → 2-line summary; kept the non-obvious low-stock view comment inline |
+
+### No logic changes
+
+No function signatures, return types, or runtime behavior changed. Only comments and one
+dead file removed.
+
+---
+
 ## 2026-07-15 — feat: employee salary status bar (owner-only)
 
 Lightweight salary tracking for the Employees screen (SPEC §4.3, demo scope).

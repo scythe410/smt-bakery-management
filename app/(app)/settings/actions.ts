@@ -1,11 +1,6 @@
 "use server";
 
-// Settings server actions (SPEC §4.4). Every mutation re-asserts the OWNER role
-// (requireRole → real 403 otherwise) and targets the caller's own tenant only:
-// the business UPDATE is gated by the owner-only RLS policy + identity-freeze
-// trigger (migration 004), so business_id / id can never be changed or spoofed
-// (CLAUDE.md §7.2/§7.3). All inputs are Zod-validated and unknown fields rejected
-// (§7.6). The VAT rate is stored as integer basis points — no float money (§3).
+// Settings server actions. Owner-only. VAT rate stored as integer basis points.
 
 import { revalidatePath } from "next/cache";
 import { getBusiness, requireRole, rolesFor } from "@/lib/auth";

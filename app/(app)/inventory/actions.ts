@@ -1,15 +1,8 @@
 "use server";
 
 // Inventory server actions. addInventoryItem inserts a stock item; lookupBarcode
-// resolves a scanned code to a product to prefill the form (SPEC §5.1).
-//
-// Security (CLAUDE.md §7): all roles may manage inventory (RLS: customer/
-// inventory/menu… are CRUD for owner/manager/staff), so each action re-asserts
-// the session (requireProfile) and sets business_id from the authenticated
-// profile — never from the client (§7.3). Every field is Zod-validated and
-// unknown fields are rejected; the unit cost is converted to integer cents here,
-// so no float money is stored (§3). The barcode lookup hits the network on the
-// SERVER, so the browser only ever talks to our own origin.
+// resolves a scanned code to a product to prefill the form. Barcode lookup is
+// server-side so the browser never reaches the external product API directly.
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
@@ -72,13 +65,6 @@ export async function addInventoryItem(
   return { ok: true };
 }
 
-/**
- * Resolve a scanned/typed barcode to a product name + category to PREFILL the
- * add-item form (SPEC §5.1). The session is re-asserted (this hits the network on
- * the server), input is Zod-validated to a GTIN, and every failure path resolves
- * to `found: false` so the client always gets a usable answer and can fall back
- * to a blank form. No write happens here — the user still reviews and submits.
- */
 export async function lookupBarcode(code: string): Promise<ProductLookupResult> {
   await requireProfile();
   const parsed = barcodeLookupSchema.safeParse(code);

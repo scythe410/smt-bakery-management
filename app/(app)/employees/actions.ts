@@ -1,10 +1,6 @@
 "use server";
 
-// Employees server actions (SPEC §4.3).
-//
-// Security (CLAUDE.md §7): salary data is owner-only (CLAUDE.md §5 — "money
-// figures"). requireRole(["owner"]) gates every salary mutation; business_id is
-// always resolved from the authenticated session, never from the client.
+// Employees server actions. Salary mutations are owner-only.
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
@@ -13,10 +9,6 @@ import { markEmployeePaidSchema } from "@/lib/zod/employees";
 
 export type EmployeePayActionState = { ok?: boolean; error?: string };
 
-/**
- * Toggle the current-period pay status for one employee.
- * Owner-only: salary is a money figure (CLAUDE.md §5).
- */
 export async function markEmployeePaid(
   employeeId: string,
   paid: boolean,

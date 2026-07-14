@@ -1,12 +1,6 @@
 "use server";
 
 // Finance server actions. addExpense inserts an operating expense.
-//
-// Security (CLAUDE.md §7): the action re-asserts the Finance role gate
-// server-side (defence in depth beside RLS, which also restricts expense to
-// owner/manager), validates every field with Zod, and sets business_id +
-// created_by from the authenticated profile — never from the client. Amount is
-// converted to integer cents here; no float money is stored.
 
 import { revalidatePath } from "next/cache";
 import { requireRole, rolesFor } from "@/lib/auth";

@@ -1,17 +1,7 @@
 "use server";
 
-// Bookings server actions. createBooking inserts a reservation or a custom-order
-// pre-order (SPEC §4.2, CLAUDE.md §4 — BOTH types in scope).
-//
-// Security (CLAUDE.md §7): bookings are CRUD for all roles (RLS: "booking" is
-// tenant-access for owner/manager/staff), so the action re-asserts the session
-// (requireProfile) and sets business_id from the authenticated profile — never
-// from the client (§7.3). Every field is Zod-validated as a discriminated union
-// on `type`, so each kind accepts only its own fields; money arrives in rupees
-// and is converted to integer cents here, so no float money is stored (§3). For a
-// custom order the outstanding balance is COMPUTED server-side (total − deposit),
-// never taken from the client. The pickup date drives when a custom order shows
-// on the dashboard, so both types land with `date` set.
+// Bookings server actions. createBooking handles reservations and custom orders.
+// balance_cents is computed server-side (total − deposit); the client never sends it.
 
 import { revalidatePath } from "next/cache";
 import { requireProfile, getBusiness } from "@/lib/auth";
@@ -31,14 +21,6 @@ const DEFAULT_TIMEZONE = "Asia/Colombo";
 
 const EMPTY_PAGE: BookingsPageResult = { items: [], hasMore: false };
 
-/**
- * Read one page of the Bookings list for the given type segment + filters (SPEC
- * §4.2). The client browser calls this on a filter/segment change and on "Load
- * more"; all filtering + pagination happen in the database (getBookingsPage →
- * listBookingsPage), so the wire only ever carries one page. Auth is re-asserted
- * and the input Zod-validated (unknown fields rejected); RLS scopes every row to
- * the caller's tenant. Invalid input returns an empty page rather than throwing.
- */
 export async function fetchBookings(input: unknown): Promise<BookingsPageResult> {
   await requireProfile();
   const parsed = bookingListQuerySchema.safeParse(input);
