@@ -1,4 +1,0 @@
-/Users/ranugi/Downloads/samasthas-bakery-managment/.vercel/README.txt
-/Users/ranugi/Downloads/samasthas-bakery-managment/README.md
-/Users/ranugi/Downloads/samasthas-bakery-managment/public/logo-placeholder.svg
-/Users/ranugi/Downloads/samasthas-bakery-managment/public/logo.webp

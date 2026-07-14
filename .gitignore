@@ -51,3 +51,7 @@ SPEC.pdf
 
 # QA / internal reports — kept local, never committed
 implementation_plan_smt.md
+
+# Tool output directories — never committed
+graphify-out/
+.vercel/

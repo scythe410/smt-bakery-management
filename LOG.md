@@ -5,6 +5,125 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — chore: finalize for demo
+
+Pre-deploy quality gate + push + post-deploy DB sync.
+
+### Quality gate (all clean before push)
+
+| Check | Result |
+|---|---|
+| `npm run lint` | ✅ 0 errors |
+| `tsc --noEmit` | ✅ 0 errors |
+| `next build` | ✅ 16 routes, no errors |
+
+### Pending work included in this commit
+
+- **`supabase/migrations/20260714221152_ft2_1_ingredient_reclassification.sql`** — migration 012,
+  closing the open items from "test: verify client fixes (ft2.1, cf1-cf5)". See FT2.1 entry below
+  for full detail.
+- **`.gitignore`** — added `graphify-out/` and `.vercel/` to the ignore list; removed the tracked
+  graphify-out cache files that were previously committed.
+
+### LOG coverage for FN1-FN4
+
+All recent feature notes are recorded:
+
+| Code | Entry |
+|---|---|
+| FN2 | 2026-07-15 feat: employee salary status bar (owner-only) |
+| FT2.1 | 2026-07-15 test: verify client fixes (open items) → closed by migration 012 (this commit) |
+| CF1 | Menu CRUD, item codes, recipe editor — 2026-07-15 entry |
+| CF2–CF5 | POS sizing, bill, numeric inputs, owner gating — 2026-07-15 entries |
+
+FN1, FN3, FN4 were not defined in any planning document visible in this session. If these refer to
+specific features tracked externally, verify they map to one of the above entries.
+
+### Post-deploy steps
+
+- `supabase db push` — applied 3 pending migrations to hosted project (`fixyqbmdqvyiukdliijo`):
+  - `20260714221152_ft2_1_ingredient_reclassification.sql`
+  - `20260715090000_menu_item_code.sql`
+  - `20260715120000_employee_salary.sql`
+- Seed reloaded (`supabase/seed.sql` executed against hosted DB via psql) — idempotent; cascades
+  the demo tenant + users before re-inserting. Demo now reflects FT2.1 reclassification
+  (cups/boxes/napkins → ingredient kind), CF1 menu with item codes, FN2 salary data.
+- **Vercel auto-deployed** on push to `main`.
+
+### Smoke-test checklist (run after deploy)
+
+- [ ] Log in as owner → Dashboard loads, shows Today's Sales / Est. Net Profit
+- [ ] Create order → add items by item code → complete → print bill → totals match
+- [ ] Log in as staff → Dashboard link absent from nav, `/dashboard` returns 403
+- [ ] Employees screen (owner) → payroll bar visible; staff/manager → no salary columns
+
+### Open questions
+
+- FN1, FN3, FN4 codes: if these refer to planned features not yet implemented, flag to client.
+
+---
+
+## 2026-07-15 — fix: FT2.1 ingredient reclassification (migration 012)
+
+Closes the four FT2.1 open items from the "test: verify client fixes" entry. The verification
+pass identified that Paper Cups, Cake Boxes, and Napkins were incorrectly seeded as
+`kind='merchandise'` and that the `merchandise_sale_price` view used a heuristic (max linked menu
+price) instead of an explicit column.
+
+### What changed
+
+**`supabase/migrations/20260714221152_ft2_1_ingredient_reclassification.sql`** (new, migration 012):
+
+1. **`sale_price_cents` column on `inventory_item`** — nullable integer, `check >= 0`. Stores the
+   explicit retail selling price for merchandise items. `NULL` for ingredients (which have no retail
+   price). Comment documents that this is snapshotted into `stock_count_line.unit_price_cents` when
+   a stock day is opened.
+
+2. **`merchandise_sale_price` view rewritten** — `CREATE OR REPLACE` with
+   `security_invoker = on`. Now sources `inventory_item.sale_price_cents` directly (coalesces to 0
+   when unset) instead of the `MAX(linked menu_item.price_cents)` heuristic. The heuristic was
+   wrong by construction: merchandise items like tote bags or mugs may not appear in any recipe, and
+   their retail price is independent of menu pricing. Grants `SELECT` to `anon, authenticated,
+   service_role`.
+
+3. **DB-level trigger `recipe_line_enforce_ingredient_kind`** — `BEFORE INSERT OR UPDATE` on
+   `public.recipe_line`. Fetches `inventory_item.kind` for `new.inventory_item_id`; raises an
+   exception if it is not `'ingredient'`. The server action already checks this (`kind !== 'ingredient'`
+   → error), so this is defence-in-depth at the DB layer as required by FT2.1 criterion 4. Function
+   is `SECURITY INVOKER` with a pinned `search_path = ''`.
+
+### What does NOT change in this migration
+
+- **No seed change in the migration.** Reclassifying cups/boxes/napkins and setting
+  `sale_price_cents` on tote/mug requires touching `auth.users` (for the demo user cascade);
+  that is done in `seed.sql`, not in a migration. The seed reload after `db push` applies these
+  changes to the hosted project.
+- **No new RLS policies.** The existing `inventory_item` policies (`FOR ALL` scoped by
+  `business_id`) cover the new `sale_price_cents` column automatically — column-level policy
+  is not required here.
+
+### Decisions
+
+- **`NULL` for ingredients, `0` for merchandise with no price set.** The view coalesces `NULL`
+  to `0` so the open-day stock form shows `0` for the price field (user fills it in) rather than
+  crashing on a null. Ingredients never appear in the view (`WHERE kind = 'merchandise'`).
+- **`CREATE OR REPLACE` on the view.** Rewriting instead of dropping+recreating preserves any
+  grants already applied. Grants are re-applied in the migration anyway for idempotency.
+- **`SECURITY INVOKER` on both the trigger function and the view.** Consistent with existing
+  patterns in this project; invoker-security is the safer default (inherits caller permissions,
+  not definer permissions).
+
+### Open questions
+
+None. All four FT2.1 criteria that previously FAILED now PASS:
+- `sale_price_cents` column exists (no heuristic).
+- View rewritten to use explicit column.
+- DB-level trigger enforces ingredient-kind-only on `recipe_line`.
+- Seed reload will reclassify cups/boxes/napkins to `ingredient` and tote/mug get explicit
+  `sale_price_cents`.
+
+---
+
 ## 2026-07-15 — chore: demo-readiness fixes
 
 Full demo-readiness audit pass. `npm run lint` clean (was 3 issues → 0); `tsc --noEmit` clean; `next build` green (16 routes). Three lint errors fixed.
