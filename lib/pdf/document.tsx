@@ -21,7 +21,7 @@ import { registerFonts } from "./fonts";
 
 registerFonts();
 
-const logoSrc = path.join(process.cwd(), "public", "logo.webp");
+const logoSrc = path.join(process.cwd(), "public", "logo.png");
 
 // ── Brand colours (DESIGN.md §2) ─────────────────────────────────────────────
 const C = {
