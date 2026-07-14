@@ -5,6 +5,50 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — chore: purge all demo data for production handoff
+
+### Context
+
+The app is being handed to the bakery for real-world use. All seed/demo data
+needed to be cleared so they start from a clean slate.
+
+### What changed
+
+**Remote Supabase DB** (via SQL Editor on dashboard)
+- TRUNCATEd all 14 domain tables in FK-safe order:
+  `stock_count_line`, `stock_movement`, `stock_day`, `order_item`, `order`,
+  `recipe_line`, `booking`, `expense`, `notification`, `commission_rule`,
+  `employee`, `menu_item`, `inventory_item`, `customer`.
+- Reset `business.order_seq` back to `1000` (migration default) so the first
+  real order starts at ORD-1001.
+- Business row and auth users/profiles were **kept** — only domain data was
+  removed.
+
+**Vercel Data Cache**
+- After truncation the dashboard still showed stale figures (LKR 107,040
+  Total Income, 66 Total Orders, etc.) because Vercel's Next.js Data Cache
+  persists across deployments.
+- Purged via Vercel Dashboard → Settings → Data Cache → Purge Everything.
+  Hard-refresh then showed all zeroes as expected.
+
+**`supabase/.temp/nuke_demo_data.sql`** (new, gitignored)
+- One-shot cleanup script. Not committed — kept in `.temp/` for reference only.
+
+### Verification
+
+- Ran a `SELECT count(*)` against all 14 tables — every table returned 0.
+- Dashboard, Finance, Reports, Inventory badge all show zeroes after cache purge.
+
+### Decisions
+
+- Full nuke (catalog + transactional data) rather than keeping menu/inventory,
+  because the bakery will set up their own items from scratch.
+- Did not delete auth users or the business row — the login accounts are real.
+- Did not reset via `supabase db reset` (which would also wipe auth users and
+  re-run seed) — targeted TRUNCATE preserves the tenant + auth layer.
+
+---
+
 ## 2026-07-15 — feat: replace initials monogram with logo on bill and PDF reports
 
 ### What changed
