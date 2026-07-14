@@ -149,12 +149,17 @@ insert into public.inventory_item
 ('dddddddd-0000-0000-0000-000000000015', '11111111-1111-1111-1111-111111111111', 'Strawberry Syrup',       'ingredient', 'syrups_toppings', 3.000,  'L',   145000,   2.000, '4001000000158', 'ING-STS'),
 ('dddddddd-0000-0000-0000-000000000016', '11111111-1111-1111-1111-111111111111', 'Caramel Syrup',          'ingredient', 'syrups_toppings', 1.000,  'L',   155000,   2.000, '4001000000165', 'ING-CRS'),   -- LOW
 ('dddddddd-0000-0000-0000-000000000017', '11111111-1111-1111-1111-111111111111', 'Assorted Sprinkles',     'ingredient', 'syrups_toppings', 5.000,  'kg',   88000,   3.000, '4001000000172', 'ING-SPR'),
--- merchandise
-('dddddddd-0000-0000-0000-000000000018', '11111111-1111-1111-1111-111111111111', 'Paper Cups (12oz)',      'merchandise', 'merch',        400.000,  'unit',  2500, 200.000, '4001000000189', 'MRC-CUP'),
-('dddddddd-0000-0000-0000-000000000019', '11111111-1111-1111-1111-111111111111', 'Cake Boxes (medium)',    'merchandise', 'merch',         60.000,  'unit', 12000,  80.000, '4001000000196', 'MRC-BOX'),   -- LOW
-('dddddddd-0000-0000-0000-000000000020', '11111111-1111-1111-1111-111111111111', 'Branded Tote Bag',       'merchandise', 'merch',         25.000,  'unit', 45000,  15.000, '4001000000202', 'MRC-TOT'),
-('dddddddd-0000-0000-0000-000000000021', '11111111-1111-1111-1111-111111111111', 'Ceramic Coffee Mug',     'merchandise', 'merch',         18.000,  'unit', 68000,  10.000, '4001000000219', 'MRC-MUG'),
-('dddddddd-0000-0000-0000-000000000022', '11111111-1111-1111-1111-111111111111', 'Napkins (pack of 100)',  'merchandise', 'other',         30.000,  'unit', 15000,  20.000, '4001000000226', 'MRC-NAP');
+-- packaging (ingredient lane — recipe-deducted per sale, not daily-counted)
+('dddddddd-0000-0000-0000-000000000018', '11111111-1111-1111-1111-111111111111', 'Paper Cups (12oz)',      'ingredient', 'other',          400.000, 'unit',  2500, 200.000, '4001000000189', 'ING-CUP'),
+('dddddddd-0000-0000-0000-000000000019', '11111111-1111-1111-1111-111111111111', 'Cake Boxes (medium)',    'ingredient', 'other',           60.000, 'unit', 12000,  80.000, '4001000000196', 'ING-BOX'),   -- LOW
+-- merchandise (physical daily count lane; sale_price_cents set below)
+('dddddddd-0000-0000-0000-000000000020', '11111111-1111-1111-1111-111111111111', 'Branded Tote Bag',       'merchandise', 'merch',          25.000, 'unit', 45000,  15.000, '4001000000202', 'MRC-TOT'),
+('dddddddd-0000-0000-0000-000000000021', '11111111-1111-1111-1111-111111111111', 'Ceramic Coffee Mug',     'merchandise', 'merch',          18.000, 'unit', 68000,  10.000, '4001000000219', 'MRC-MUG'),
+('dddddddd-0000-0000-0000-000000000022', '11111111-1111-1111-1111-111111111111', 'Napkins (pack of 100)',  'ingredient', 'other',           30.000, 'unit', 15000,  20.000, '4001000000226', 'ING-NAP');
+
+-- Explicit retail prices for merchandise items (migration 012: sale_price_cents column).
+update public.inventory_item set sale_price_cents =  95000 where id = 'dddddddd-0000-0000-0000-000000000020';  -- Tote Bag    LKR 950
+update public.inventory_item set sale_price_cents = 120000 where id = 'dddddddd-0000-0000-0000-000000000021';  -- Coffee Mug  LKR 1,200
 
 -- ---------------------------------------------------------------------------
 -- 5. Menu (12 items) with prices
@@ -532,10 +537,9 @@ insert into public.stock_day (id, business_id, date, status, opened_by, opened_a
 insert into public.stock_count_line
   (business_id, stock_day_id, inventory_item_id, opening_qty, received_qty, closing_qty, unit_price_cents) values
 -- item                                                     open   recv  close  price(cents)
-('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000019',  68.000, 0.000,  60.000,  15000),  -- Cake Boxes  (out 8  @ LKR 150)
-('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000020',  31.000, 0.000,  25.000,  95000),  -- Tote Bag    (out 6  @ LKR 950)
-('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000021',  22.000, 0.000,  18.000, 120000),  -- Coffee Mug  (out 4  @ LKR 1200)
-('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000022',  35.000, 0.000,  30.000,      0),  -- Napkins     (out 5, packaging)
-('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000018', 460.000, 0.000, 400.000,      0);  -- Paper Cups  (out 60, packaging)
+-- Only true merchandise (physical daily count lane). Packaging items (cups/boxes/napkins)
+-- are ingredient-kind and deducted via recipe; they do not appear in the daily count.
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000020',  31.000, 0.000,  25.000,  95000),  -- Tote Bag   (out 6  @ LKR 950)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000021',  22.000, 0.000,  18.000, 120000);  -- Coffee Mug (out 4  @ LKR 1200)
 
 commit;

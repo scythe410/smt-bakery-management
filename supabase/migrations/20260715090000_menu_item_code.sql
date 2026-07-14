@@ -14,6 +14,22 @@
 alter table public.menu_item
   add column item_code integer not null default 0;
 
+-- ---------------------------------------------------------------------------
+-- Backfill existing rows BEFORE creating the unique index (order matters:
+-- adding the column sets all existing rows to 0, so we assign sequential
+-- codes first, then the index creation finds no duplicates).
+-- ---------------------------------------------------------------------------
+with numbered as (
+  select id,
+         row_number() over (partition by business_id order by created_at, id) as rn
+    from public.menu_item
+   where item_code = 0
+)
+update public.menu_item m
+   set item_code = n.rn
+  from numbered n
+ where m.id = n.id;
+
 -- Unique per business — two items in the same bakery can't share a code.
 create unique index menu_item_code_unique_per_business
   on public.menu_item (business_id, item_code);
@@ -47,17 +63,3 @@ create trigger menu_item_set_item_code
   before insert on public.menu_item
   for each row
   execute function private.set_menu_item_code();
-
--- ---------------------------------------------------------------------------
--- Backfill existing rows with sequential codes per business
--- ---------------------------------------------------------------------------
-with numbered as (
-  select id,
-         row_number() over (partition by business_id order by created_at, id) as rn
-    from public.menu_item
-   where item_code = 0
-)
-update public.menu_item m
-   set item_code = n.rn
-  from numbered n
- where m.id = n.id;
