@@ -14,7 +14,6 @@ import {
   View,
   Text,
   StyleSheet,
-  type Styles,
 } from "@react-pdf/renderer";
 import { registerFonts } from "./fonts";
 
@@ -204,7 +203,7 @@ export function DocHeader({
 export function DocFooter() {
   return (
     <View style={s.footer} fixed>
-      <Text>Samantha's Bakery · BizCore</Text>
+      <Text>Samantha&apos;s Bakery · BizCore</Text>
       <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
     </View>
   );

@@ -50,7 +50,7 @@ export function MenuItemForm({
   const { t } = useTranslation();
   const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<"details" | "recipe">("details");
-  const [imageName, setImageName] = useState<string | null>(null);
+  const [pickedName, setPickedName] = useState<string | null>(null);
 
   const boundAction =
     mode.kind === "edit"
@@ -62,10 +62,12 @@ export function MenuItemForm({
     {},
   );
 
+  // Derive: once the action succeeds the label shows reset without setState in effect.
+  const imageName = state.ok ? null : pickedName;
+
   useEffect(() => {
     if (state.ok) {
       formRef.current?.reset();
-      setImageName(null);
       onDone();
     }
   }, [state.ok, onDone]);
@@ -184,7 +186,7 @@ export function MenuItemForm({
                 name="image"
                 accept="image/png,image/jpeg,image/webp"
                 className="sr-only"
-                onChange={(e) => setImageName(e.target.files?.[0]?.name ?? null)}
+                onChange={(e) => setPickedName(e.target.files?.[0]?.name ?? null)}
               />
             </label>
             <span className="text-caption text-faint">{t("menu.form.imageHint")}</span>
