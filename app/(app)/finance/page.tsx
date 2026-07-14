@@ -1,5 +1,5 @@
-// Finance (SPEC §3.2) — owner/manager only (CLAUDE.md §5). requireRole() returns
-// a real 403 for staff (app/forbidden.tsx). Three tabs (Overview / Expenses /
+// Finance (SPEC §3.2) — owner-only (CLAUDE.md §5). requireRole() returns
+// a real 403 for manager and staff (app/forbidden.tsx). Three tabs (Overview / Expenses /
 // Platform Earnings) and the period selector live in the URL, so each selection
 // is server-rendered from the derived selectors and is shareable. The active
 // tab's data is fetched behind a Suspense boundary; its key includes the tab +

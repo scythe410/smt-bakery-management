@@ -5,6 +5,79 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — test: verify client fixes (ft2.1, cf1-cf5)
+
+Verification pass against concrete acceptance criteria. `tsc --noEmit` clean (0 errors); `next build`
+green (all 16 routes registered, no type errors). Stale comments in `finance/page.tsx` and
+`reports/page.tsx` corrected inline (trivial).
+
+### PASS / FAIL table
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| **FT2.1** packaging is `ingredient` kind | **FAIL** | `seed.sql` lines 153–157: Paper Cups, Cake Boxes, Napkins all seeded as `kind='merchandise'`. Criterion requires `ingredient`. |
+| **FT2.1** only retail goods (tote/mug) are `merchandise` | **FAIL** | Cups/boxes/napkins are merchandise in the seed. Tote Bag and Ceramic Mug are correctly merchandise; the other three are not. |
+| **FT2.1** merchandise has explicit `sale_price_cents` (no heuristic) | **FAIL** | No `sale_price_cents` column on `inventory_item`. `merchandise_sale_price` view (migration 009) still derives price as `max(menu_item.price_cents)` via recipe_line — the max-linked-menu-price heuristic the criterion disallows. |
+| **FT2.1** `recipe_line` rejects merchandise at DB level | **FAIL** | `recipe_line_enforce_unit` trigger checks unit match only. The ingredient-kind guard lives in the server action (`kind !== 'ingredient'` → error) but not in a DB constraint or trigger. |
+| **FT2.1** daily count shows only merchandise | PASS | `open_stock_day` RPC (migration 009 line 186): `and inv.kind = 'merchandise'` — ingredients never appear. |
+| **CF1** Menu screen at `/menu` | PASS | Route registered in build (`ƒ /menu`); renders `<MenuList>` behind Suspense. |
+| **CF1** Create / edit / delete menu item | PASS | `createMenuItem`, `updateMenuItem`, `deleteMenuItem` server actions in `app/(app)/menu/actions.ts`. |
+| **CF1** Availability toggle | PASS | `toggleMenuItemAvailability` action; toggle button in `components/menu/menu-browser.tsx:248`. |
+| **CF1** Unique per-business item code | PASS | Migration 010: `UNIQUE (business_id, item_code)` index + `set_menu_item_code` BEFORE INSERT trigger. |
+| **CF1** Recipe editor: ingredient-kind only | PASS | Dropdown populated by `listIngredientItems()` (`.eq("kind","ingredient")`); server action line 222 rejects `kind !== 'ingredient'` for whole batch. |
+| **CF1** Recipe editor: rejects unit mismatch | PASS | Server copies `inventory_item.unit` onto each line (no client unit field); DB trigger `recipe_line_enforce_unit` enforces match as a second guard. |
+| **CF2** `type="text" inputMode` on all numeric fields | PASS | Verified in `stock-take.tsx`, `ingredient-audit.tsx`, `add-expense-form.tsx`, `recipe-editor.tsx`, `add-item-form.tsx`, `menu-item-form.tsx`, `new-booking-form.tsx`. No remaining `type="number"`. |
+| **CF2** Money converts rupees→cents on submit | PASS | `toCents(parsed.data.priceMajor)` in menu actions; same pattern in expense/booking/inventory actions. |
+| **CF3** Order screen with item code chips | PASS | `components/orders/new-order-form.tsx:207`: `#{m.itemCode}` chip per row. |
+| **CF3** Quick-add by item code (Enter) | PASS | `new-order-form.tsx:61`: `menu.filter((m) => m.itemCode === asInt)`; name-substring fallback; adds with qty 1. |
+| **CF3** Qty defaults to 1, editable | PASS | Tapping adds 1; in-cart rows show a `type="text" inputMode="numeric"` qty field. |
+| **CF3** Server re-reads/snapshots `menu_item` | PASS | `create_order` RPC receives `{menu_item_id, qty}` pairs only; server action ignores any client price (`orders/actions.ts:84`). |
+| **CF4** Bill route at `/orders/[id]/bill` | PASS | Route `ƒ /orders/[id]/bill` in build output; dynamic, RLS-scoped via `getOrderWithItems`. |
+| **CF4** Real print path (chrome hidden) | PASS | `PrintBillButton` calls `window.print()`; `(app)/layout.tsx` wraps header+nav in `print:hidden`; action bar has `print:hidden`. |
+| **CF4** Heavier receipt text | PASS | `order-bill.tsx`: font-semibold (600) body floor, font-bold (700) line totals, font-extrabold (800) business name + grand total. `@media print` in `globals.css` forces `font-weight:600` on body. |
+| **CF4** Bill totals match order | PASS | `getOrderBillData` fetches from DB; `subtotalFmt`/`totalFmt` pre-formatted from stored cents, not from client. |
+| **CF5** Dashboard: owner-only, 403 for manager+staff | PASS | `dashboard/page.tsx`: `requireRole(rolesFor("dashboard"))` → `OWNER_ONLY`. |
+| **CF5** Finance: owner-only, 403 for manager+staff | PASS | `finance/page.tsx`: `requireRole(rolesFor("finance"))` → `OWNER_ONLY` (`lib/access.ts:28`). |
+| **CF5** Reports: owner-only, 403 for manager+staff | PASS | `reports/page.tsx`: `requireRole(rolesFor("reports"))` → `OWNER_ONLY` (`lib/access.ts:29`). |
+| **CF5** Nav hides gated sections | PASS | `bottom-nav.tsx:77`: `NAV_ITEMS.filter((item) => canAccess(profile.role, item.section))`. |
+| **CF5** Cashier can create order + see per-order total | PASS | `orders: ALL_ROLES` (`access.ts:33`); `orders-browser.tsx:299`: `formatLKR(o.totalCents)` always visible. |
+
+### What changed
+
+- `app/(app)/finance/page.tsx` — corrected stale file comment: "owner/manager only" → "owner-only, 403 for manager and staff".
+- `app/(app)/reports/page.tsx` — same stale comment correction.
+
+### Open items (larger — not reworked inline)
+
+**FT2.1 requires a multi-part migration before it can pass:**
+
+1. **Add `sale_price_cents` to `inventory_item`** (nullable integer) — the retail selling price for
+   merchandise items. `merchandise_sale_price` view must be rewritten to use this column as the
+   open-day default rather than the `max(linked menu price)` heuristic.
+
+2. **Reclassify packaging in the seed**: `Paper Cups (12oz)`, `Cake Boxes (medium)`, and
+   `Napkins (pack of 100)` must be reclassified to `kind='ingredient'`. They are consumed per sale
+   (already linked in recipes) and belong in the ingredient lane (recipe-deducted). Only
+   `Branded Tote Bag` and `Ceramic Coffee Mug` remain `merchandise` (pure retail goods, physical
+   count lane).
+
+3. **Set `sale_price_cents` on seed merchandise items**: Tote Bag and Ceramic Mug need explicit
+   retail prices set (inventory_item.sale_price_cents); the stock-take open-day will snapshot this
+   instead of deriving it from linked menu items.
+
+4. **DB-level merchandise rejection on `recipe_line`**: add a BEFORE INSERT/UPDATE trigger that
+   fetches `inventory_item.kind` and raises an exception if it is `'merchandise'`. The server action
+   already checks this, but a DB guard provides the second layer required by the criterion.
+
+5. **Update the daily stock-take seed**: after reclassifying cups/boxes/napkins, the closed
+   stock_day seed must be updated to include only the two true merchandise items (tote/mug), not
+   cups/napkins.
+
+This is a coordinated migration + seed change; flagging as an open item per the review instructions.
+
+
+---
+
 ## 2026-07-15 — chore: restrict dashboard and sales figures to owner
 
 ### What changed

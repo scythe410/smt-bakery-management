@@ -1,5 +1,5 @@
-// Reports (SPEC §3.5) — owner/manager only (CLAUDE.md §5). requireRole() returns
-// a real 403 for staff (app/forbidden.tsx). The report type + date live in the
+// Reports (SPEC §3.5) — owner-only (CLAUDE.md §5). requireRole() returns
+// a real 403 for manager and staff (app/forbidden.tsx). The report type + date live in the
 // URL, so each selection is server-rendered from the derived selector and is
 // shareable. The date defaults to the tenant's current day (resolved in its own
 // timezone, so "today" means today for the shop). The report body is fetched
