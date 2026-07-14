@@ -1,24 +1,18 @@
 "use client";
 
-// Employees directory (SPEC §4.3). Renders the tenant's staff as stacked cards:
-// name/title, permissions, shift schedule, and (owner-only) salary + pay status.
-//
-// Salary and payroll bar are gated by `isOwner` read from AppContext — consistent
-// with CF5/CLAUDE.md §5: aggregate/money figures are owner-only; managers and
-// staff see the directory only. Employee names, titles, and permission labels
-// use i18n where applicable; dynamic business content (names, job titles) is not
-// translated (CLAUDE.md §3).
-
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { CalendarClock, ShieldCheck, UserCheck } from "lucide-react";
+import { CalendarClock, Pencil, Plus, ShieldCheck, Trash2, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { PayrollBar } from "@/components/employees/payroll-bar";
-import { markEmployeePaid } from "@/app/(app)/employees/actions";
+import { EmployeeForm } from "@/components/employees/employee-form";
+import { markEmployeePaid, deleteEmployee } from "@/app/(app)/employees/actions";
 import { useAppContext } from "@/components/app/app-provider";
 import { formatLKR } from "@/lib/format";
 import type { EmployeeListItem, PayrollSummary, PayStatus } from "@/lib/db/selectors/employees";
+import type { ProfileOption } from "@/lib/db/queries/employees";
 
 const KNOWN_PERMISSIONS = new Set([
   "all",
@@ -37,7 +31,6 @@ const PAY_STATUS_TONE: Record<PayStatus, "success" | "warning" | "neutral"> = {
   not_set: "neutral",
 };
 
-// Per-employee salary + toggle (rendered only for owner when salary is configured).
 function SalaryCell({
   empId,
   salaryCents,
@@ -54,10 +47,10 @@ function SalaryCell({
   function toggle() {
     const nextPaid = status !== "paid";
     const next: PayStatus = nextPaid ? "paid" : "pending";
-    setStatus(next); // optimistic
+    setStatus(next);
     startTransition(async () => {
       const result = await markEmployeePaid(empId, nextPaid);
-      if (result.error) setStatus(status); // revert on error
+      if (result.error) setStatus(status);
     });
   }
 
@@ -92,122 +85,184 @@ function SalaryCell({
 export function EmployeesList({
   items,
   payroll,
+  unlinkedProfiles,
 }: {
   items: EmployeeListItem[];
   payroll: PayrollSummary;
+  unlinkedProfiles: ProfileOption[];
 }) {
   const { t } = useTranslation();
   const { profile } = useAppContext();
+  const router = useRouter();
   const isOwner = profile.role === "owner";
 
-  if (items.length === 0) {
+  const [creating, setCreating] = useState(false);
+  const [editingEmp, setEditingEmp] = useState<EmployeeListItem | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  function handleDelete(emp: EmployeeListItem) {
+    if (!window.confirm(t("employees.form.deleteConfirm", { name: emp.name }))) return;
+    setDeletingId(emp.id);
+    startTransition(async () => {
+      await deleteEmployee(emp.id);
+      setDeletingId(null);
+      router.refresh();
+    });
+  }
+
+  if (creating || editingEmp) {
     return (
       <Card>
-        <p className="text-body text-muted">{t("employees.empty")}</p>
+        <EmployeeForm
+          mode={editingEmp ? { kind: "edit", employee: editingEmp } : { kind: "create" }}
+          unlinkedProfiles={unlinkedProfiles}
+          onDone={() => {
+            setCreating(false);
+            setEditingEmp(null);
+            router.refresh();
+          }}
+        />
       </Card>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Owner-only payroll status bar */}
       {isOwner ? <PayrollBar payroll={payroll} /> : null}
 
       <div className="flex items-center justify-between gap-2">
         <p className="text-label text-muted">
-          {t("employees.count", { count: items.length })}
+          {items.length > 0 ? t("employees.count", { count: items.length }) : null}
         </p>
+        {isOwner ? (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="bg-brand text-caption inline-flex h-9 items-center gap-1.5 rounded-[var(--radius)] px-3 font-medium text-white transition-colors hover:bg-brand-ember"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            {t("employees.add")}
+          </button>
+        ) : null}
       </div>
 
-      {items.map((emp) => (
-        <Card key={emp.id} className="flex flex-col gap-3">
-          {/* Identity: name + job title, login-account marker. */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-h2 text-ink">{emp.name}</span>
-              <span className="text-label text-muted">
-                {emp.role ?? t("employees.roleUnset")}
-              </span>
-            </div>
-            {emp.hasLogin ? (
-              <StatusPill
-                tone="info"
-                label={
-                  <span className="inline-flex items-center gap-1">
-                    <UserCheck className="size-3" aria-hidden />
-                    {t("employees.hasLogin")}
-                  </span>
-                }
-              />
-            ) : null}
-          </div>
-
-          {/* Permissions. */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption text-muted inline-flex items-center gap-1">
-              <ShieldCheck className="size-3.5" aria-hidden />
-              {t("employees.permissions")}
-            </span>
-            {emp.permissions.length === 0 ? (
-              <span className="text-caption text-faint">{t("employees.noPermissions")}</span>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {emp.permissions.map((perm) => (
+      {items.length === 0 ? (
+        <Card>
+          <p className="text-body text-muted">{t("employees.empty")}</p>
+        </Card>
+      ) : (
+        items.map((emp) => (
+          <Card key={emp.id} className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-h2 text-ink">{emp.name}</span>
+                <span className="text-label text-muted">
+                  {emp.role ?? t("employees.roleUnset")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {emp.hasLogin ? (
                   <StatusPill
-                    key={perm}
-                    tone={perm === "all" ? "success" : "neutral"}
+                    tone="info"
                     label={
-                      KNOWN_PERMISSIONS.has(perm) ? t(`employees.permission.${perm}`) : perm
+                      <span className="inline-flex items-center gap-1">
+                        <UserCheck className="size-3" aria-hidden />
+                        {t("employees.hasLogin")}
+                      </span>
                     }
                   />
-                ))}
+                ) : null}
+                {isOwner ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingEmp(emp)}
+                      className="text-muted hover:text-ink transition-colors"
+                      aria-label={t("employees.editTitle")}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(emp)}
+                      disabled={deletingId === emp.id}
+                      className="text-danger transition-colors disabled:opacity-40"
+                      aria-label={t("employees.form.deleteConfirm", { name: emp.name })}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </>
+                ) : null}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Weekly shift schedule. */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption text-muted inline-flex items-center gap-1">
-              <CalendarClock className="size-3.5" aria-hidden />
-              {t("employees.shift")}
-            </span>
-            {emp.shift.length === 0 ? (
-              <span className="text-caption text-faint">{t("employees.noShift")}</span>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {emp.shift.map(({ day, hours }) => (
-                  <span
-                    key={day}
-                    className="bg-surface-2 border-border text-caption text-ink inline-flex items-center gap-1.5 rounded-[var(--radius)] border px-2 py-1"
-                  >
-                    <span className="text-muted font-medium uppercase">
-                      {t(`employees.weekday.${day}`)}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-caption text-muted inline-flex items-center gap-1">
+                <ShieldCheck className="size-3.5" aria-hidden />
+                {t("employees.permissions")}
+              </span>
+              {emp.permissions.length === 0 ? (
+                <span className="text-caption text-faint">{t("employees.noPermissions")}</span>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {emp.permissions.map((perm) => (
+                    <StatusPill
+                      key={perm}
+                      tone={perm === "all" ? "success" : "neutral"}
+                      label={
+                        KNOWN_PERMISSIONS.has(perm) ? t(`employees.permission.${perm}`) : perm
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-caption text-muted inline-flex items-center gap-1">
+                <CalendarClock className="size-3.5" aria-hidden />
+                {t("employees.shift")}
+              </span>
+              {emp.shift.length === 0 ? (
+                <span className="text-caption text-faint">{t("employees.noShift")}</span>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {emp.shift.map(({ day, hours }) => (
+                    <span
+                      key={day}
+                      className="bg-surface-2 border-border text-caption text-ink inline-flex items-center gap-1.5 rounded-[var(--radius)] border px-2 py-1"
+                    >
+                      <span className="text-muted font-medium uppercase">
+                        {t(`employees.weekday.${day}`)}
+                      </span>
+                      <span className="tabular-nums">{hours}</span>
                     </span>
-                    <span className="tabular-nums">{hours}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Owner-only salary + pay toggle. */}
-          {isOwner ? (
-            emp.salaryCents !== null ? (
-              <SalaryCell
-                empId={emp.id}
-                salaryCents={emp.salaryCents}
-                initialStatus={emp.payStatus}
-              />
-            ) : (
-              <p className="border-border text-caption text-faint border-t pt-3">
-                {t("employees.payroll.notSet")}
-              </p>
-            )
-          ) : null}
-        </Card>
-      ))}
+            {isOwner ? (
+              emp.salaryCents !== null ? (
+                <SalaryCell
+                  empId={emp.id}
+                  salaryCents={emp.salaryCents}
+                  initialStatus={emp.payStatus}
+                />
+              ) : (
+                <p className="border-border text-caption text-faint border-t pt-3">
+                  {t("employees.payroll.notSet")}
+                </p>
+              )
+            ) : null}
+          </Card>
+        ))
+      )}
 
-      <p className="text-caption text-faint px-1">{t("employees.scopeNote")}</p>
+      {items.length > 0 && (
+        <p className="text-caption text-faint px-1">{t("employees.scopeNote")}</p>
+      )}
     </div>
   );
 }

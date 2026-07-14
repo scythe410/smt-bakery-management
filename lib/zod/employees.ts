@@ -12,3 +12,24 @@ export const markEmployeePaidSchema = z
   .strict();
 
 export type MarkEmployeePaidInput = z.infer<typeof markEmployeePaidSchema>;
+
+export const upsertEmployeeSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    role: z.string().max(100).optional(),
+    salaryCents: z.number().int().min(0).nullable(),
+    profileId: z.string().uuid().nullable(),
+    permissions: z.record(z.string(), z.boolean()),
+    shift: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+export type UpsertEmployeeInput = z.infer<typeof upsertEmployeeSchema>;
+
+export const deleteEmployeeSchema = z
+  .object({
+    employeeId: z.string().uuid(),
+  })
+  .strict();
+
+export type DeleteEmployeeInput = z.infer<typeof deleteEmployeeSchema>;

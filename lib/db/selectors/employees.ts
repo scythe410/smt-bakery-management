@@ -5,8 +5,10 @@
 
 import "server-only";
 import { cache } from "react";
-import { listEmployees } from "@/lib/db/queries/employees";
+import { listEmployees, listUnlinkedProfiles, type ProfileOption } from "@/lib/db/queries/employees";
 import { parsePermissions, parseShiftSchedule, type ShiftDay } from "@/lib/employees/employee-config";
+
+export type { ProfileOption };
 
 export type PayStatus = "paid" | "pending" | "not_set";
 
@@ -86,3 +88,6 @@ async function loadEmployeeList(): Promise<EmployeeList> {
 
 /** The Employees list + payroll summary for this tenant. React-`cache()`d per request. */
 export const getEmployeeList = cache((): Promise<EmployeeList> => loadEmployeeList());
+
+/** Profiles not yet linked to an employee record. React-`cache()`d per request. */
+export const getUnlinkedProfiles = cache((): Promise<ProfileOption[]> => listUnlinkedProfiles());
