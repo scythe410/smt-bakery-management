@@ -61,6 +61,7 @@ export function AddExpenseForm({ onDone }: { onDone: () => void }) {
           name="amount"
           inputMode="decimal"
           required
+          onFocus={(e) => e.currentTarget.select()}
           className={`${FIELD_CLASS} tabular-nums`}
         />
       </label>

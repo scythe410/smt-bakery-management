@@ -50,6 +50,7 @@ export function TaxCurrencyForm({ currency, tax }: { currency: string; tax: TaxC
               inputMode="decimal"
               required
               defaultValue={bpsToPercentString(tax.vatRateBps)}
+              onFocus={(e) => e.currentTarget.select()}
               className={`${FIELD_CLASS} tabular-nums`}
             />
           </label>

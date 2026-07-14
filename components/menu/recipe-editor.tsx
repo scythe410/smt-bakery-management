@@ -127,6 +127,7 @@ export function RecipeEditor({
                   inputMode="decimal"
                   value={line.qty}
                   onChange={(e) => updateQty(idx, e.target.value)}
+                  onFocus={(e) => e.currentTarget.select()}
                   className={`${FIELD} w-20 tabular-nums`}
                   aria-label={t("menu.recipe.qty")}
                   placeholder="0"

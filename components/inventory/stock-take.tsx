@@ -232,6 +232,7 @@ export function StockTake({
                               [l.lineId]: { ...s[l.lineId], received: e.target.value },
                             }))
                           }
+                          onFocus={(e) => e.currentTarget.select()}
                           className={FIELD}
                         />
                       </label>
@@ -251,6 +252,7 @@ export function StockTake({
                               [l.lineId]: { ...s[l.lineId], closing: e.target.value },
                             }))
                           }
+                          onFocus={(e) => e.currentTarget.select()}
                           className={FIELD}
                         />
                       </label>
@@ -315,6 +317,7 @@ export function StockTake({
                           [d.itemId]: { ...s[d.itemId], opening: e.target.value },
                         }))
                       }
+                      onFocus={(e) => e.currentTarget.select()}
                       className={FIELD}
                     />
                   </label>
@@ -331,6 +334,7 @@ export function StockTake({
                             [d.itemId]: { ...s[d.itemId], price: e.target.value },
                           }))
                         }
+                        onFocus={(e) => e.currentTarget.select()}
                         className={FIELD}
                       />
                     </label>

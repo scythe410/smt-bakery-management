@@ -118,6 +118,7 @@ export function NewBookingForm({
                 inputMode="decimal"
                 defaultValue="0"
                 required
+                onFocus={(e) => e.currentTarget.select()}
                 className={`${FIELD_CLASS} tabular-nums`}
               />
             </label>
@@ -129,6 +130,7 @@ export function NewBookingForm({
                 inputMode="decimal"
                 defaultValue="0"
                 required
+                onFocus={(e) => e.currentTarget.select()}
                 className={`${FIELD_CLASS} tabular-nums`}
               />
             </label>
@@ -163,6 +165,7 @@ export function NewBookingForm({
               inputMode="numeric"
               defaultValue="2"
               required
+              onFocus={(e) => e.currentTarget.select()}
               className={`${FIELD_CLASS} tabular-nums`}
             />
           </label>

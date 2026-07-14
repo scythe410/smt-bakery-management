@@ -124,6 +124,7 @@ export function MenuItemForm({
                 inputMode="decimal"
                 required
                 defaultValue={defaultPrice}
+                onFocus={(e) => e.currentTarget.select()}
                 className={`${FIELD} tabular-nums`}
               />
             </label>

@@ -244,6 +244,7 @@ export function NewOrderForm({
                             value={qtyRaw[m.id] ?? String(qty)}
                             onChange={(e) => handleQtyChange(m.id, e.target.value)}
                             onBlur={() => commitQty(m.id)}
+                            onFocus={(e) => e.currentTarget.select()}
                             aria-label={t("orders.new.qtyFor", { name: m.name })}
                             className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
                           />

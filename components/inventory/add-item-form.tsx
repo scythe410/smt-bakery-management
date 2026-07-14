@@ -104,6 +104,7 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
             inputMode="decimal"
             defaultValue="0"
             required
+            onFocus={(e) => e.currentTarget.select()}
             className={`${FIELD_CLASS} tabular-nums`}
           />
         </label>
@@ -129,6 +130,7 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
             inputMode="decimal"
             defaultValue="0"
             required
+            onFocus={(e) => e.currentTarget.select()}
             className={`${FIELD_CLASS} tabular-nums`}
           />
         </label>
@@ -140,6 +142,7 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
             inputMode="decimal"
             defaultValue="0"
             required
+            onFocus={(e) => e.currentTarget.select()}
             className={`${FIELD_CLASS} tabular-nums`}
           />
         </label>

@@ -160,6 +160,7 @@ export function IngredientAudit({ items }: { items: AuditItem[] }) {
             inputMode="decimal"
             value={counted}
             onChange={(e) => setCounted(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             placeholder={t("stock.audit.countPlaceholder")}
             className={`${FIELD} tabular-nums`}
           />
