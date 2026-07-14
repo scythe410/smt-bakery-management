@@ -41,14 +41,21 @@ specific features tracked externally, verify they map to one of the above entrie
 
 ### Post-deploy steps
 
-- `supabase db push` — applied 3 pending migrations to hosted project (`fixyqbmdqvyiukdliijo`):
-  - `20260714221152_ft2_1_ingredient_reclassification.sql`
-  - `20260715090000_menu_item_code.sql`
-  - `20260715120000_employee_salary.sql`
-- Seed reloaded (`supabase/seed.sql` executed against hosted DB via psql) — idempotent; cascades
-  the demo tenant + users before re-inserting. Demo now reflects FT2.1 reclassification
-  (cups/boxes/napkins → ingredient kind), CF1 menu with item codes, FN2 salary data.
-- **Vercel auto-deployed** on push to `main`.
+- **Pushed to `main`** — Vercel auto-deploy triggered.
+- **`supabase db push`** — applied 3 pending migrations to hosted project (`fixyqbmdqvyiukdliijo`):
+  - `20260714221152_ft2_1_ingredient_reclassification.sql` — ✅ applied
+  - `20260715090000_menu_item_code.sql` — ❌ failed first attempt (unique index created before
+    backfill; all existing rows had `item_code=0`, so the index saw duplicates). Fixed: moved the
+    backfill UPDATE to run before `CREATE UNIQUE INDEX`. ✅ applied on second push.
+  - `20260715120000_employee_salary.sql` — ✅ applied
+- **`seed.sql` reloaded** via `supabase db query --linked --file supabase/seed.sql`. Required
+  three seed changes first (see "fix: FT2.1 seed reclassification" commit):
+  - Paper Cups, Cake Boxes, Napkins reclassified `kind='merchandise'` → `kind='ingredient'`
+    (the new `recipe_line_enforce_ingredient_kind` trigger blocked the seed until the seed matched).
+  - `sale_price_cents` set on Tote Bag (LKR 950) and Coffee Mug (LKR 1,200) via UPDATE after INSERT.
+  - `stock_count_line` trimmed to true merchandise only (tote + mug); removed the three
+    packaging items that are now ingredient-lane.
+- Seed reload confirmed clean (no errors). Demo now reflects FT2.1 reclassification.
 
 ### Smoke-test checklist (run after deploy)
 
