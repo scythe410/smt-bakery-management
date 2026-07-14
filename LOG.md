@@ -5,6 +5,46 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — Fix: numeric input handling across forms
+
+### Root cause
+
+Every `<input type="number">` in a React controlled component is broken for mid-type decimal entry. The HTML spec requires browsers to apply a *value sanitization algorithm* to `type="number"` inputs: if the current value string is not a valid floating-point number, the browser coerces it to `""` before passing it to `e.target.value`. This means:
+
+1. User types `"1"` → `e.target.value = "1"` → state = `"1"` ✓
+2. User types `"."` (making `"1."`) → browser sanitizes `"1."` to `""` → `e.target.value = ""` → state resets to `""` → React re-renders with `value=""` → field appears blank ✗
+
+The user must now start over. Intermediate states like `"0."`, `".5"`, `""` (clearing before retyping), or `"1.0"` all trigger this. On uncontrolled inputs the browser's own validation prevents typing a bare `"."` or `"0."` without snapping, and always shows spinner arrows that waste space on a 390 px mobile viewport.
+
+### Fix
+
+Switch every numeric-data input from `type="number"` to `type="text"` with the appropriate `inputMode`:
+- `inputMode="decimal"` for decimals (amounts, quantities, prices, VAT rate)  
+- `inputMode="numeric"` for integers (party size, item code)
+
+`inputMode` tells the mobile OS to display the number pad; `type="text"` tells the browser to pass the raw typed string through `e.target.value` without sanitization. The field never fights the user mid-keystroke. Removed `step`, `min`, `max` HTML attributes (they only apply to `type="number"`; server-side Zod already validates all ranges).
+
+### Files changed
+
+| File | Inputs fixed |
+|---|---|
+| `components/inventory/stock-take.tsx` | opening qty, price (open-day); received, closing (close-day) — 4 controlled |
+| `components/inventory/ingredient-audit.tsx` | counted qty — 1 controlled |
+| `components/menu/recipe-editor.tsx` | ingredient qty per BOM line — 1 controlled |
+| `components/finance/add-expense-form.tsx` | expense amount — 1 uncontrolled |
+| `components/inventory/add-item-form.tsx` | qty on hand, unit cost, low-stock threshold — 3 uncontrolled |
+| `components/bookings/new-booking-form.tsx` | order total, deposit, party size — 3 uncontrolled |
+| `components/settings/tax-currency-form.tsx` | VAT rate — 1 uncontrolled |
+| `components/menu/menu-item-form.tsx` | price, item code — 2 uncontrolled |
+
+`orders/new-order-form.tsx` uses stepper buttons (+/−) for quantities, not a text input — no change needed.
+
+### Not changed
+
+Order quantities use a stepper (+/− button pair), not a freeform text input, so there's nothing to fix there.
+
+---
+
 ## 2026-07-15 — Menu screen: CRUD, item codes, recipe editor
 
 Full build of the Menu screen (SPEC §4.1). Previously the screen was a stub showing "coming soon"; `menu_item` was seed-only with no CRUD.

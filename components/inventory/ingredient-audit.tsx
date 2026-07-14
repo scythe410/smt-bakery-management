@@ -156,10 +156,8 @@ export function IngredientAudit({ items }: { items: AuditItem[] }) {
           </span>
           <input
             ref={countedRef}
-            type="number"
+            type="text"
             inputMode="decimal"
-            step="0.001"
-            min="0"
             value={counted}
             onChange={(e) => setCounted(e.target.value)}
             placeholder={t("stock.audit.countPlaceholder")}

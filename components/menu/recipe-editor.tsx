@@ -123,10 +123,8 @@ export function RecipeEditor({
                   ))}
                 </select>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.001"
-                  min="0.001"
                   value={line.qty}
                   onChange={(e) => updateQty(idx, e.target.value)}
                   className={`${FIELD} w-20 tabular-nums`}

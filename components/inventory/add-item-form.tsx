@@ -99,11 +99,9 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("inventory.add.qty")}</span>
           <input
-            type="number"
+            type="text"
             name="qtyOnHand"
             inputMode="decimal"
-            step="0.001"
-            min="0"
             defaultValue="0"
             required
             className={`${FIELD_CLASS} tabular-nums`}
@@ -126,11 +124,9 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("inventory.add.unitCost")} (LKR)</span>
           <input
-            type="number"
+            type="text"
             name="unitCost"
             inputMode="decimal"
-            step="0.01"
-            min="0"
             defaultValue="0"
             required
             className={`${FIELD_CLASS} tabular-nums`}
@@ -139,11 +135,9 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("inventory.add.lowStockThreshold")}</span>
           <input
-            type="number"
+            type="text"
             name="lowStockThreshold"
             inputMode="decimal"
-            step="0.001"
-            min="0"
             defaultValue="0"
             required
             className={`${FIELD_CLASS} tabular-nums`}

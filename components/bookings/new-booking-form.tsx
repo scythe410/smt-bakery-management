@@ -113,11 +113,9 @@ export function NewBookingForm({
             <label className="flex flex-col gap-1">
               <span className="text-caption text-muted">{t("bookings.new.total")} (LKR)</span>
               <input
-                type="number"
+                type="text"
                 name="total"
                 inputMode="decimal"
-                step="0.01"
-                min="0"
                 defaultValue="0"
                 required
                 className={`${FIELD_CLASS} tabular-nums`}
@@ -126,11 +124,9 @@ export function NewBookingForm({
             <label className="flex flex-col gap-1">
               <span className="text-caption text-muted">{t("bookings.new.deposit")} (LKR)</span>
               <input
-                type="number"
+                type="text"
                 name="deposit"
                 inputMode="decimal"
-                step="0.01"
-                min="0"
                 defaultValue="0"
                 required
                 className={`${FIELD_CLASS} tabular-nums`}
@@ -162,11 +158,9 @@ export function NewBookingForm({
           <label className="flex flex-col gap-1">
             <span className="text-caption text-muted">{t("bookings.new.partySize")}</span>
             <input
-              type="number"
+              type="text"
               name="partySize"
               inputMode="numeric"
-              step="1"
-              min="1"
               defaultValue="2"
               required
               className={`${FIELD_CLASS} tabular-nums`}

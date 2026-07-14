@@ -223,10 +223,8 @@ export function StockTake({
                       <label className="flex flex-col gap-1">
                         <span className="text-caption text-muted">{t("stock.col.received")}</span>
                         <input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="0.001"
-                          min="0"
                           value={closeInputs[l.lineId]?.received ?? ""}
                           onChange={(e) =>
                             setCloseInputs((s) => ({
@@ -243,10 +241,8 @@ export function StockTake({
                           ref={(el) => {
                             fieldRefs.current[l.lineId] = el;
                           }}
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="0.001"
-                          min="0"
                           placeholder={t("stock.close.countPlaceholder")}
                           value={closeInputs[l.lineId]?.closing ?? ""}
                           onChange={(e) =>
@@ -310,10 +306,8 @@ export function StockTake({
                       ref={(el) => {
                         fieldRefs.current[d.itemId] = el;
                       }}
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.001"
-                      min="0"
                       value={openInputs[d.itemId]?.opening ?? ""}
                       onChange={(e) =>
                         setOpenInputs((s) => ({
@@ -328,10 +322,8 @@ export function StockTake({
                     <label className="flex flex-col gap-1">
                       <span className="text-caption text-muted">{t("stock.col.price")} (LKR)</span>
                       <input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        step="0.01"
-                        min="0"
                         value={openInputs[d.itemId]?.price ?? ""}
                         onChange={(e) =>
                           setOpenInputs((s) => ({

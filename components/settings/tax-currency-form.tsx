@@ -45,12 +45,9 @@ export function TaxCurrencyForm({ currency, tax }: { currency: string; tax: TaxC
           <label className="flex flex-col gap-1">
             <span className="text-caption text-muted">{t("settings.tax.vatRate")}</span>
             <input
-              type="number"
+              type="text"
               name="vatRatePercent"
               inputMode="decimal"
-              step="0.01"
-              min="0"
-              max="100"
               required
               defaultValue={bpsToPercentString(tax.vatRateBps)}
               className={`${FIELD_CLASS} tabular-nums`}

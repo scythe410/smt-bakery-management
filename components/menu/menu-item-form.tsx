@@ -117,11 +117,9 @@ export function MenuItemForm({
             <label className="flex flex-col gap-1">
               <span className="text-caption text-muted">{t("menu.form.price")} (LKR)</span>
               <input
-                type="number"
+                type="text"
                 name="priceMajor"
                 inputMode="decimal"
-                step="0.01"
-                min="0"
                 required
                 defaultValue={defaultPrice}
                 className={`${FIELD} tabular-nums`}
@@ -130,12 +128,9 @@ export function MenuItemForm({
             <label className="flex flex-col gap-1">
               <span className="text-caption text-muted">{t("menu.form.code")}</span>
               <input
-                type="number"
+                type="text"
                 name="itemCode"
                 inputMode="numeric"
-                step="1"
-                min="0"
-                max="9999"
                 defaultValue={isEdit && mode.initialItemCode ? mode.initialItemCode : ""}
                 placeholder={t("menu.form.codeAuto")}
                 className={`${FIELD} tabular-nums`}

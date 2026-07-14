@@ -57,11 +57,9 @@ export function AddExpenseForm({ onDone }: { onDone: () => void }) {
       <label className="flex flex-col gap-1">
         <span className="text-caption text-muted">{t("finance.expenses.amount")} (LKR)</span>
         <input
-          type="number"
+          type="text"
           name="amount"
           inputMode="decimal"
-          step="0.01"
-          min="0"
           required
           className={`${FIELD_CLASS} tabular-nums`}
         />
