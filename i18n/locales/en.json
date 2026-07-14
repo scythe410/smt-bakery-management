@@ -338,7 +338,8 @@
   "reports": {
     "type": {
       "label": "Report",
-      "daily_sales": "Daily Sales"
+      "daily_sales": "Daily Sales",
+      "end_of_day": "End of Day"
     },
     "date": {
       "label": "Date"
@@ -377,6 +378,84 @@
     "note": "Revenue, commission and net revenue count completed orders only.",
     "error": {
       "title": "Couldn't load Reports.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
+  "stock": {
+    "nav": {
+      "stockTake": "Daily Count",
+      "audit": "Audit"
+    },
+    "status": {
+      "none": "Not started",
+      "open": "Day open",
+      "closed": "Day closed"
+    },
+    "col": {
+      "opening": "Opening",
+      "received": "Received",
+      "closing": "Closing",
+      "out": "Out",
+      "left": "Left",
+      "price": "Price"
+    },
+    "stats": {
+      "revenue": "Merch Revenue",
+      "unitsOut": "Units Out",
+      "left": "Units Left",
+      "items": "Items"
+    },
+    "open": {
+      "hint": "Set this morning's opening stock for each merchandise item, then open the day.",
+      "action": "Open day",
+      "saving": "Opening…"
+    },
+    "close": {
+      "hint": "Enter what's left this evening.",
+      "action": "Close day",
+      "saving": "Closing…",
+      "countPlaceholder": "Count"
+    },
+    "totalRevenue": "Total revenue",
+    "viewReport": "View report",
+    "empty": "No merchandise counted for this day.",
+    "noMerchandise": "No merchandise items yet. Add a merchandise item first.",
+    "dashboard": {
+      "title": "Stock-take today",
+      "notOpened": "Open today's merchandise count."
+    },
+    "detail": {
+      "title": "Merchandise",
+      "item": "Item",
+      "billed": "Billed",
+      "variance": "Variance",
+      "empty": "No merchandise counted on this day."
+    },
+    "report": {
+      "notOpened": "No stock-take was opened for this day.",
+      "openNote": "The day is still open — figures are provisional until it's closed.",
+      "basis": "Merchandise revenue is physical units out × the selling price snapshotted at open. A positive variance flags shrinkage against units billed through orders."
+    },
+    "audit": {
+      "hint": "Spot-count an ingredient and record the difference against system stock.",
+      "item": "Ingredient",
+      "systemQty": "System qty",
+      "countedQty": "Counted qty",
+      "countPlaceholder": "Counted amount",
+      "previewVariance": "Variance",
+      "action": "Record count",
+      "saving": "Recording…",
+      "recorded": "Count recorded",
+      "variance": "Variance",
+      "noVariance": "No variance",
+      "varianceFlag": "Adjusted",
+      "noIngredients": "No ingredient items yet. Add an ingredient first.",
+      "notIngredient": "That item isn't an ingredient. Use the daily count for merchandise."
+    },
+    "error": {
+      "generic": "Couldn't save that. Check the details and try again.",
+      "title": "Couldn't load the stock-take",
       "body": "Check your connection and try again.",
       "retry": "Retry"
     }

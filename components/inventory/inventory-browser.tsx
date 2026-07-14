@@ -11,7 +11,8 @@
 // (CLAUDE.md §3).
 
 import { useMemo, useState } from "react";
-import { Plus, ScanLine, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Plus, ScanLine, AlertTriangle, ClipboardList, ClipboardCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -112,6 +113,24 @@ export function InventoryBrowser({
           <ScanLine className="size-4" aria-hidden />
           {t("inventory.scan.action")}
         </button>
+      </div>
+
+      {/* Reconciliation flows: daily merchandise count + periodic ingredient audit */}
+      <div className="flex gap-2">
+        <Link
+          href="/inventory/stock-take"
+          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+        >
+          <ClipboardList className="size-4" aria-hidden />
+          {t("stock.nav.stockTake")}
+        </Link>
+        <Link
+          href="/inventory/audit"
+          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+        >
+          <ClipboardCheck className="size-4" aria-hidden />
+          {t("stock.nav.audit")}
+        </Link>
       </div>
 
       {scanning ? (

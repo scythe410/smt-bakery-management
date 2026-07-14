@@ -661,6 +661,135 @@ export type Database = {
           },
         ]
       }
+      stock_count_line: {
+        Row: {
+          business_id: string
+          closing_qty: number | null
+          created_at: string
+          id: string
+          inventory_item_id: string
+          opening_qty: number
+          received_qty: number
+          stock_day_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          closing_qty?: number | null
+          created_at?: string
+          id?: string
+          inventory_item_id: string
+          opening_qty?: number
+          received_qty?: number
+          stock_day_id: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          closing_qty?: number | null
+          created_at?: string
+          id?: string
+          inventory_item_id?: string
+          opening_qty?: number
+          received_qty?: number
+          stock_day_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_count_line_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_count_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_item"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_count_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_count_line_stock_day_id_business_id_fkey"
+            columns: ["stock_day_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "stock_day"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
+      }
+      stock_day: {
+        Row: {
+          business_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          date: string
+          id: string
+          opened_at: string
+          opened_by: string | null
+          status: Database["public"]["Enums"]["stock_day_status"]
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          opened_at?: string
+          opened_by?: string | null
+          status?: Database["public"]["Enums"]["stock_day_status"]
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          opened_at?: string
+          opened_by?: string | null
+          status?: Database["public"]["Enums"]["stock_day_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_day_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_day_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_day_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movement: {
         Row: {
           business_id: string
@@ -734,6 +863,13 @@ export type Database = {
             referencedRelation: "order"
             referencedColumns: ["id", "business_id"]
           },
+          {
+            foreignKeyName: "stock_movement_ref_stock_day_fk"
+            columns: ["ref_stock_day_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "stock_day"
+            referencedColumns: ["id", "business_id"]
+          },
         ]
       }
     }
@@ -750,6 +886,22 @@ export type Database = {
         Update: {
           business_id?: string | null
           id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_item_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchandise_sale_price: {
+        Row: {
+          business_id: string | null
+          inventory_item_id: string | null
+          price_cents: number | null
         }
         Relationships: [
           {
@@ -787,6 +939,27 @@ export type Database = {
       }
     }
     Functions: {
+      close_stock_day: {
+        Args: { p_lines: Json; p_stock_day_id: string }
+        Returns: {
+          business_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          date: string
+          id: string
+          opened_at: string
+          opened_by: string | null
+          status: Database["public"]["Enums"]["stock_day_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_day"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_order: {
         Args: {
           p_customer_name: string
@@ -818,6 +991,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      open_stock_day: {
+        Args: { p_date: string; p_lines: Json }
+        Returns: {
+          business_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          date: string
+          id: string
+          opened_at: string
+          opened_by: string | null
+          status: Database["public"]["Enums"]["stock_day_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_day"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_language: "en" | "si"
@@ -841,6 +1035,7 @@ export type Database = {
       order_status: "pending" | "completed" | "cancelled"
       payment_method: "cash" | "card" | "online" | "wallet"
       payment_status: "unpaid" | "paid" | "refunded"
+      stock_day_status: "open" | "closed"
       stock_movement_reason:
         | "sale"
         | "sale_reversal"
@@ -997,6 +1192,7 @@ export const Constants = {
       order_status: ["pending", "completed", "cancelled"],
       payment_method: ["cash", "card", "online", "wallet"],
       payment_status: ["unpaid", "paid", "refunded"],
+      stock_day_status: ["open", "closed"],
       stock_movement_reason: [
         "sale",
         "sale_reversal",

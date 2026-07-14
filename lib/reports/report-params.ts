@@ -1,14 +1,14 @@
 // Reports type + date ↔ URL params. Client-safe (no server-only): the page
 // (server) parses the current params, and ReportControls (client) builds URLs
 // from the same lists — one source of truth for both. The report type is an
-// extensible enum: today only "daily_sales" ships, but the list, the labels
-// (i18n `reports.type.*`), and the switch below are all keyed off it, so adding
-// a report type is additive, not a rewrite (CLAUDE.md §5 "extend, don't
+// extensible enum ("daily_sales" and "end_of_day" ship today); the list, the
+// labels (i18n `reports.type.*`), and the page's switch are all keyed off it, so
+// adding a report type is additive, not a rewrite (CLAUDE.md §5 "extend, don't
 // hardcode").
 
 import type { PeriodInput } from "@/lib/db/period";
 
-export const REPORT_TYPES = ["daily_sales"] as const;
+export const REPORT_TYPES = ["daily_sales", "end_of_day"] as const;
 export type ReportType = (typeof REPORT_TYPES)[number];
 
 /** Default when no/invalid type is in the URL. */

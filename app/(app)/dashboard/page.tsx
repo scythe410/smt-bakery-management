@@ -10,14 +10,22 @@
 
 import { Suspense } from "react";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { StockSummary } from "@/components/dashboard/stock-summary";
 import { TodaysBookings } from "@/components/dashboard/todays-bookings";
-import { StatsSkeleton, BookingsSkeleton } from "@/components/dashboard/dashboard-skeletons";
+import {
+  StatsSkeleton,
+  StockSummarySkeleton,
+  BookingsSkeleton,
+} from "@/components/dashboard/dashboard-skeletons";
 
 export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <Suspense fallback={<StatsSkeleton />}>
         <DashboardStats />
+      </Suspense>
+      <Suspense fallback={<StockSummarySkeleton />}>
+        <StockSummary />
       </Suspense>
       <Suspense fallback={<BookingsSkeleton />}>
         <TodaysBookings />

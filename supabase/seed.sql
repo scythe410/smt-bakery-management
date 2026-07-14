@@ -502,4 +502,30 @@ insert into public.notification (business_id, type, message, is_read, created_at
 ('11111111-1111-1111-1111-111111111111', 'payment',   'Payment received for order ORD-1039.',                   true,  now() - interval '1 day 2 hours'),
 ('11111111-1111-1111-1111-111111111111', 'booking',   'Reservation confirmed for a party of 4.',               true,  now() - interval '2 days');
 
+-- ---------------------------------------------------------------------------
+-- 13. Daily merchandise stock-take — one CLOSED session for today (the tenant's
+--     local Colombo date), so the Dashboard card + the End-of-Day report show
+--     live figures on first load. closing_qty == the seeded qty_on_hand, so the
+--     close was a zero-variance reconcile (no count_adjust needed) and the seed's
+--     low-stock states stay intact. opening = closing + out captures the day's
+--     merchandise sales; revenue = out * unit_price_cents (the selling price
+--     snapshot). Packaging (cups/napkins) has no retail price ⇒ counted but 0
+--     revenue. Inserted directly (not via the RPC), representing an already-closed,
+--     already-reconciled day.
+-- ---------------------------------------------------------------------------
+insert into public.stock_day (id, business_id, date, status, opened_by, opened_at, closed_by, closed_at) values
+('ffffffff-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+ (timezone('Asia/Colombo', now()))::date, 'closed',
+ 'aaaaaaaa-0000-0000-0000-000000000001', (timezone('Asia/Colombo', now()))::date + time '08:00',
+ 'aaaaaaaa-0000-0000-0000-000000000001', (timezone('Asia/Colombo', now()))::date + time '19:15');
+
+insert into public.stock_count_line
+  (business_id, stock_day_id, inventory_item_id, opening_qty, received_qty, closing_qty, unit_price_cents) values
+-- item                                                     open   recv  close  price(cents)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000019',  68.000, 0.000,  60.000,  15000),  -- Cake Boxes  (out 8  @ LKR 150)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000020',  31.000, 0.000,  25.000,  95000),  -- Tote Bag    (out 6  @ LKR 950)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000021',  22.000, 0.000,  18.000, 120000),  -- Coffee Mug  (out 4  @ LKR 1200)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000022',  35.000, 0.000,  30.000,      0),  -- Napkins     (out 5, packaging)
+('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000018', 460.000, 0.000, 400.000,      0);  -- Paper Cups  (out 60, packaging)
+
 commit;

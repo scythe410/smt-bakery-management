@@ -11,6 +11,7 @@ import { requireRole, rolesFor } from "@/lib/auth";
 import { resolveTenantPeriod } from "@/lib/db/selectors/context";
 import { ReportControls } from "@/components/reports/report-controls";
 import { DailySalesReport } from "@/components/reports/daily-sales-report";
+import { EndOfDayReport } from "@/components/reports/end-of-day-report";
 import { ReportsSkeleton } from "@/components/reports/reports-skeleton";
 import { isDateStr, toReportType } from "@/lib/reports/report-params";
 
@@ -44,7 +45,11 @@ export default async function ReportsPage({
     <div className="flex flex-col gap-4">
       <ReportControls reportType={reportType} date={date} />
       <Suspense key={suspenseKey} fallback={<ReportsSkeleton />}>
-        <DailySalesReport reportType={reportType} date={date} />
+        {reportType === "end_of_day" ? (
+          <EndOfDayReport date={date} />
+        ) : (
+          <DailySalesReport reportType={reportType} date={date} />
+        )}
       </Suspense>
     </div>
   );

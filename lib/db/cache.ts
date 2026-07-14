@@ -38,6 +38,8 @@ export const businessTags = {
   menu: (b: string) => `menu:${b}`,
   /** `notification` rows (unread bell badge). */
   notifications: (b: string) => `notifications:${b}`,
+  /** `stock_day` + `stock_count_line` rows (daily merchandise count / End-of-Day). */
+  stock: (b: string) => `stock:${b}`,
   /** `commission_rule` + `recipe_line` + ingredient costs (drive commission & COGS). */
   pricing: (b: string) => `pricing:${b}`,
   /** the `business` row itself (name, logo, timezone, tax config). */

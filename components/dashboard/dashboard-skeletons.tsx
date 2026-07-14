@@ -55,6 +55,27 @@ export function StatsSkeleton() {
   );
 }
 
+/** Skeleton for the stock-take summary card (label + figure + two stat lines). */
+export function StockSummarySkeleton() {
+  return (
+    <div className="animate-pulse" aria-hidden>
+      <Card className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <Bar className="h-3 w-28" />
+          <Bar className="rounded-pill h-5 w-16" />
+        </div>
+        <div className="flex items-end justify-between">
+          <Bar className="h-7 w-32" />
+          <div className="flex flex-col items-end gap-1">
+            <Bar className="h-3 w-16" />
+            <Bar className="h-3 w-16" />
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /** Skeleton for the Today's Bookings section (title + a few list rows). */
 export function BookingsSkeleton() {
   return (
