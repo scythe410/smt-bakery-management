@@ -13,6 +13,11 @@
 // and always torn down (controls.stop()) on cleanup — leaving the screen, reading
 // a code, or an error all stop the camera; nothing keeps it live in the
 // background.
+//
+// Hardware path: a keyboard-wedge scanner (USB/Bluetooth) feeds the SAME
+// handleCode pipeline via useBarcodeScanner, so a hardware scan resolves exactly
+// like a camera read — and needs no camera permission (the primary mode at a
+// fixed counter). Each decode is announced through an aria-live region.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
@@ -20,6 +25,7 @@ import { Camera, Keyboard, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AddItemForm, type AddItemPrefill } from "@/components/inventory/add-item-form";
 import { lookupBarcode } from "@/app/(app)/inventory/actions";
+import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
 
 type Phase = "scanning" | "looking_up" | "form" | "duplicate";
 type CamError = "denied" | "no_camera" | "insecure" | "generic";
@@ -158,6 +164,10 @@ export function ScanToAdd({
     };
   }, [phase, attempt, handleCode]);
 
+  // Hardware keyboard-wedge scanner — active only while scanning, funnelling into
+  // the same handleCode pipeline as the camera. Works with the camera denied.
+  useBarcodeScanner({ onScan: (code) => void handleCode(code), enabled: phase === "scanning" });
+
   function rescan() {
     handledRef.current = false;
     setPrefill(null);
@@ -286,6 +296,14 @@ export function ScanToAdd({
           <p className="text-caption text-muted text-center">{t("inventory.scan.hint")}</p>
         </>
       )}
+
+      {/* Hardware scanner works alongside (or instead of) the camera. */}
+      <p className="text-caption text-faint text-center">{t("inventory.scan.hardwareHint")}</p>
+
+      {/* Announce a decoded code to assistive tech (consecutive scans re-announce). */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {captured ? t("inventory.scan.announce", { code: captured }) : ""}
+      </span>
 
       {/* Manual entry — fallback for unreadable codes or a denied camera. */}
       {showManual || camError ? (

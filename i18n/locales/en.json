@@ -174,6 +174,8 @@
       "done": "Done",
       "duplicate": "That barcode is already on another item.",
       "duplicateNamed": "Already in inventory: {{name}}",
+      "hardwareHint": "Or scan with a connected USB/Bluetooth barcode scanner.",
+      "announce": "Scanned {{code}}",
       "error": {
         "denied": "Camera access was blocked.",
         "no_camera": "No camera was found on this device.",
@@ -386,6 +388,11 @@
     "nav": {
       "stockTake": "Daily Count",
       "audit": "Audit"
+    },
+    "scan": {
+      "hint": "Scan an item's barcode to jump straight to its count field.",
+      "jumped": "Jumped to {{name}}.",
+      "notFound": "No item here matches {{code}}."
     },
     "status": {
       "none": "Not started",

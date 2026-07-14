@@ -12,8 +12,13 @@
 // counts but don't see money (CLAUDE.md §5). Item names are business data, shown
 // as entered — not translated (§3). All money is pre-integer cents; formatLKR is
 // render-time only. Loading/empty/error states per DESIGN.md §6.
+//
+// A hardware keyboard-wedge scan (useBarcodeScanner) resolves against this day's
+// own count and jumps to the matched item's field — the Closing input while open,
+// the Opening input while none — focusing it so the operator keys the count
+// straight in. Announced through an aria-live region for consecutive scans.
 
-import { useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PackageOpen, Lock, FileText } from "lucide-react";
@@ -21,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatLKR } from "@/lib/format";
+import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
 import { openStockDay, closeStockDay } from "@/app/(app)/inventory/stock-take/actions";
 import type { StockTakeSession } from "@/lib/db/selectors/stock";
 
@@ -42,6 +48,39 @@ export function StockTake({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState("");
+  // key (lineId while open / itemId while none) → the qty field to focus on a scan.
+  const fieldRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // code → the field to jump to on a hardware scan, resolved against this day's
+  // own count (close-day lines when open, open-day items when none).
+  const byBarcode = useMemo(() => {
+    const map = new Map<string, { key: string; name: string }>();
+    if (session.status === "open") {
+      for (const l of session.lines) if (l.barcode) map.set(l.barcode, { key: l.lineId, name: l.name });
+    } else if (session.status === "none") {
+      for (const d of session.defaults) if (d.barcode) map.set(d.barcode, { key: d.itemId, name: d.name });
+    }
+    return map;
+  }, [session]);
+
+  useBarcodeScanner({
+    enabled: session.status !== "closed",
+    onScan: (code) => {
+      const match = byBarcode.get(code);
+      if (!match) {
+        setAnnounce(t("stock.scan.notFound", { code }));
+        return;
+      }
+      setAnnounce(t("stock.scan.jumped", { name: match.name }));
+      requestAnimationFrame(() => {
+        const el = fieldRefs.current[match.key];
+        el?.scrollIntoView({ block: "center", behavior: "smooth" });
+        el?.focus();
+        el?.select();
+      });
+    },
+  });
 
   // --- Open-day form state (status "none") ---
   const [openInputs, setOpenInputs] = useState<Record<string, { opening: string; price: string }>>(
@@ -157,6 +196,10 @@ export function StockTake({
           <StatusPill tone="warning" label={t("stock.status.open")} />
           <span className="text-caption text-muted">{t("stock.close.hint")}</span>
         </div>
+        <span className="text-caption text-faint">{t("stock.scan.hint")}</span>
+        <span className="sr-only" role="status" aria-live="polite">
+          {announce}
+        </span>
         <Card className="flex flex-col gap-3">
           {session.lines.length === 0 ? (
             <p className="text-body text-muted py-2">{t("stock.empty")}</p>
@@ -197,6 +240,9 @@ export function StockTake({
                       <label className="flex flex-col gap-1">
                         <span className="text-caption text-muted">{t("stock.col.closing")}</span>
                         <input
+                          ref={(el) => {
+                            fieldRefs.current[l.lineId] = el;
+                          }}
                           type="number"
                           inputMode="decimal"
                           step="0.001"
@@ -243,6 +289,10 @@ export function StockTake({
   return (
     <div className="flex flex-col gap-3">
       <span className="text-caption text-muted">{t("stock.open.hint")}</span>
+      <span className="text-caption text-faint">{t("stock.scan.hint")}</span>
+      <span className="sr-only" role="status" aria-live="polite">
+        {announce}
+      </span>
       <Card className="flex flex-col gap-3">
         {session.defaults.length === 0 ? (
           <p className="text-body text-muted py-2">{t("stock.noMerchandise")}</p>
@@ -257,6 +307,9 @@ export function StockTake({
                       {t("stock.col.opening")} ({d.unit})
                     </span>
                     <input
+                      ref={(el) => {
+                        fieldRefs.current[d.itemId] = el;
+                      }}
                       type="number"
                       inputMode="decimal"
                       step="0.001"

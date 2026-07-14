@@ -12,6 +12,12 @@ export async function AuditPanel() {
   const { items } = await getInventoryList();
   const ingredients: AuditItem[] = items
     .filter((it) => it.kind === "ingredient")
-    .map((it) => ({ id: it.id, name: it.name, unit: it.unit, qtyOnHand: it.qtyOnHand ?? 0 }));
+    .map((it) => ({
+      id: it.id,
+      name: it.name,
+      unit: it.unit,
+      barcode: it.barcode,
+      qtyOnHand: it.qtyOnHand ?? 0,
+    }));
   return <IngredientAudit items={ingredients} />;
 }

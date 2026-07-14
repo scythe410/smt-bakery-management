@@ -27,6 +27,7 @@ export type StockCountLineWithItem = StockCountLineRow & {
     unit: string;
     kind: InventoryKind;
     category: InventoryCategory;
+    barcode: string | null;
   } | null;
 };
 
@@ -49,7 +50,7 @@ export async function listStockCountLines(
   const supabase = scope?.client ?? (await createClient());
   let query = supabase
     .from("stock_count_line")
-    .select("*, inventory_item(name, unit, kind, category)")
+    .select("*, inventory_item(name, unit, kind, category, barcode)")
     .eq("stock_day_id", stockDayId);
   if (scope) query = query.eq("business_id", scope.businessId);
 

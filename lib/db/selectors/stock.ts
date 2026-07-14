@@ -217,6 +217,8 @@ export type StockTakeLine = {
   itemId: string;
   name: string;
   unit: string;
+  /** Stored barcode (GTIN), or null — lets a hardware scan jump to this line. */
+  barcode: string | null;
   openingQty: number;
   receivedQty: number;
   closingQty: number | null;
@@ -230,6 +232,8 @@ export type StockTakeDefault = {
   itemId: string;
   name: string;
   unit: string;
+  /** Stored barcode (GTIN), or null — lets a hardware scan jump to this item. */
+  barcode: string | null;
   openingQty: number;
   suggestedPriceCents: number;
 };
@@ -257,6 +261,7 @@ function shapeSessionLines(lines: StockCountLineWithItem[]): StockTakeLine[] {
         itemId: l.inventory_item_id,
         name: l.inventory_item?.name ?? "",
         unit: l.inventory_item?.unit ?? "",
+        barcode: l.inventory_item?.barcode ?? null,
         openingQty,
         receivedQty,
         closingQty,
@@ -282,6 +287,7 @@ async function loadStockTakeSession(date: string): Promise<StockTakeSession> {
       itemId: it.id,
       name: it.name,
       unit: it.unit,
+      barcode: it.barcode,
       openingQty: toNum(it.qty_on_hand),
       suggestedPriceCents: priceMap.get(it.id) ?? 0,
     }))
