@@ -5,6 +5,40 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: POS sizing to reference + quick-add by item code
+
+### What changed
+
+**`lib/db/selectors/orders.ts`**
+- Added `itemCode: number` to `NewOrderMenuItem` type.
+- `getNewOrderMenu` now maps `m.item_code` into the picker items so the form can do code lookup.
+
+**`components/orders/new-order-form.tsx`** (rewritten)
+- **No more nested scroll.** Removed `max-h-64 overflow-y-auto` from the items list — the whole page scrolls naturally, which is the standard mobile POS pattern (no scroll-within-scroll UX trap).
+- **Quick-add bar.** A search input above the item list lets the cashier type a code number (e.g. `5`) and press Enter to add the first match. Falls back to name substring if no code match. Cleared automatically after an add; an ×-button clears it manually. Refocuses the bar after each add for fast multi-item entry.
+- **Item code chip.** Each item row now shows `#N` before the name so codes are visually scannable.
+- **Tappable item name area.** The name+price block is a `<button type="button">` — tapping adds 1, same as pressing Enter on the matching code.
+- **Editable qty (CF2 fix applied).** When an item is in the cart (qty > 0), the qty display becomes a `type="text" inputMode="numeric"` input. Blur commits: non-positive/empty → removes item from cart; valid integer → normalises the canonical qty.
+- **Cart-state highlight.** In-cart rows get `bg-[var(--red-tint)]` background and bold name so the cashier can see what's been added without leaving the list.
+- **Payment fields moved below items.** Source+customer remains at top; payment method+status moves below the estimated total. More natural POS flow: pick items first, then settle how it's paid.
+- **Stepper buttons compacted.** `size-7` (28 px) with `size-3.5` icons — tighter than previous `size-8`, consistent with compact row `py-1.5` padding.
+
+**`i18n/locales/en.json` + `si.json`** — added under `orders.new`:
+- `searchPlaceholder`, `clearSearch`, `noMatch`, `qtyFor`
+
+### Decisions
+
+- **Single list, no separate cart section.** The item list IS the cart (in-cart rows highlighted in red-tint). On a typical bakery menu of 10-20 items this is cleaner than a split picker+cart. If the menu grows large the quick-add bar makes the cart pattern unnecessary.
+- **`inputMode="text"` for the search bar** (not `"numeric"`) because it's used for both code entry and name search. The cashier can type numbers from the standard keyboard just as fast.
+- **`String(asInt) === q` guard.** Prevents "5.5" from matching item code 5 (parseInt returns 5 but String(5) ≠ "5.5").
+- **Fancy quotes and `↵` removed from i18n strings.** TypeScript's JSON checker rejected the curly-quote characters (U+201C/U+201D) and the downwards-arrow-with-corner character (U+21B5) as unexpected tokens. Used plain ASCII single quotes instead.
+
+### Open questions / deviations
+
+None. Security model unchanged: server action still re-reads `menu_item` for all price/name snapshots; client sends only `{ menuItemId, qty }` pairs.
+
+---
+
 ## 2026-07-15 — Fix: numeric input handling across forms
 
 ### Root cause

@@ -8,9 +8,13 @@
 // the same stored prices for UX; it is explicitly labelled as such, and the saved
 // order uses the server's recomputation. Item names/prices are business data,
 // shown as entered/stored — not translated (CLAUDE.md §3).
+//
+// Quick-add: cashier types an item code (integer) and presses Enter — the item is
+// added with qty 1. Falls back to name-substring search if no code matches.
+// Qty for in-cart items is directly editable (CF2 pattern: type="text").
 
-import { useActionState, useEffect, useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { Minus, Plus, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { createOrder, type CreateOrderState } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
@@ -32,21 +36,72 @@ export function NewOrderForm({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Canonical integer qty per menu item (0 = not in order).
   const [qtyById, setQtyById] = useState<Record<string, number>>({});
+  // Raw string values for the editable qty text inputs (CF2: never sanitize mid-type).
+  const [qtyRaw, setQtyRaw] = useState<Record<string, string>>({});
+  // Quick-add / search query.
+  const [quickAdd, setQuickAdd] = useState("");
+
   const [state, formAction, pending] = useActionState<CreateOrderState, FormData>(createOrder, {});
 
   useEffect(() => {
     if (state.ok) onDone();
   }, [state.ok, onDone]);
 
+  // Filter menu by quick-add query: pure integer → code lookup (with name fallback),
+  // anything else → name substring.
+  const filteredMenu = useMemo(() => {
+    const q = quickAdd.trim();
+    if (!q) return menu;
+    const asInt = parseInt(q, 10);
+    if (!isNaN(asInt) && asInt > 0 && String(asInt) === q) {
+      const byCode = menu.filter((m) => m.itemCode === asInt);
+      if (byCode.length > 0) return byCode;
+    }
+    const lower = q.toLowerCase();
+    return menu.filter((m) => m.name.toLowerCase().includes(lower));
+  }, [menu, quickAdd]);
+
+  function addItem(id: string) {
+    const next = (qtyById[id] ?? 0) + 1;
+    setQtyById((prev) => ({ ...prev, [id]: next }));
+    setQtyRaw((prev) => ({ ...prev, [id]: String(next) }));
+    setQuickAdd("");
+    searchRef.current?.focus();
+  }
+
   function bump(id: string, delta: number) {
+    const next = Math.max(0, (qtyById[id] ?? 0) + delta);
     setQtyById((prev) => {
-      const next = Math.max(0, (prev[id] ?? 0) + delta);
       const copy = { ...prev };
       if (next === 0) delete copy[id];
       else copy[id] = next;
       return copy;
     });
+    setQtyRaw((prev) => {
+      const copy = { ...prev };
+      if (next === 0) delete copy[id];
+      else copy[id] = String(next);
+      return copy;
+    });
+  }
+
+  function handleQtyChange(id: string, raw: string) {
+    setQtyRaw((prev) => ({ ...prev, [id]: raw }));
+  }
+
+  function commitQty(id: string) {
+    const parsed = parseInt(qtyRaw[id] ?? "", 10);
+    if (!isFinite(parsed) || parsed <= 0) {
+      setQtyById((prev) => { const c = { ...prev }; delete c[id]; return c; });
+      setQtyRaw((prev) => { const c = { ...prev }; delete c[id]; return c; });
+    } else {
+      setQtyById((prev) => ({ ...prev, [id]: parsed }));
+      setQtyRaw((prev) => ({ ...prev, [id]: String(parsed) }));
+    }
   }
 
   const lines = useMemo(
@@ -65,6 +120,7 @@ export function NewOrderForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
+      {/* Source + customer */}
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("orders.new.source")}</span>
@@ -88,6 +144,144 @@ export function NewOrderForm({
         </label>
       </div>
 
+      {/* Quick-add / item picker */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-caption text-muted">{t("orders.new.items")}</span>
+
+        {menu.length === 0 ? (
+          <p className="text-caption text-muted py-1">{t("orders.new.noMenu")}</p>
+        ) : (
+          <>
+            {/* Code / name search bar */}
+            <div className="relative">
+              <Search
+                className="text-muted absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                aria-hidden
+              />
+              <input
+                ref={searchRef}
+                type="text"
+                value={quickAdd}
+                onChange={(e) => setQuickAdd(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const first = filteredMenu[0];
+                    if (first) addItem(first.id);
+                  }
+                }}
+                placeholder={t("orders.new.searchPlaceholder")}
+                className={`${FIELD_CLASS} pl-8 ${quickAdd ? "pr-8" : ""}`}
+              />
+              {quickAdd ? (
+                <button
+                  type="button"
+                  onClick={() => { setQuickAdd(""); searchRef.current?.focus(); }}
+                  aria-label={t("orders.new.clearSearch")}
+                  className="text-muted hover:text-ink absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+
+            {/* Item list — no max-h, page scroll handles overflow */}
+            {filteredMenu.length === 0 ? (
+              <p className="text-caption text-muted py-1">
+                {t("orders.new.noMatch", { query: quickAdd.trim() })}
+              </p>
+            ) : (
+              <ul className="border-border divide-border divide-y rounded-[var(--radius)] border">
+                {filteredMenu.map((m) => {
+                  const qty = qtyById[m.id] ?? 0;
+                  const inCart = qty > 0;
+                  return (
+                    <li
+                      key={m.id}
+                      className={`flex items-center gap-2 px-2 py-1.5 transition-colors ${
+                        inCart ? "bg-[var(--red-tint)]" : ""
+                      }`}
+                    >
+                      {/* Item code chip */}
+                      <span className="text-caption text-muted w-7 shrink-0 text-right tabular-nums">
+                        #{m.itemCode}
+                      </span>
+
+                      {/* Name + price — tap to add 1 */}
+                      <button
+                        type="button"
+                        onClick={() => addItem(m.id)}
+                        className="flex min-w-0 flex-1 flex-col text-left"
+                      >
+                        <span
+                          className={`text-label truncate ${
+                            inCart ? "text-ink font-semibold" : "text-ink"
+                          }`}
+                        >
+                          {m.name}
+                        </span>
+                        <span className="text-caption text-muted tabular-nums">
+                          {formatLKR(m.priceCents)}
+                        </span>
+                      </button>
+
+                      {/* Stepper — shows qty input when in cart */}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => bump(m.id, -1)}
+                          disabled={!inCart}
+                          aria-label={t("orders.new.decrease", { name: m.name })}
+                          className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border disabled:opacity-30"
+                        >
+                          <Minus className="size-3.5" aria-hidden />
+                        </button>
+
+                        {inCart ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={qtyRaw[m.id] ?? String(qty)}
+                            onChange={(e) => handleQtyChange(m.id, e.target.value)}
+                            onBlur={() => commitQty(m.id)}
+                            aria-label={t("orders.new.qtyFor", { name: m.name })}
+                            className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                          />
+                        ) : (
+                          <span className="text-faint w-9 text-center text-sm tabular-nums">
+                            —
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => bump(m.id, 1)}
+                          aria-label={t("orders.new.increase", { name: m.name })}
+                          className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                        >
+                          <Plus className="size-3.5" aria-hidden />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Estimated total — server recomputes the authoritative figure on save */}
+      <div className="bg-surface-2 flex items-center justify-between rounded-[var(--radius)] px-3 py-2">
+        <span className="text-caption text-muted">
+          {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
+        </span>
+        <span className="text-label text-ink font-semibold tabular-nums">
+          {formatLKR(estimatedCents)}
+        </span>
+      </div>
+
+      {/* Payment method + status (below items — cashier picks items first) */}
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("orders.new.paymentMethod")}</span>
@@ -109,60 +303,6 @@ export function NewOrderForm({
             ))}
           </select>
         </label>
-      </div>
-
-      {/* Menu line picker */}
-      <div className="flex flex-col gap-1">
-        <span className="text-caption text-muted">{t("orders.new.items")}</span>
-        {menu.length === 0 ? (
-          <p className="text-caption text-muted py-2">{t("orders.new.noMenu")}</p>
-        ) : (
-          <ul className="border-border max-h-64 divide-y overflow-y-auto rounded-[var(--radius)] border">
-            {menu.map((m) => {
-              const qty = qtyById[m.id] ?? 0;
-              return (
-                <li key={m.id} className="flex items-center justify-between gap-2 px-2 py-2">
-                  <div className="min-w-0">
-                    <p className="text-label text-ink truncate">{m.name}</p>
-                    <p className="text-caption text-muted tabular-nums">{formatLKR(m.priceCents)}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => bump(m.id, -1)}
-                      disabled={qty === 0}
-                      aria-label={t("orders.new.decrease", { name: m.name })}
-                      className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border disabled:opacity-40"
-                    >
-                      <Minus className="size-4" aria-hidden />
-                    </button>
-                    <span className="text-label w-5 text-center tabular-nums" aria-live="polite">
-                      {qty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => bump(m.id, 1)}
-                      aria-label={t("orders.new.increase", { name: m.name })}
-                      className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
-                    >
-                      <Plus className="size-4" aria-hidden />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Estimated total — server recomputes the authoritative figure on save */}
-      <div className="bg-surface-2 flex items-center justify-between rounded-[var(--radius)] px-3 py-2">
-        <span className="text-caption text-muted">
-          {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
-        </span>
-        <span className="text-label text-ink font-semibold tabular-nums">
-          {formatLKR(estimatedCents)}
-        </span>
       </div>
 
       <input type="hidden" name="items" value={itemsJson} readOnly />

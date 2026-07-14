@@ -142,6 +142,7 @@ export const getOrderTabCounts = cache(async (): Promise<OrderTabCounts> => {
 export type NewOrderMenuItem = {
   id: string;
   name: string;
+  itemCode: number;
   priceCents: number;
   category: string | null;
 };
@@ -152,6 +153,7 @@ export const getNewOrderMenu = cache(async (): Promise<NewOrderMenuItem[]> => {
   return rows.map((m) => ({
     id: m.id,
     name: m.name,
+    itemCode: m.item_code,
     priceCents: m.price_cents,
     category: m.category,
   }));
