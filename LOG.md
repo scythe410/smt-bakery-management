@@ -5,6 +5,45 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: replace initials monogram with logo on bill and PDF reports
+
+### What changed
+
+**`components/orders/order-bill.tsx`**
+- Removed the `"SA"` text-badge fallback; replaced with `<BrandLogo>` (the `/public/logo.webp`
+  wordmark) when `businessLogoUrl` is null. When the business does upload a logo it still renders
+  that instead.
+
+**`app/(app)/orders/[id]/bill/page.tsx`**
+- Added `@page { size: 80mm auto; margin: 4mm; }` via an inline `<style>` tag. This makes
+  browser print / Save as PDF produce a receipt-width page instead of an A4 sheet with the
+  receipt floating in the middle. The tag is scoped to this route, so other pages' print
+  behavior is unaffected.
+
+**`lib/pdf/document.tsx`**
+- `DocHeader` now renders `logo.webp` via `@react-pdf/renderer`'s `Image` component (same
+  `path.join(process.cwd(), "public", ...)` pattern as font registration). The initials badge
+  and its styles are removed. This covers both the Daily Sales and End of Day PDF reports
+  because they both go through `BrandedDoc → DocHeader`.
+
+### Logic check (requested)
+
+Revenue / Commission / Net Revenue on the Daily Sales report show LKR 0 when no orders have
+`status = 'completed'`. Both orders in the screenshot (ORD-1190 cancelled, ORD-1191 pending)
+are correctly excluded — the selector (`_shared.ts → REALIZED_STATUS = "completed"`) and the
+table note ("Revenue, commission and net revenue count completed orders only.") are correct.
+Commission is recomputed from stored subtotals × `commission_rule.rate_bps`; stored
+`commission_cents` is not trusted (CLAUDE.md §7.7). No logic changes needed.
+
+### Decisions
+
+- Used `BrandLogo` (app wordmark) not a monogram as the bill fallback. Rationale: the logo IS
+  Samantha's Bakery — using the wordmark is correct branding and what the client asked for.
+- `@page` is always in print context; no `@media print` wrapper needed.
+- PDF logo dimensions: 44pt × 32pt (≈ 480∶347 aspect ratio of the source WebP).
+
+---
+
 ## 2026-07-15 — chore: finalize for demo
 
 Pre-deploy quality gate + push + post-deploy DB sync.
