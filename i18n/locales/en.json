@@ -557,6 +557,76 @@
       "retry": "Retry"
     }
   },
+  "menu": {
+    "title": "Menu",
+    "searchPlaceholder": "Search by name, code, or category",
+    "addItem": "Add Item",
+    "empty": "No menu items yet. Add the first item.",
+    "noMatch": "No items match your filters.",
+    "showing": "Showing {{shown}} of {{total}}",
+    "total": "{{count}} items",
+    "deleteConfirm": "Delete this item? This cannot be undone.",
+    "recipeCount_one": "{{count}} ingredient",
+    "recipeCount_other": "{{count}} ingredients",
+    "status": {
+      "available": "Available",
+      "unavailable": "Unavailable"
+    },
+    "filter": {
+      "allCategories": "All categories",
+      "unavailable": "Hide unavailable"
+    },
+    "action": {
+      "edit": "Edit item",
+      "delete": "Delete item",
+      "markAvailable": "Mark available",
+      "markUnavailable": "Mark unavailable"
+    },
+    "form": {
+      "titleCreate": "Add Menu Item",
+      "titleEdit": "Edit {{name}}",
+      "close": "Close",
+      "tab": {
+        "details": "Details",
+        "recipe": "Recipe"
+      },
+      "name": "Name",
+      "price": "Price",
+      "code": "Code #",
+      "codeAuto": "Auto",
+      "category": "Category",
+      "categoryPlaceholder": "e.g. Bakery, Beverages",
+      "available": "Available",
+      "image": "Image",
+      "imageChoose": "Choose image…",
+      "imageChange": "Change image",
+      "imageHint": "PNG, JPG or WebP, up to 5 MB.",
+      "create": "Add item",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Couldn't save that item. Check the fields and try again.",
+      "errorCodeDuplicate": "That item code is already in use. Choose a different code."
+    },
+    "recipe": {
+      "empty": "No ingredients linked yet.",
+      "noIngredients": "No ingredients in inventory. Add an ingredient first.",
+      "ingredient": "Ingredient",
+      "qty": "Quantity",
+      "remove": "Remove ingredient",
+      "add": "Add ingredient",
+      "save": "Save recipe",
+      "saving": "Saving…",
+      "error": "Couldn't save the recipe. Check the fields and try again.",
+      "errorNotFound": "One of those ingredients wasn't found.",
+      "errorNotIngredient": "Only ingredient-type inventory items can be linked to a recipe."
+    },
+    "error": {
+      "title": "Couldn't load the menu.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
   "forbidden": {
     "title": "You don't have access to this page.",
     "body": "Your role doesn't include this area. Ask an owner or manager if you need it.",
