@@ -33,6 +33,8 @@ export default async function OrderBillPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Receipt-sized page when printing — overrides the browser's A4 default */}
+      <style>{`@page { size: 80mm auto; margin: 4mm; }`}</style>
       {/* Action bar — hidden when printing so only the receipt appears */}
       <div className="flex items-center gap-2 print:hidden">
         <Link

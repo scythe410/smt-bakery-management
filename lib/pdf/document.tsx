@@ -8,16 +8,20 @@
 // react-pdf StyleSheet does not read CSS custom properties).
 
 import React from "react";
+import path from "path";
 import {
   Document,
   Page,
   View,
   Text,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import { registerFonts } from "./fonts";
 
 registerFonts();
+
+const logoSrc = path.join(process.cwd(), "public", "logo.webp");
 
 // ── Brand colours (DESIGN.md §2) ─────────────────────────────────────────────
 const C = {
@@ -53,20 +57,10 @@ const s = StyleSheet.create({
     marginBottom: 16,
     borderBottom: `1pt solid ${C.border}`,
   },
-  monogram: {
-    width: 32,
+  logoImg: {
     height: 32,
-    backgroundColor: C.red,
-    borderRadius: 4,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  monogramText: {
-    fontFamily: "Archivo",
-    fontWeight: 700,
-    fontSize: 13,
-    color: C.white,
-    letterSpacing: 0.5,
+    width: 44,
+    objectFit: "contain",
   },
   headerRight: { flex: 1 },
   businessName: {
@@ -179,17 +173,9 @@ export function DocHeader({
   period: string;
   generatedAt: string;
 }) {
-  const initials = businessName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-
   return (
     <View style={s.header} fixed>
-      <View style={s.monogram}>
-        <Text style={s.monogramText}>{initials || "SB"}</Text>
-      </View>
+      <Image src={logoSrc} style={s.logoImg} />
       <View style={s.headerRight}>
         <Text style={s.businessName}>{businessName}</Text>
         <Text style={s.reportMeta}>

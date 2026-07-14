@@ -12,6 +12,7 @@
 
 import Image from "next/image";
 import { useTranslation } from "react-i18next";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import type { OrderBillData } from "@/lib/db/selectors/order-bill";
 
 export function OrderBill({ data }: { data: OrderBillData }) {
@@ -41,9 +42,7 @@ export function OrderBill({ data }: { data: OrderBillData }) {
             />
           </div>
         ) : (
-          <div className="flex size-14 items-center justify-center rounded-xl bg-brand font-extrabold text-lg text-brand-white select-none">
-            {data.businessName.slice(0, 2).toUpperCase()}
-          </div>
+          <BrandLogo className="h-14" sizes="120px" alt={data.businessName} />
         )}
         <h1 className="text-xl font-extrabold text-ink leading-tight tracking-tight">
           {data.businessName}
