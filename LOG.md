@@ -5,6 +5,62 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — chore: restrict dashboard and sales figures to owner
+
+### What changed
+
+**`lib/access.ts`** (unstaged edit, now committed)
+- `dashboard`, `finance`, `reports` all moved to `OWNER_ONLY` (previously dashboard was `ALL_ROLES`
+  and finance/reports were `OWNER_MANAGER`).
+- `employees` stays `OWNER_MANAGER`. All operational sections (`inventory`, `menu`, `orders`,
+  `bookings`) stay `ALL_ROLES`.
+
+**`app/(app)/dashboard/page.tsx`**
+- Added `requireRole(rolesFor("dashboard"))` at the top of the async page function. Previously the
+  page had no role gate — any authenticated user could reach `/dashboard` and see Today's Sales,
+  Est. Net Profit, etc. The server now returns 403 for manager and staff.
+
+**`components/dashboard/dashboard-stats.tsx`**
+- Upgraded `requireProfile()` → `requireRole(rolesFor("dashboard"))` for defense-in-depth. In case
+  any future page renders `DashboardStats` outside the dashboard route, it still enforces the owner
+  gate rather than just authentication.
+
+**`components/inventory/stock-take-panel.tsx`**
+- Updated comment: "manager/owner see revenue" → "owner sees revenue". The code already used
+  `canAccess(profile.role, "reports")` which — now that `reports` is `OWNER_ONLY` — correctly
+  returns `false` for manager. No logic change needed.
+
+**`components/inventory/stock-take.tsx`**
+- Updated the top-of-file comment to reflect the new policy.
+
+**`CLAUDE.md §5`**
+- Rewrote the roles → access matrix to explicitly state: owner = all sections; manager = operational
+  + employees, no money screens; staff = operational only, no money screens.
+- Added a note about per-order totals on the bill/checkout remaining visible (cashier operational
+  need, not analytics).
+
+### Decisions
+
+- **Server gate is the enforcement layer.** Supabase RLS is row-level (not column-level) and cannot
+  selectively hide revenue fields from within an order row. All revenue aggregate data in this app
+  flows through server components and route handlers, not client→Supabase queries. The `requireRole`
+  gate at the server page level is therefore the correct enforcement mechanism — not just a nav
+  hide. Implementing SECURITY DEFINER Postgres functions for every revenue aggregate to also gate
+  at the DB layer would be a significant migration with no practical security gain given the
+  server-only data path.
+- **Per-order totals stay.** `orders-browser.tsx` shows `totalCents` per order row. This is the
+  cashier operational total — the amount to collect from the customer — not an analytics/aggregate
+  figure. Client confirmed this must remain visible regardless of role.
+- **Stock-take revenue was already gated correctly.** `StockTakePanel` already called
+  `canAccess(profile.role, "reports")` — the access.ts change to OWNER_ONLY propagated this gate
+  to owner-only without any logic change in that file.
+
+### Open questions / deviations
+
+None.
+
+---
+
 ## 2026-07-15 — feat: per-order printable bill with heavier receipt text
 
 ### What changed

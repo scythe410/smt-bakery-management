@@ -8,8 +8,8 @@
 //              received) per item; units out + revenue update live.
 //   * closed — read-only summary (opening / received / out / left / revenue) with
 //              a link to the End-of-Day report.
-// Revenue figures render only for owner/manager (canSeeRevenue); staff run the
-// counts but don't see money (CLAUDE.md §5). Item names are business data, shown
+// Revenue figures render only for owner (canSeeRevenue); manager and staff run
+// the counts but don't see money (CLAUDE.md §5). Item names are business data, shown
 // as entered — not translated (§3). All money is pre-integer cents; formatLKR is
 // render-time only. Loading/empty/error states per DESIGN.md §6.
 //

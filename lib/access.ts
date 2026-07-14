@@ -23,15 +23,19 @@ const OWNER_MANAGER: readonly AppRole[] = ["owner", "manager"];
 const OWNER_ONLY: readonly AppRole[] = ["owner"];
 
 export const SECTION_ROLES: Record<Section, readonly AppRole[]> = {
-  dashboard: ALL_ROLES,
+  // Analytics / money — owner only (CLAUDE.md §5).
+  dashboard: OWNER_ONLY,
+  finance: OWNER_ONLY,
+  reports: OWNER_ONLY,
+  // Operational — all roles.
   inventory: ALL_ROLES,
   menu: ALL_ROLES,
   orders: ALL_ROLES,
   bookings: ALL_ROLES,
-  finance: OWNER_MANAGER,
-  reports: OWNER_MANAGER,
+  // Admin — owner / manager.
   employees: OWNER_MANAGER,
-  settings: OWNER_ONLY, // business/billing config — owner only
+  // Business / billing config — owner only.
+  settings: OWNER_ONLY,
 };
 
 /** Roles allowed into a section — for both requireRole() and UI nav gating. */
