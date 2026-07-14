@@ -679,11 +679,28 @@
       "sat": "Sat",
       "sun": "Sun"
     },
-    "scopeNote": "Directory view only. Payroll and attendance are not included in this build.",
+    "scopeNote": "Salary tracking for the current pay period. Attendance not included.",
     "error": {
       "title": "Couldn't load employees",
       "body": "Check your connection and retry.",
       "retry": "Retry"
+    },
+    "payroll": {
+      "label": "Payroll",
+      "salary": "Monthly salary",
+      "total": "Total payroll",
+      "paidOf": "{{paid}} of {{total}} paid",
+      "pending": "{{count}} pending",
+      "progress": "{{paid}} of {{total}} employees paid this period",
+      "markPaid": "Mark paid",
+      "markPending": "Revert",
+      "notSet": "Salary not set",
+      "error": "Could not update pay status.",
+      "status": {
+        "paid": "Paid",
+        "pending": "Pending",
+        "not_set": "Not set"
+      }
     }
   }
 }

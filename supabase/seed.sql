@@ -467,28 +467,38 @@ insert into public.booking (
 
 -- ---------------------------------------------------------------------------
 -- 11. Employees (owner/manager/staff link to profiles; two are non-login staff).
+--     salary_cents in LKR minor units; 2 of 5 paid → non-trivial payroll bar.
+--     Total payroll LKR 253,000 (25,300,000 cents); 2 paid, 3 pending.
 -- ---------------------------------------------------------------------------
-insert into public.employee (business_id, name, role, permissions, shift_schedule, profile_id) values
+insert into public.employee
+  (business_id, name, role, permissions, shift_schedule, profile_id,
+   salary_cents, pay_status, paid_at)
+values
 ('11111111-1111-1111-1111-111111111111', 'Samantha Perera', 'Owner',
  '{"all": true}'::jsonb,
  '{"mon":"08:00-17:00","tue":"08:00-17:00","wed":"08:00-17:00","thu":"08:00-17:00","fri":"08:00-17:00"}'::jsonb,
- 'aaaaaaaa-0000-0000-0000-000000000001'),
+ 'aaaaaaaa-0000-0000-0000-000000000001',
+ 7500000, 'paid', now() - interval '3 days'),
 ('11111111-1111-1111-1111-111111111111', 'Nadeesha Fernando', 'Manager',
  '{"orders": true, "inventory": true, "reports": true, "finance": true, "settings": false}'::jsonb,
  '{"mon":"07:00-16:00","wed":"07:00-16:00","thu":"07:00-16:00","fri":"07:00-16:00","sat":"07:00-16:00"}'::jsonb,
- 'aaaaaaaa-0000-0000-0000-000000000002'),
+ 'aaaaaaaa-0000-0000-0000-000000000002',
+ 5800000, 'paid', now() - interval '3 days'),
 ('11111111-1111-1111-1111-111111111111', 'Kasun Silva', 'Barista',
  '{"orders": true, "inventory": true, "menu": true, "bookings": true}'::jsonb,
  '{"tue":"09:00-18:00","wed":"09:00-18:00","fri":"09:00-18:00","sat":"09:00-18:00","sun":"09:00-16:00"}'::jsonb,
- 'aaaaaaaa-0000-0000-0000-000000000003'),
+ 'aaaaaaaa-0000-0000-0000-000000000003',
+ 4000000, 'pending', null),
 ('11111111-1111-1111-1111-111111111111', 'Amara Jayasinghe', 'Head Baker',
  '{"inventory": true, "menu": true}'::jsonb,
  '{"mon":"05:00-13:00","tue":"05:00-13:00","wed":"05:00-13:00","thu":"05:00-13:00","sat":"05:00-13:00"}'::jsonb,
- null),
+ null,
+ 4800000, 'pending', null),
 ('11111111-1111-1111-1111-111111111111', 'Ruwan Dias', 'Cashier',
  '{"orders": true}'::jsonb,
  '{"thu":"10:00-19:00","fri":"10:00-19:00","sat":"10:00-19:00","sun":"10:00-19:00"}'::jsonb,
- null);
+ null,
+ 3200000, 'pending', null);
 
 -- ---------------------------------------------------------------------------
 -- 12. Notifications — some unread (drive the bell badge; unread count = 4).

@@ -210,9 +210,12 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          paid_at: string | null
+          pay_status: string
           permissions: Json
           profile_id: string | null
           role: string | null
+          salary_cents: number | null
           shift_schedule: Json
           updated_at: string
         }
@@ -221,9 +224,12 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          paid_at?: string | null
+          pay_status?: string
           permissions?: Json
           profile_id?: string | null
           role?: string | null
+          salary_cents?: number | null
           shift_schedule?: Json
           updated_at?: string
         }
@@ -232,9 +238,12 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          paid_at?: string | null
+          pay_status?: string
           permissions?: Json
           profile_id?: string | null
           role?: string | null
+          salary_cents?: number | null
           shift_schedule?: Json
           updated_at?: string
         }

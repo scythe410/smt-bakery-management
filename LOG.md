@@ -5,6 +5,101 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: employee salary status bar (owner-only)
+
+Lightweight salary tracking for the Employees screen (SPEC §4.3, demo scope).
+`tsc --noEmit` clean; `next build` green (16 routes, no errors). Locale parity 528/528.
+
+### What changed
+
+**`supabase/migrations/20260715120000_employee_salary.sql`** (new)
+- Adds three columns to `public.employee`:
+  - `salary_cents integer` (nullable, check >= 0) — monthly LKR salary in minor units
+  - `pay_status text not null default 'not_set'` (check in `paid | pending | not_set`)
+  - `paid_at timestamptz` (nullable, set when marked paid)
+- No new table, no new enum: check constraint keeps it simple. The existing
+  "employee: owner/manager access" `FOR ALL` RLS policy already covers UPDATE, so
+  tenant isolation is inherited. Salary mutations are additionally gated owner-only in
+  the server action via `requireRole(["owner"])`.
+
+**`lib/supabase/types.ts`** — added `salary_cents`, `pay_status`, `paid_at` to
+`employee` Row / Insert / Update.
+
+**`lib/zod/employees.ts`** (new) — `markEmployeePaidSchema` (employeeId + paid boolean,
+`.strict()`). Validated server-side on every mutation (CLAUDE.md §7.6).
+
+**`app/(app)/employees/actions.ts`** (new) — `markEmployeePaid` server action:
+`requireRole(["owner"])` gate; Zod validation; stamps `pay_status`, `paid_at` from the
+server; filters by `business_id` from session (never client-supplied). Revalidates
+`/employees` on success.
+
+**`lib/db/selectors/employees.ts`** — extended `EmployeeListItem` with `salaryCents`,
+`payStatus`, `paidAt`. Added `PayrollSummary` type (totalCents, paidCount, pendingCount,
+employeesWithSalary). `getEmployeeList` now returns `{ items, payroll }` — the summary is
+computed in the selector (pure iteration, no extra DB round trip).
+
+**`components/employees/payroll-bar.tsx`** (new) — client component; renders when
+`employeesWithSalary > 0`. Shows payroll label, total `LKR X` right-aligned, a branded
+progress bar (paid/total %) with `role="progressbar"` + aria attributes, and a
+pending-count row. Skips rendering entirely when no salaries are configured (nil state).
+
+**`components/employees/employees-list.tsx`** — reads `profile.role` from `useAppContext()`
+to derive `isOwner`. Renders `<PayrollBar>` above the directory if owner. Per employee:
+owner sees a `SalaryCell` sub-component (salary amount + Paid/Pending status pill + toggle
+button) or "Salary not set" if `salaryCents` is null; manager and staff see no salary.
+`SalaryCell` uses `useState` for optimistic status + `useTransition` to call
+`markEmployeePaid`; reverts to previous state on error. Updated `scopeNote` to reflect
+that salary tracking is now built.
+
+**`components/employees/employees-data.tsx`** — passes `payroll` from selector to list.
+
+**`components/employees/employees-skeleton.tsx`** — added payroll bar skeleton block (3
+rows matching the card) above the directory card skeletons.
+
+**`supabase/seed.sql`** — employee INSERT now includes `salary_cents`, `pay_status`,
+`paid_at`. Demo values:
+
+| Employee | Salary | Status |
+|---|---|---|
+| Samantha Perera (Owner) | LKR 75,000 | Paid |
+| Nadeesha Fernando (Manager) | LKR 58,000 | Paid |
+| Kasun Silva (Barista) | LKR 40,000 | Pending |
+| Amara Jayasinghe (Head Baker) | LKR 48,000 | Pending |
+| Ruwan Dias (Cashier) | LKR 32,000 | Pending |
+
+Total payroll LKR 253,000 · 2 of 5 paid → non-trivial progress bar at ~40%.
+
+**`i18n/locales/en.json` + `si.json`** — added `employees.payroll.*` key tree
+(label, salary, total, paidOf, pending, progress, markPaid, markPending, notSet, error,
+status.paid / pending / not_set) and updated `employees.scopeNote`. Parity 528/528.
+
+### Decisions
+
+- **Columns on `employee`, not a separate table.** Per-period history is out of scope for
+  the demo. A single `pay_status` column on the employee row is the minimal viable
+  representation; the owner resets it each month manually. A proper `employee_pay_period`
+  table is the natural follow-up when payroll history is needed.
+- **Owner-only gate at the server action level.** RLS (`FOR ALL`) allows manager to
+  UPDATE employee rows (for shift/permission edits). Salary mutations are additionally
+  gated `requireRole(["owner"])` in the server action — consistent with CLAUDE.md §7: "Never
+  trust the client for money." Manager can see employee rows but the UI hides salary fields
+  (isOwner check from AppContext). For a stricter column-level boundary in production, add a
+  `SECURITY DEFINER` RPC that enforces owner-only at the DB layer.
+- **Optimistic toggle.** `SalaryCell` flips state immediately on click and reverts on
+  server error — fast UX without a loading spinner on a simple boolean flip.
+- **`paid_at` cleared on revert** (`null` when pending). Preserves a useful "when was
+  this paid" timestamp for the owner without needing a separate history table.
+- **Progress bar denominator = employees with salary set** (paid + pending only). Employees
+  with `pay_status = 'not_set'` are excluded so the bar reads "N of M salaried employees
+  paid" rather than "N of all employees".
+
+### Open questions / deviations
+
+None. Security model: owner-gate in server action; `business_id` from session; Zod on
+all inputs; no salary data reachable from client without authentication.
+
+---
+
 ## 2026-07-15 — test: verify client fixes (ft2.1, cf1-cf5)
 
 Verification pass against concrete acceptance criteria. `tsc --noEmit` clean (0 errors); `next build`

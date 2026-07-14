@@ -1,25 +1,25 @@
 "use client";
 
-// Employees directory (SPEC §4.3) — read-focused. Renders the tenant's staff as
-// stacked cards (DESIGN.md §4 tables→mobile): name (bold), job title, the
-// permission set as chips, and the weekly shift schedule. A "Login" pill marks
-// employees linked to an app account. This screen is a directory view only —
-// payroll and attendance are out of scope pending client confirmation (surfaced
-// as a note), and there is no create/edit here yet (baseline pending confirmation).
+// Employees directory (SPEC §4.3). Renders the tenant's staff as stacked cards:
+// name/title, permissions, shift schedule, and (owner-only) salary + pay status.
 //
-// Client component so labels re-translate instantly on the language toggle.
-// Employee names and job titles are business data, shown as entered — not
-// translated (CLAUDE.md §3). Permission keys are config values, so they DO go
-// through i18n (employees.permission.*), falling back to the raw key defensively.
+// Salary and payroll bar are gated by `isOwner` read from AppContext — consistent
+// with CF5/CLAUDE.md §5: aggregate/money figures are owner-only; managers and
+// staff see the directory only. Employee names, titles, and permission labels
+// use i18n where applicable; dynamic business content (names, job titles) is not
+// translated (CLAUDE.md §3).
 
+import { useState, useTransition } from "react";
 import { useTranslation } from "react-i18next";
 import { CalendarClock, ShieldCheck, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { EmployeeListItem } from "@/lib/db/selectors/employees";
+import { PayrollBar } from "@/components/employees/payroll-bar";
+import { markEmployeePaid } from "@/app/(app)/employees/actions";
+import { useAppContext } from "@/components/app/app-provider";
+import { formatLKR } from "@/lib/format";
+import type { EmployeeListItem, PayrollSummary, PayStatus } from "@/lib/db/selectors/employees";
 
-// Permission keys we know how to label (they mirror app sections + the "all"
-// sentinel). i18n keys exist for these; anything else falls back to its raw key.
 const KNOWN_PERMISSIONS = new Set([
   "all",
   "orders",
@@ -31,8 +31,74 @@ const KNOWN_PERMISSIONS = new Set([
   "settings",
 ]);
 
-export function EmployeesList({ items }: { items: EmployeeListItem[] }) {
+const PAY_STATUS_TONE: Record<PayStatus, "success" | "warning" | "neutral"> = {
+  paid: "success",
+  pending: "warning",
+  not_set: "neutral",
+};
+
+// Per-employee salary + toggle (rendered only for owner when salary is configured).
+function SalaryCell({
+  empId,
+  salaryCents,
+  initialStatus,
+}: {
+  empId: string;
+  salaryCents: number;
+  initialStatus: PayStatus;
+}) {
   const { t } = useTranslation();
+  const [status, setStatus] = useState<PayStatus>(initialStatus);
+  const [isPending, startTransition] = useTransition();
+
+  function toggle() {
+    const nextPaid = status !== "paid";
+    const next: PayStatus = nextPaid ? "paid" : "pending";
+    setStatus(next); // optimistic
+    startTransition(async () => {
+      const result = await markEmployeePaid(empId, nextPaid);
+      if (result.error) setStatus(status); // revert on error
+    });
+  }
+
+  return (
+    <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-caption text-muted">{t("employees.payroll.salary")}</span>
+        <span className="text-label font-semibold text-ink tabular-nums">
+          {formatLKR(salaryCents)}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <StatusPill
+          tone={PAY_STATUS_TONE[status]}
+          label={t(`employees.payroll.status.${status}`)}
+        />
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={isPending}
+          className="text-caption text-brand hover:text-brand-ember font-medium transition-colors disabled:opacity-40"
+        >
+          {status === "paid"
+            ? t("employees.payroll.markPending")
+            : t("employees.payroll.markPaid")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function EmployeesList({
+  items,
+  payroll,
+}: {
+  items: EmployeeListItem[];
+  payroll: PayrollSummary;
+}) {
+  const { t } = useTranslation();
+  const { profile } = useAppContext();
+  const isOwner = profile.role === "owner";
 
   if (items.length === 0) {
     return (
@@ -44,6 +110,9 @@ export function EmployeesList({ items }: { items: EmployeeListItem[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Owner-only payroll status bar */}
+      {isOwner ? <PayrollBar payroll={payroll} /> : null}
+
       <div className="flex items-center justify-between gap-2">
         <p className="text-label text-muted">
           {t("employees.count", { count: items.length })}
@@ -52,7 +121,7 @@ export function EmployeesList({ items }: { items: EmployeeListItem[] }) {
 
       {items.map((emp) => (
         <Card key={emp.id} className="flex flex-col gap-3">
-          {/* Identity: name + job title, with a login-account marker. */}
+          {/* Identity: name + job title, login-account marker. */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col gap-0.5">
               <span className="text-h2 text-ink">{emp.name}</span>
@@ -87,7 +156,9 @@ export function EmployeesList({ items }: { items: EmployeeListItem[] }) {
                   <StatusPill
                     key={perm}
                     tone={perm === "all" ? "success" : "neutral"}
-                    label={KNOWN_PERMISSIONS.has(perm) ? t(`employees.permission.${perm}`) : perm}
+                    label={
+                      KNOWN_PERMISSIONS.has(perm) ? t(`employees.permission.${perm}`) : perm
+                    }
                   />
                 ))}
               </div>
@@ -118,10 +189,24 @@ export function EmployeesList({ items }: { items: EmployeeListItem[] }) {
               </div>
             )}
           </div>
+
+          {/* Owner-only salary + pay toggle. */}
+          {isOwner ? (
+            emp.salaryCents !== null ? (
+              <SalaryCell
+                empId={emp.id}
+                salaryCents={emp.salaryCents}
+                initialStatus={emp.payStatus}
+              />
+            ) : (
+              <p className="border-border text-caption text-faint border-t pt-3">
+                {t("employees.payroll.notSet")}
+              </p>
+            )
+          ) : null}
         </Card>
       ))}
 
-      {/* Scope note — payroll/attendance not built pending confirmation. */}
       <p className="text-caption text-faint px-1">{t("employees.scopeNote")}</p>
     </div>
   );
