@@ -9,7 +9,7 @@
 // the browser dialog. Item names are business data, shown as entered — not
 // translated.
 
-import { Download, Printer, AlertTriangle } from "lucide-react";
+import { Download, FileDown, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { csvRow } from "@/lib/csv";
@@ -84,14 +84,14 @@ export function EndOfDayDetail({
             <Download className="size-4" aria-hidden />
             {t("reports.actions.exportCsv")}
           </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
+          <a
+            href={`/api/reports/pdf?type=end_of_day&date=${date}`}
+            download
             className="border-border-strong text-label text-ink hover:bg-surface-2 focus-visible:ring-brand/40 flex h-9 items-center gap-1.5 rounded-[var(--radius)] border px-3 font-medium outline-none transition-colors focus-visible:ring-2"
           >
-            <Printer className="size-4" aria-hidden />
-            {t("reports.actions.print")}
-          </button>
+            <FileDown className="size-4" aria-hidden />
+            {t("reports.actions.downloadPdf")}
+          </a>
         </div>
       </div>
 

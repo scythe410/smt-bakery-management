@@ -11,7 +11,7 @@
 // math — toMajor is render-time formatting, CLAUDE.md §3) and downloads it.
 // Print / PDF hands off to the browser's print dialog (Save as PDF there).
 
-import { Download, Printer } from "lucide-react";
+import { Download, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
@@ -101,14 +101,14 @@ export function ReportDetail({
             <Download className="size-4" aria-hidden />
             {t("reports.actions.exportCsv")}
           </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
+          <a
+            href={`/api/reports/pdf?type=${reportType}&date=${date}`}
+            download
             className="border-border-strong text-label text-ink hover:bg-surface-2 focus-visible:ring-brand/40 flex h-9 items-center gap-1.5 rounded-[var(--radius)] border px-3 font-medium outline-none transition-colors focus-visible:ring-2"
           >
-            <Printer className="size-4" aria-hidden />
-            {t("reports.actions.print")}
-          </button>
+            <FileDown className="size-4" aria-hidden />
+            {t("reports.actions.downloadPdf")}
+          </a>
         </div>
       </div>
 

@@ -375,7 +375,7 @@
     },
     "actions": {
       "exportCsv": "Export CSV",
-      "print": "Print / PDF"
+      "downloadPdf": "Download PDF"
     },
     "note": "Revenue, commission and net revenue count completed orders only.",
     "error": {
