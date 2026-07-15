@@ -5,6 +5,86 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — test: cli crud and deletion coverage for all entities
+
+### Context
+
+Systematic create + delete coverage for every entity, run through the **Supabase
+CLI** against the **linked (blank client) project** via the Management API, as the
+**authenticated owner** (`set role authenticated` + `request.jwt.claims.sub` = owner
+uuid) so RLS, triggers, RPCs and cascades actually run — not `service_role` (which
+bypasses RLS). Docker/psql/local stack are unavailable here (per prior entries), so
+this was the correct path.
+
+**Non-pollution guarantee.** Every test is wrapped in `BEGIN … ROLLBACK`. Before
+any write I *proved* the Management API honours `BEGIN … ROLLBACK` (inserted a marker
+inside a txn, rolled back, confirmed 0 rows persisted in a separate call). Re-verified
+after the whole run: instance is still **blank** — 1 business, 3 profiles, 3 auth
+users, all 14 domain tables at 0, `order_seq = 0`. No second tenant, no test rows.
+
+Reproducible suites committed under `supabase/tests/`:
+`crud_deletion_coverage.sql`, `crud_role_and_isolation.sql`.
+
+### PASS/FAIL matrix
+
+| Entity | Create (valid) | Delete | Invalid rejected | Delete w/ dependents | Cross-tenant / role |
+|---|---|---|---|---|---|
+| menu_item | ✅ (item_code auto) | ✅ | ✅ null-name; ✅ price<0¹ | ✅ order history **preserved** (order_item → SET NULL + snapshot) | ✅ |
+| recipe_line | ✅ | ✅ (parents intact) | ✅ merchandise-item blocked; ✅ unit-mismatch blocked | — | ✅ |
+| inventory_item (ingredient) | ✅ | ✅ | ✅ bad-kind enum; ✅ unit_cost<0¹ | ⚠️ **FLAG** — CASCADE erases stock_movement ledger + count lines | ✅ |
+| inventory_item (merchandise) | ✅ | ✅ | ✅ sale_price<0 (CHECK) | — | ✅ |
+| order + order_item (create_order RPC) | ✅ server-computed total | ✅ (items cascade; ledger ref → NULL) | ✅ empty; ✅ qty=0; ✅ unknown/x-tenant item | ✅ realize → ledger `sale` deduction (−40, idempotent) | ✅ |
+| expense | ✅ | ✅ | ✅ null-category; ✅ amount<0¹ | — | ✅ staff denied; manager allowed |
+| commission_rule | ✅ | ✅ | ✅ dup-source; ✅ bad-enum; ✅ rate<0¹ | — | ✅ staff denied |
+| booking (reservation + custom_order) | ✅ ✅ | ✅ | ✅ bad-type enum; ✅ deposit<0¹ | — | ✅ |
+| employee (+salary/pay/link) | ✅ | ✅ frees account | ✅ salary<0; ✅ bad pay_status; ✅ null-name | ✅ **delete keeps linked login + profile** | ✅ staff denied |
+| stock_day / stock_count_line (open/close RPC) | ✅ open + seed; ✅ idempotent | ✅ (lines cascade; ledger ref → NULL) | ✅ dup-day/date | ✅ close reconciles qty via `count_adjust` | ✅ |
+| stock_movement (ingredient audit) | ✅ count_adjust + restock (running total) | append-only | ✅ bad-reason enum | append-only: UPDATE/DELETE **denied** (0 rows) | ✅ |
+
+¹ Negative-money inserts were **accepted** at first run (Zod was the only guard) →
+**fixed**, see below. All other cells passed on the first run.
+
+### Findings & fixes
+
+**1. Negative money accepted at the DB — FIXED.** Only `employee.salary_cents` and
+`inventory_item.sale_price_cents` had CHECKs; `price_cents`, `unit_cost_cents`,
+`amount_cents`, `rate_bps`, `deposit_cents` accepted negatives (violating the money
+non-negotiable, CLAUDE.md §3). Added **migration `20260715130000_money_nonneg_check_constraints.sql`**
+— `CHECK (… >= 0)` on 12 money columns across menu_item, inventory_item, expense,
+commission_rule, booking (deposit/balance), order (subtotal/commission/total),
+order_item (+ `qty >= 1`), stock_count_line. Pushed to the linked project via
+`supabase db push` (local + remote migration history in sync). Re-verified: all five
+negative inserts now rejected; valid `price = 0` still succeeds. `qty_on_hand` was
+deliberately **left unconstrained** — stock may go negative by design (§4).
+
+**2. Deleting an inventory_item with history erases its audit ledger — FLAGGED
+(not fixed; design decision, client's call).** `stock_movement` and
+`stock_count_line` FK `inventory_item` **ON DELETE CASCADE**, and inventory has no
+soft-delete flag, so an owner hard-deleting an ingredient silently wipes its stock
+audit trail (incl. `sale` movements). Contrast `menu_item`: deletion is history-safe
+(`order_item.menu_item_id` → SET NULL, name/price snapshot retained). Recommended fix
+(separate prompt): add `inventory_item.is_archived`, soft-deactivate in the delete
+action, and block hard-delete when a ledger exists — spans schema + selectors + UI +
+i18n, so out of scope for this test pass. Standing FLAG in `crud_deletion_coverage.sql`.
+
+### Notes
+
+- Employee/account decoupling confirmed both directions: deleting an `employee`
+  removes only the HR row (FK `employee.profile_id` → profile is SET NULL *on profile
+  delete*, and no FK points from `auth.users`/`profile` back to `employee`), so the
+  login + profile survive and the account is freed for re-linking (HD3).
+- Tenant isolation re-confirmed end-to-end: a second tenant's owner cannot read,
+  update, delete, or inject into tenant B1 (a client-supplied `business_id` is stamped
+  back to the caller's own tenant by the BEFORE INSERT trigger).
+- Deviation from the brief's "reject negative money" expectation was a real gap, now
+  closed at the DB layer rather than trusting the app path.
+
+### Open questions
+
+- Inventory soft-delete (finding #2) needs a product decision before implementation.
+
+---
+
 ## 2026-07-15 — chore: blank-slate data for client handoff
 
 ### Context
