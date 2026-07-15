@@ -1084,6 +1084,34 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_order_status: {
+        Args: {
+          p_new_status: Database["public"]["Enums"]["order_status"]
+          p_order_id: string
+        }
+        Returns: {
+          business_id: string
+          commission_cents: number
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          id: string
+          order_no: string
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          source: Database["public"]["Enums"]["order_source"]
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal_cents: number
+          total_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_language: "en" | "si"

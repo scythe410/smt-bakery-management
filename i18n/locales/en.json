@@ -232,7 +232,15 @@
     "status": {
       "pending": "Pending",
       "completed": "Completed",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "action": {
+        "complete": "Complete",
+        "cancel": "Cancel",
+        "reopen": "Reopen"
+      },
+      "confirmCancel": "Cancel order {{no}}? This reverses its stock and removes it from sales.",
+      "error": "Couldn't update that order. Try again.",
+      "errorReversed": "This order was already reversed and can't be completed again."
     },
     "payment": {
       "cash": "Cash",

@@ -63,3 +63,18 @@ export const orderListQuerySchema = z
   .strict();
 
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
+
+// Zod schema for the status-transition mutation (the changeOrderStatus action).
+// The client sends only which order and which target status; the RPC
+// (public.set_order_status) re-resolves the order under RLS, validates the
+// transition, and keeps the stock ledger consistent server-side. business_id /
+// id are never client-set. orderId is z.guid() (shape guard only) to accept the
+// seed/vanity ids, exactly like newOrderSchema's line ids.
+export const orderStatusChangeSchema = z
+  .object({
+    orderId: z.guid(),
+    status: z.enum(ORDER_STATUSES as unknown as [string, ...string[]]),
+  })
+  .strict();
+
+export type OrderStatusChangeInput = z.infer<typeof orderStatusChangeSchema>;

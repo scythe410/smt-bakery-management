@@ -5,6 +5,76 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: order status transitions with ledger-safe stock reversal
+
+### Context
+
+The client twice reported they couldn't change an order's status after creating
+it — the status-change action was never built (orders only ever landed `pending`).
+The catch: a naive status flip corrupts inventory, because a realized order
+deducts recipe ingredients through the FT1 `stock_movement` ledger. The fix had to
+keep that ledger consistent on every transition.
+
+### The key realization
+
+FT1 (migration 008) already ships an `order_sync_stock` AFTER UPDATE trigger that
+deducts on entering the "sold" state and reverses on leaving it, in the SAME
+transaction as the status change, via **idempotent** helpers (unique
+`(ref_order_id, inventory_item_id, reason)` + `ON CONFLICT DO NOTHING`). So ledger
+safety did **not** need re-implementing — a status UPDATE is already atomic and
+exactly-once. The work was a guarded, validated transition surface on top.
+
+### Schema — migration `20260715160000_order_status_transition.sql`
+
+- **`public.set_order_status(p_order_id, p_new_status)`** — SECURITY INVOKER,
+  pinned `search_path`. Resolves the current status under RLS (cross-tenant/unknown
+  ⇒ `OR404`, never leaked); no-ops when unchanged (no UPDATE, no trigger fire);
+  else UPDATEs only `status` and lets the trigger post the deduct/reverse. Returns
+  the order row. `revoke all from public` + `grant execute to authenticated`.
+- **The ledger trap, guarded.** The idempotency key is deduct-once/reverse-once per
+  order *lifetime*: once reversed, the `sale` row still exists, so re-entering
+  "sold" would NOT re-deduct yet WOULD re-count revenue. The RPC refuses to set
+  `completed` when a `sale_reversal` exists (errcode **OR001**) rather than corrupt
+  stock. A voided order can't be re-completed — it must be recreated.
+
+### App
+
+- `lib/zod/order.ts` — `orderStatusChangeSchema` (`orderId` z.guid + `status` enum,
+  strict). `lib/orders/order-config.ts` — client-safe `STATUS_ACTIONS` (sensible
+  next statuses per current) + `STATUS_ACTION_META` (verb key + button intent).
+- `app/(app)/orders/actions.ts` — `changeOrderStatus` action: `requireProfile`
+  (owner/manager/**staff** — whoever can create an order can complete/cancel it),
+  Zod-validates, calls the RPC, maps `OR001 → orders.status.errorReversed`, and
+  revalidates `["orders","inventory"]` (Dashboard/Finance/Reports read the `orders`
+  tag, so a cancel drops it from realized revenue).
+- `components/orders/orders-browser.tsx` — per-row `OrderRowActions`: Complete /
+  Cancel on pending, Cancel on completed, Reopen on cancelled. `window.confirm`
+  before voiding a completed sale (reverses stock + revenue). On success reloads
+  page 0 so the order moves Active↔Archived immediately; the action's
+  `revalidatePath` refreshes the tab counts. New i18n keys (en + si).
+
+### Decisions
+
+- **Completed is not reopened to pending** in the UI — under deduct-once/reverse-once
+  a reopened-then-reversed order can't be re-completed, so that path would strand
+  it. Completed → cancelled (void) is the correction; Reopen is offered only on
+  cancelled → pending. The OR001 guard still backs this at the DB for any API path.
+- **No new RLS policy.** The existing `order: tenant access` (for-all) policy already
+  authorizes a tenant-scoped status UPDATE for all three roles, matching "whoever
+  can create can complete/cancel."
+
+### Verify — `supabase/tests/order_status_transition.sql` (11 checks, RAISE-on-fail)
+
+Rolled-back, JWT-impersonated, self-provisioning (blank handoff instance): new order
+is `pending` and deducts nothing; complete deducts exactly once (one `sale`,
+100→94); re-complete is a no-op; cancel reverses exactly once (one `sale_reversal`,
+→100); re-cancel is a no-op; cancelled ≠ realized; re-completing a reversed order
+raises OR001; reopen cancelled→pending touches no stock; unknown id ⇒ OR404; **staff**
+can complete (→98) and cancel (→100). Migration pushed to the linked project; types
+regenerated. `tsc --noEmit` + eslint clean; both locale JSONs parse.
+
+---
+
 ## 2026-07-15 — fix: bill branding (name, address, larger logo)
 
 ### Context

@@ -37,3 +37,27 @@ export const ARCHIVED_STATUSES: readonly OrderStatus[] = ["completed", "cancelle
 export function tabForStatus(status: OrderStatus): OrderTab {
   return (ACTIVE_STATUSES as readonly OrderStatus[]).includes(status) ? "active" : "archived";
 }
+
+// Sensible, ledger-safe transitions offered per current status (SPEC §3.4). Every
+// offered action is fully correct under FT1's deduct-once / reverse-once ledger:
+//   * pending  → completed (deducts) or cancelled (no stock effect).
+//   * completed → cancelled (reverses the sale). A completed order is deliberately
+//     NOT reopened to pending — under the idempotency key a reversed order can't be
+//     re-completed, so that path would strand it. Void to cancelled instead.
+//   * cancelled → pending  (reopen an accidental cancel; back to the Active tab).
+// The server RPC re-validates and guards the one unsafe case regardless (a demo
+// UI can't be the only gate — CLAUDE.md §7).
+export const STATUS_ACTIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  pending: ["completed", "cancelled"],
+  completed: ["cancelled"],
+  cancelled: ["pending"],
+};
+
+// Target status → its i18n action-verb key (orders.status.action.*) + button
+// intent. Keyed by the TARGET: reaching 'pending' is a "reopen", etc.
+export type StatusActionIntent = "primary" | "danger" | "neutral";
+export const STATUS_ACTION_META: Record<OrderStatus, { key: string; intent: StatusActionIntent }> = {
+  completed: { key: "complete", intent: "primary" },
+  cancelled: { key: "cancel", intent: "danger" },
+  pending: { key: "reopen", intent: "neutral" },
+};

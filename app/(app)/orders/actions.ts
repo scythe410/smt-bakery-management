@@ -19,7 +19,11 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateBusinessTags } from "@/lib/db/cache";
-import { newOrderSchema, orderListQuerySchema } from "@/lib/zod/order";
+import {
+  newOrderSchema,
+  orderListQuerySchema,
+  orderStatusChangeSchema,
+} from "@/lib/zod/order";
 import {
   getOrdersPage,
   type OrderFilterInput,
@@ -80,4 +84,43 @@ export async function createOrder(
   // updating qty_on_hand and the low-stock nav badge.
   revalidateBusinessTags(profile.business_id, ["orders", "inventory"]);
   return { ok: true, orderNo: data.order_no };
+}
+
+export type ChangeOrderStatusState = { ok?: boolean; error?: string };
+
+/**
+ * Transition an order's status (SPEC §3.4). Ledger safety is NOT re-implemented
+ * here: the whole of it lives in the atomic RPC public.set_order_status, which
+ * moves the order under RLS and lets the order_sync_stock trigger deduct/reverse
+ * stock idempotently in the same transaction. This action only authorizes,
+ * validates the input shape, and maps the outcome.
+ *
+ * Role: requireProfile — whoever can create an order (owner / manager / staff)
+ * can complete/cancel it too (RLS scopes it to their own tenant). No aggregate
+ * money is exposed, so this stays open to staff (CLAUDE.md §5).
+ */
+export async function changeOrderStatus(input: unknown): Promise<ChangeOrderStatusState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "orders.status.error" };
+
+  const parsed = orderStatusChangeSchema.safeParse(input);
+  if (!parsed.success) return { error: "orders.status.error" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_order_status", {
+    p_order_id: parsed.data.orderId,
+    p_new_status: parsed.data.status as Enums["order_status"],
+  });
+
+  if (error) {
+    // OR001 = the RPC refused to re-complete a reversed order (see migration 016).
+    if (error.code === "OR001") return { error: "orders.status.errorReversed" };
+    return { error: "orders.status.error" };
+  }
+
+  revalidatePath("/orders");
+  // Same tags as create: order rows drive Dashboard/Finance/Reports realized
+  // revenue (a cancel drops it); inventory changes as stock is reversed/deducted.
+  revalidateBusinessTags(profile.business_id, ["orders", "inventory"]);
+  return { ok: true };
 }

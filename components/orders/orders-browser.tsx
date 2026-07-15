@@ -10,16 +10,23 @@
 // Order numbers / customer names are business data, shown as entered (not
 // translated, CLAUDE.md §3).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
 import { NewOrderForm } from "@/components/orders/new-order-form";
-import { fetchOrders } from "@/app/(app)/orders/actions";
+import { changeOrderStatus, fetchOrders } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
-import { ORDER_SOURCES, ORDER_STATUSES, PAYMENT_METHODS } from "@/lib/orders/order-config";
+import {
+  ORDER_SOURCES,
+  ORDER_STATUSES,
+  PAYMENT_METHODS,
+  STATUS_ACTIONS,
+  STATUS_ACTION_META,
+  type StatusActionIntent,
+} from "@/lib/orders/order-config";
 import type {
   OrderSource,
   OrderStatus,
@@ -46,6 +53,17 @@ const PAYMENT_STATUS_TONE: Record<string, Tone> = {
 };
 
 const TABS: OrderTab[] = ["active", "archived"];
+
+// Row status-action buttons. Primary = the brand fill (complete); danger/neutral
+// are outline buttons (only `text-danger` exists as a token, no border-danger).
+const ACTION_CLASS: Record<StatusActionIntent, string> = {
+  primary:
+    "bg-brand text-brand-white hover:bg-brand-ember h-9 rounded-[var(--radius)] px-3 text-label font-semibold transition-colors disabled:opacity-50",
+  danger:
+    "border-border-strong text-danger hover:bg-surface-2 h-9 rounded-[var(--radius)] border px-3 text-label font-semibold transition-colors disabled:opacity-50",
+  neutral:
+    "border-border-strong text-ink hover:bg-surface-2 h-9 rounded-[var(--radius)] border px-3 text-label font-semibold transition-colors disabled:opacity-50",
+};
 
 export function OrdersBrowser({
   initial,
@@ -322,6 +340,10 @@ export function OrdersBrowser({
                     />
                     <StatusPill tone={STATUS_TONE[o.status]} label={t(`orders.status.${o.status}`)} />
                   </div>
+                  <OrderRowActions
+                    order={o}
+                    onChanged={() => setReloadToken((n) => n + 1)}
+                  />
                 </li>
               ))}
             </ul>
@@ -338,6 +360,70 @@ export function OrdersBrowser({
           </>
         )}
       </Card>
+    </div>
+  );
+}
+
+// Per-row status transitions (SPEC §3.4). Offers only the sensible next statuses
+// for the current one (STATUS_ACTIONS); the server RPC is the real gate. A
+// completed → cancelled void is confirmed first (it reverses stock + realized
+// revenue). On success the parent reloads page 0, so the order moves to its new
+// tab immediately (e.g. pending → completed leaves Active for Archived).
+function OrderRowActions({
+  order,
+  onChanged,
+}: {
+  order: OrderListItem;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const targets = STATUS_ACTIONS[order.status];
+  if (targets.length === 0) return null;
+
+  function run(target: OrderStatus) {
+    setError(null);
+    // Confirm before voiding a completed sale — it reverses stock and drops the
+    // order from realized revenue.
+    if (
+      order.status === "completed" &&
+      target === "cancelled" &&
+      !window.confirm(t("orders.status.confirmCancel", { no: order.orderNo }))
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const res = await changeOrderStatus({ orderId: order.id, status: target });
+      if (res.error) setError(t(res.error));
+      else onChanged();
+    });
+  }
+
+  return (
+    <div className="mt-0.5 flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {targets.map((target) => {
+          const meta = STATUS_ACTION_META[target];
+          return (
+            <button
+              key={target}
+              type="button"
+              disabled={pending}
+              onClick={() => run(target)}
+              className={ACTION_CLASS[meta.intent]}
+            >
+              {t(`orders.status.action.${meta.key}`)}
+            </button>
+          );
+        })}
+      </div>
+      {error ? (
+        <span role="alert" className="text-caption text-danger">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }
