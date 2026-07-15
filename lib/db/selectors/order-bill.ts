@@ -33,6 +33,8 @@ export type OrderBillData = {
   // Business header
   businessName: string;
   businessLogoUrl: string | null;
+  /** Optional postal address printed at the foot of the bill; null → omitted. */
+  businessAddress: string | null;
   // Order metadata
   orderNo: string;
   /** ISO UTC timestamp — pre-formatted as `createdAtFmt` for display. */
@@ -98,8 +100,9 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
     });
 
   return {
-    businessName: business?.name ?? "Samantha's Bakery",
+    businessName: business?.name ?? "Samanthas Bake House",
     businessLogoUrl: business?.logo_url ?? null,
+    businessAddress: business?.address ?? null,
     orderNo: order.order_no,
     createdAt: order.created_at,
     createdAtFmt: formatBillDateTime(order.created_at, timezone),

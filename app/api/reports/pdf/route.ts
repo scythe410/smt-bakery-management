@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
   // ── Business name ───────────────────────────────────────────────────────────
   const business = await getBusiness();
-  const businessName = business?.name ?? "Samantha's Bakery";
+  const businessName = business?.name ?? "Samanthas Bake House";
   const generatedAt = isoNow();
 
   // ── Render ──────────────────────────────────────────────────────────────────

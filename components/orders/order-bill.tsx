@@ -32,17 +32,17 @@ export function OrderBill({ data }: { data: OrderBillData }) {
       {/* ── Business header ────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-col items-center gap-2 text-center">
         {data.businessLogoUrl ? (
-          <div className="relative size-14 overflow-hidden rounded-xl">
+          <div className="relative size-20 overflow-hidden rounded-xl">
             <Image
               src={data.businessLogoUrl}
               alt={data.businessName}
               fill
               className="object-contain"
-              sizes="56px"
+              sizes="80px"
             />
           </div>
         ) : (
-          <BrandLogo className="h-14" sizes="120px" alt={data.businessName} />
+          <BrandLogo className="h-20" sizes="160px" alt={data.businessName} />
         )}
         <h1 className="text-xl font-extrabold text-ink leading-tight tracking-tight">
           {data.businessName}
@@ -122,6 +122,9 @@ export function OrderBill({ data }: { data: OrderBillData }) {
       <div className="mt-2 flex flex-col items-center gap-0.5 text-center">
         <p className="text-sm font-bold text-ink">{t("orders.bill.thankYou")}</p>
         <p className="text-xs font-semibold text-muted">{data.businessName}</p>
+        {data.businessAddress ? (
+          <p className="text-xs font-semibold text-muted">{data.businessAddress}</p>
+        ) : null}
       </div>
     </div>
   );

@@ -26,11 +26,13 @@ const FIELD_CLASS =
 
 export function BusinessProfileForm({
   name,
+  address,
   timezone,
   localeDefault,
   logoUrl,
 }: {
   name: string;
+  address: string | null;
   timezone: string;
   localeDefault: Language;
   logoUrl: string | null;
@@ -103,6 +105,19 @@ export function BusinessProfileForm({
             defaultValue={name}
             className={FIELD_CLASS}
           />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-caption text-muted">{t("settings.business.address")}</span>
+          <input
+            type="text"
+            name="address"
+            maxLength={200}
+            defaultValue={address ?? ""}
+            placeholder={t("settings.business.addressPlaceholder")}
+            className={FIELD_CLASS}
+          />
+          <span className="text-caption text-faint">{t("settings.business.addressHint")}</span>
         </label>
 
         <div className="grid grid-cols-2 gap-2">

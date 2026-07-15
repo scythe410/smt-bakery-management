@@ -6,7 +6,7 @@ import { getCurrentLanguage } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Samantha's Bakery",
+  title: "Samanthas Bake House",
   description: "Café & bakery operations — a BizCore demo.",
 };
 

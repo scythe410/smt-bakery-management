@@ -1,8 +1,8 @@
 {
-  "appName": "Samantha's Bakery",
+  "appName": "Samanthas Bake House",
   "login": {
     "title": "Sign in",
-    "subtitle": "Welcome back. Sign in to manage your bakery.",
+    "subtitle": "Welcome back. Sign in to manage your bake house.",
     "email": "Email",
     "emailPlaceholder": "you@bakery.lk",
     "password": "Password",
@@ -509,6 +509,9 @@
       "logoHint": "PNG, JPG, WebP or SVG, up to 2 MB.",
       "logoSaved": "Logo updated.",
       "name": "Business name",
+      "address": "Address",
+      "addressPlaceholder": "e.g. Walahanduwa, Galle",
+      "addressHint": "Shown at the foot of printed bills. Leave blank to omit.",
       "timezone": "Timezone",
       "defaultLanguage": "Default language",
       "saved": "Business profile saved.",

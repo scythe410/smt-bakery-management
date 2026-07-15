@@ -26,6 +26,8 @@ export type UserAccount = {
 export type SettingsView = {
   business: {
     name: string;
+    /** Optional postal address line (bill footer); null when unset. */
+    address: string | null;
     currency: string;
     timezone: string;
     localeDefault: Language;
@@ -54,6 +56,7 @@ async function loadSettings(): Promise<SettingsView> {
   return {
     business: {
       name: business.name,
+      address: business.address,
       currency: business.currency,
       timezone: business.timezone,
       localeDefault: business.locale_default as Language,

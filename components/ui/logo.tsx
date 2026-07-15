@@ -3,7 +3,7 @@
 //
 // `src` should be a resolvable URL. Storage logo paths are private object paths,
 // not URLs, so callers pass a signed/public URL or nothing; until logo upload
-// lands, this renders the "SB" monogram.
+// lands, this renders the "SBH" monogram.
 
 import Image from "next/image";
 
@@ -15,7 +15,7 @@ const SIZES = {
 
 export function Logo({
   src,
-  name = "SB",
+  name = "SBH",
   size = "md",
   className = "",
 }: {
@@ -52,10 +52,15 @@ export function Logo({
   );
 }
 
-/** "Samantha's Bakery" → "SB"; single word → first two letters. */
+/** "Samanthas Bake House" → "SBH"; single word → first two letters. Multi-word
+ *  takes the leading letter of each word (capped at 3) so a rename tracks. */
 function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "SB";
+  if (words.length === 0) return "SBH";
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  return words
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
 }

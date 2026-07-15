@@ -1,4 +1,4 @@
-// BrandLogo — the fixed Samantha's Bakery brand mark (public/logo.webp), for the
+// BrandLogo — the fixed Samanthas Bake House brand mark (public/logo.webp), for the
 // login screen, the app header (top-left), and printed bills/reports. Distinct
 // from <Logo> (components/ui/logo.tsx), which renders a tenant's UPLOADED square
 // logo with a monogram fallback. This one is the app's own landscape wordmark, so
@@ -17,7 +17,7 @@ const INTRINSIC = { width: 480, height: 347 } as const;
 
 export function BrandLogo({
   className = "",
-  alt = "Samantha's Bakery",
+  alt = "Samanthas Bake House",
   priority = false,
   // Actual rendered width hint, so next/image fetches a right-sized variant.
   // Default suits the login mark (h-20 ≈ 110px wide); the header passes a smaller

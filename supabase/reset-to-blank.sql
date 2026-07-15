@@ -1,11 +1,11 @@
--- reset-to-blank.sql — blank-slate the Samantha's Bakery tenant for client handoff.
+-- reset-to-blank.sql — blank-slate the Samanthas Bake House tenant for client handoff.
 --
 -- Purpose: remove ALL demo/sample business DATA so the owner starts from an empty
 -- app and enters their own menu, inventory, employees, costs and prices.
 --
 -- Scope & safety:
 --   * Single transaction. Either the whole reset applies or none of it does.
---   * Tenant-scoped: every statement is bounded to the Samantha's Bakery business_id
+--   * Tenant-scoped: every statement is bounded to the Samanthas Bake House business_id
 --     (resolved by name), so it can never touch another tenant's rows.
 --   * Idempotent: DELETEs of already-empty tables are no-ops; the config UPDATE is
 --     absolute (not relative), so re-running leaves the same blank state. Safe to re-run.
@@ -27,10 +27,10 @@ declare
 begin
   select id into v_business
     from public.business
-   where name = 'Samantha''s Bakery';
+   where name = 'Samanthas Bake House';
 
   if v_business is null then
-    raise exception 'reset-to-blank: business "Samantha''s Bakery" not found — aborting';
+    raise exception 'reset-to-blank: business "Samanthas Bake House" not found — aborting';
   end if;
 
   -- 1) Delete all business DATA in FK-safe order (children before parents).

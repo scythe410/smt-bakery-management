@@ -13,6 +13,9 @@ import { languages } from "@/i18n/config";
 export const businessProfileSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
+    // Optional postal line shown on the printed bill. Blank clears it (→ null in
+    // the action); no format is imposed — it's free text (e.g. "Walahanduwa, Galle").
+    address: z.string().trim().max(200).optional(),
     timezone: z.enum(TIMEZONES as unknown as [string, ...string[]]),
     localeDefault: z.enum(languages as unknown as [string, ...string[]]),
   })

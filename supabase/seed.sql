@@ -1,9 +1,9 @@
--- seed.sql — internally consistent demo data for Samantha's Bakery (BizCore demo)
+-- seed.sql — internally consistent demo data for Samanthas Bake House (BizCore demo)
 --
 -- Loaded after migrations on `supabase db reset` (see config.toml [db.seed]).
 --
 -- Design goals (CLAUDE.md §1, §3):
---   * ONE tenant ("Samantha's Bakery"). Every row scoped by its business_id.
+--   * ONE tenant ("Samanthas Bake House"). Every row scoped by its business_id.
 --   * Every figure the app shows (Dashboard / Finance / Reports) is DERIVED from
 --     these rows — never hardcoded downstream. To keep Dashboard "today" alive no
 --     matter when the seed is loaded, orders/expenses/bookings are dated RELATIVE
@@ -43,10 +43,11 @@ delete from auth.users where email in (
 -- ---------------------------------------------------------------------------
 -- 1. Business (tenant root)
 -- ---------------------------------------------------------------------------
-insert into public.business (id, name, logo_url, currency, timezone, locale_default, tax_config)
+insert into public.business (id, name, address, logo_url, currency, timezone, locale_default, tax_config)
 values (
   '11111111-1111-1111-1111-111111111111',
-  'Samantha''s Bakery',
+  'Samanthas Bake House',
+  'Walahanduwa, Galle',
   null,
   'LKR',
   'Asia/Colombo',

@@ -18,6 +18,7 @@ export async function SettingsData() {
     <div className="flex flex-col gap-4">
       <BusinessProfileForm
         name={settings.business.name}
+        address={settings.business.address}
         timezone={settings.business.timezone}
         localeDefault={settings.business.localeDefault}
         logoUrl={settings.business.logoUrl}

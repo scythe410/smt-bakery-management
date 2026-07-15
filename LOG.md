@@ -1,7 +1,63 @@
 # LOG
 
-Running change log for Samantha's Bakery (BizCore demo). Newest entry on top.
+Running change log for Samanthas Bake House (BizCore demo). Newest entry on top.
 Each entry: what changed, decisions made, deviations, open questions. One prompt = one entry.
+
+---
+
+## 2026-07-15 — fix: bill branding (name, address, larger logo)
+
+### Context
+
+Client branding corrections on the printed bill: the business is **Samanthas Bake
+House** (no apostrophe, "Bake House" two words — not "Bakery"), the bill must carry
+a postal **address** at its foot, and the receipt logo should be a bit larger.
+
+### Name → "Samanthas Bake House"
+
+Replaced every hardcoded brand variant across the enumerated surfaces:
+`business.name` (seed + live tenant row via `db query`), page title
+(`app/layout.tsx`), i18n `appName` (en + si), bill/PDF fallbacks
+(`order-bill.ts`, `reports/pdf/route.ts`), PDF footer (`lib/pdf/document.tsx`),
+`BrandLogo` alt/comment, and the login subtitle copy ("manage your bake house").
+Monogram fallback (`components/ui/logo.tsx`) is now **"SBH"**: `initials()` takes the
+leading letter of each word (capped at 3) so it tracks a rename, defaulting to "SBH".
+
+### Address (new nullable column)
+
+- Migration `20260715150000_business_address.sql` — `business.address text` (nullable).
+  **No new policy**: the owner-only UPDATE policy + identity-freeze (migration 004)
+  already cover it (freeze pins only id/created_at), so address rides the existing
+  owner-writable, tenant-scoped surface. Pushed to the linked project; types
+  regenerated (`gen types --linked --schema public`).
+- Owner-editable in **Settings › Business Profile** — new field wired through the
+  Zod schema (`address` optional, ≤200 chars, blank → null in the action),
+  `updateBusinessProfile`, the settings selector/view, and the form (+ en/si labels,
+  placeholder, hint).
+- Rendered at the **bottom** of the bill (`order-bill.tsx`), sourced from
+  `OrderBillData.businessAddress` (← `business.address`), omitted when null. Never
+  hardcoded.
+- Set to **"Walahanduwa, Galle"** on the live tenant and in `seed.sql`.
+
+### Logo
+
+Bill logo bumped `h-14`/`size-14` → `h-20`/`size-20` (uploaded logo + `BrandLogo`
+wordmark), `sizes` hints adjusted. Heavier receipt text (CF4) and money formatting
+unchanged.
+
+### Decisions
+
+- Left the npm package name (`samanthas-bakery`) and the OpenFoodFacts HTTP
+  User-Agent (`SamanthasBakery-BizCore`) untouched — neither is user-facing branding
+  nor in the client's enumerated scope; renaming the package would churn the lockfile
+  for no product benefit.
+- `reset-to-blank.sql` resolves the tenant by name, so its lookup + guard strings were
+  updated in lockstep with the new `business.name` (else the handoff reset would abort).
+
+### Verify
+
+`tsc --noEmit` + eslint clean; both locale JSONs parse. Live tenant row confirms
+`name = "Samanthas Bake House"`, `address = "Walahanduwa, Galle"`.
 
 ---
 

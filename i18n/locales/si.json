@@ -1,8 +1,8 @@
 {
-  "appName": "Samantha's Bakery",
+  "appName": "Samanthas Bake House",
   "login": {
     "title": "පිවිසෙන්න",
-    "subtitle": "නැවත සාදරයෙන් පිළිගනිමු. ඔබේ බේකරිය කළමනාකරණය කිරීමට පිවිසෙන්න.",
+    "subtitle": "නැවත සාදරයෙන් පිළිගනිමු. ඔබේ බේක් හවුස් කළමනාකරණය කිරීමට පිවිසෙන්න.",
     "email": "විද්‍යුත් තැපෑල",
     "emailPlaceholder": "you@bakery.lk",
     "password": "මුරපදය",
@@ -509,6 +509,9 @@
       "logoHint": "PNG, JPG, WebP හෝ SVG, උපරිම 2 MB.",
       "logoSaved": "ලාංඡනය යාවත්කාලීන විය.",
       "name": "ව්‍යාපාරයේ නම",
+      "address": "ලිපිනය",
+      "addressPlaceholder": "උදා. Walahanduwa, Galle",
+      "addressHint": "මුද්‍රිත බිල්පත්වල පාදයේ පෙන්වයි. ඉවත් කිරීමට හිස්ව තබන්න.",
       "timezone": "වේලා කලාපය",
       "defaultLanguage": "පෙරනිමි භාෂාව",
       "saved": "ව්‍යාපාර පැතිකඩ සුරැකිණි.",

@@ -189,7 +189,7 @@ export function DocHeader({
 export function DocFooter() {
   return (
     <View style={s.footer} fixed>
-      <Text>Samantha&apos;s Bakery · BizCore</Text>
+      <Text>Samanthas Bake House · BizCore</Text>
       <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
     </View>
   );
