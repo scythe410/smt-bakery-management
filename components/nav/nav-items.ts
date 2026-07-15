@@ -8,6 +8,7 @@ import {
   Boxes,
   CalendarDays,
   ChartColumn,
+  Coins,
   LayoutDashboard,
   ReceiptText,
   Settings,
@@ -37,6 +38,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { section: "menu", href: "/menu", labelKey: "nav.menu", Icon: BookOpen, badge: "menuAttention" },
   { section: "orders", href: "/orders", labelKey: "nav.orders", Icon: ReceiptText, badge: null },
   { section: "bookings", href: "/bookings", labelKey: "nav.bookings", Icon: CalendarDays, badge: null },
+  // Staff-only surface (role-filtered in bottom-nav): a standalone Expenses
+  // ledger. Owner/manager reach expenses via Finance, so they never see this.
+  { section: "expenses", href: "/expenses", labelKey: "nav.expenses", Icon: Coins, badge: null },
   { section: "employees", href: "/employees", labelKey: "nav.employees", Icon: Users, badge: null },
   { section: "reports", href: "/reports", labelKey: "nav.reports", Icon: ChartColumn, badge: null },
   { section: "settings", href: "/settings", labelKey: "nav.settings", Icon: Settings, badge: null },

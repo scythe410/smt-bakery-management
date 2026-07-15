@@ -11,11 +11,18 @@ import { addExpenseSchema } from "@/lib/zod/expense";
 
 export type AddExpenseState = { ok?: boolean; error?: string };
 
+// Expenses are a cost, so they have two UI surfaces: the owner's Finance ›
+// Expenses tab and the staff-only standalone /expenses ledger. Authorize the
+// union of both (owner + staff); RLS still enforces the real per-role boundary.
+const EXPENSE_WRITE_ROLES = [
+  ...new Set([...rolesFor("finance"), ...rolesFor("expenses")]),
+] as const;
+
 export async function addExpense(
   _prevState: AddExpenseState,
   formData: FormData,
 ): Promise<AddExpenseState> {
-  const profile = await requireRole(rolesFor("finance"));
+  const profile = await requireRole(EXPENSE_WRITE_ROLES);
   if (!profile.business_id) return { error: "finance.expenses.addError" };
 
   const parsed = addExpenseSchema.safeParse({
@@ -37,9 +44,11 @@ export async function addExpense(
   });
   if (error) return { error: "finance.expenses.addError" };
 
-  // Refresh the ledger + Overview so the new row and totals appear (the Overview /
-  // Dashboard figures come from the data cache).
+  // Refresh both expense surfaces so the new row + totals appear wherever it was
+  // added: Finance (owner) and the standalone /expenses ledger (staff). The
+  // Overview / Dashboard figures come from the data cache (`expenses` tag).
   revalidatePath("/finance");
+  revalidatePath("/expenses");
   revalidateBusinessTags(profile.business_id, ["expenses"]);
   return { ok: true };
 }

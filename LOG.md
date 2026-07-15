@@ -5,6 +5,75 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-16 — feat: staff access to expenses only
+
+### Context
+
+The client wants the STAFF login to record expenses — but nothing else on the
+money side. An expense is a **cost, not a sales figure**, so this is consistent
+with CF5 (which hides income/revenue/profit from staff, not costs). Staff gets a
+standalone Expenses ledger; owner keeps full Finance; no revenue/aggregate is
+exposed to staff.
+
+### Schema — migration `20260715170000_staff_expense_access.sql`
+
+Four PERMISSIVE staff policies on `public.expense` (they OR-combine with the
+existing owner/manager `for all` policy): `select` + `insert` scoped to the
+caller's tenant; `update`/`delete` restricted to **own** rows
+(`created_by = auth.uid()`). `commission_rule`, `employee`, and every revenue
+aggregate are left owner/manager-only — untouched — so staff can never derive net
+revenue, platform earnings, or profit. `business_id` stays force-stamped by the
+existing `set_business_id_from_session` trigger, so a client-supplied tenant is
+ignored (no cross-tenant write).
+
+### App
+
+- `lib/access.ts` — new `expenses` **section = staff-only**. Drives the route
+  gate, the nav filter, and (via `rolesFor`) the action's role check from one
+  source. Owner/manager reach expenses inside Finance, so the standalone surface
+  is staff's alone.
+- `components/nav/nav-items.ts` — new `Expenses` nav item (`/expenses`, Coins
+  icon) after Bookings; role-filtered, so only staff sees it. `nav.expenses`
+  i18n (en + si). The app-header title derives from the same registry.
+- `app/(app)/expenses/` — new route (`page` + `loading` + `error`). `requireRole`
+  is a real 403 for owner/manager. Reuses Finance's `ExpensesTab` (same ledger +
+  add form + server action), scoped to This Month.
+- `app/(app)/finance/actions.ts` — `addExpense` now authorizes the **union** of
+  the two expense surfaces (`rolesFor("finance") ∪ rolesFor("expenses")` =
+  owner + staff) and revalidates both `/finance` and `/expenses`. RLS remains the
+  real per-role boundary.
+- `CLAUDE.md §5` — staff matrix updated: `+ Expenses (record/view — standalone
+  ledger, not Finance overview)`, still no Dashboard/Finance overview/Reports,
+  with the CF5 rationale and the enforcement points spelled out.
+
+### Decisions
+
+- **Expenses section is staff-only**, not all-roles, so owner/manager don't get a
+  redundant nav item beside Finance. Owner records expenses in Finance; staff in
+  the standalone ledger. Both hit the same `addExpense` action.
+- **This Month, no period selector** on the staff route — the finance period
+  plumbing lives under Finance; a fixed current-month ledger keeps the staff
+  surface minimal and focused (record + view).
+
+### Open question
+
+- **Manager** currently has neither Finance nor the standalone Expenses (RLS
+  allows manager expense access, but there's no manager UI). Left as-is —
+  out of scope for this staff-focused request. If the client wants manager to
+  record expenses too, extend `expenses` section to `["manager","staff"]`.
+
+### Verify — `supabase/tests/rls_staff_expense.sql` (8 checks, RAISE-on-fail)
+
+Rolled-back, JWT-impersonated: staff can insert an expense; sees the whole tenant
+ledger (own + owner's); can update/delete its OWN row; **0 rows** when it tries to
+update or delete an owner-created row; **0 rows** reading `commission_rule` (the
+money boundary holds); a client-supplied foreign `business_id` is coerced to the
+caller's own tenant. Migration pushed to the linked project. `tsc --noEmit` +
+eslint clean; both locale JSONs parse. (UI: staff nav shows Expenses and hides
+Dashboard/Finance/Reports; those routes 403 for staff.)
+
+---
+
 ## 2026-07-15 — feat: order status transitions with ledger-safe stock reversal
 
 ### Context
