@@ -258,7 +258,7 @@ export type Database = {
           {
             foreignKeyName: "employee_profile_id_fkey"
             columns: ["profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
@@ -326,6 +326,7 @@ export type Database = {
           low_stock_threshold: number
           name: string
           qty_on_hand: number
+          sale_price_cents: number | null
           sku: string | null
           unit: string
           unit_cost_cents: number
@@ -341,6 +342,7 @@ export type Database = {
           low_stock_threshold?: number
           name: string
           qty_on_hand?: number
+          sale_price_cents?: number | null
           sku?: string | null
           unit?: string
           unit_cost_cents?: number
@@ -356,6 +358,7 @@ export type Database = {
           low_stock_threshold?: number
           name?: string
           qty_on_hand?: number
+          sale_price_cents?: number | null
           sku?: string | null
           unit?: string
           unit_cost_cents?: number
@@ -665,6 +668,20 @@ export type Database = {
             referencedColumns: ["id", "business_id"]
           },
           {
+            foreignKeyName: "recipe_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "recipe_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "merchandise_sale_price"
+            referencedColumns: ["inventory_item_id", "business_id"]
+          },
+          {
             foreignKeyName: "recipe_line_menu_item_id_business_id_fkey"
             columns: ["menu_item_id", "business_id"]
             isOneToOne: false
@@ -731,6 +748,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_low_stock"
             referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_count_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "merchandise_sale_price"
+            referencedColumns: ["inventory_item_id", "business_id"]
           },
           {
             foreignKeyName: "stock_count_line_stock_day_id_business_id_fkey"
@@ -869,6 +893,13 @@ export type Database = {
             referencedColumns: ["id", "business_id"]
           },
           {
+            foreignKeyName: "stock_movement_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "merchandise_sale_price"
+            referencedColumns: ["inventory_item_id", "business_id"]
+          },
+          {
             foreignKeyName: "stock_movement_ref_order_id_business_id_fkey"
             columns: ["ref_order_id", "business_id"]
             isOneToOne: false
@@ -914,6 +945,16 @@ export type Database = {
           business_id: string | null
           inventory_item_id: string | null
           price_cents: number | null
+        }
+        Insert: {
+          business_id?: string | null
+          inventory_item_id?: string | null
+          price_cents?: never
+        }
+        Update: {
+          business_id?: string | null
+          inventory_item_id?: string | null
+          price_cents?: never
         }
         Relationships: [
           {
@@ -1003,6 +1044,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      list_linkable_accounts: {
+        Args: never
+        Returns: {
+          email: string
+          id: string
+          linked_employee_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
       open_stock_day: {
         Args: { p_date: string; p_lines: Json }
         Returns: {
@@ -1023,6 +1073,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_account_role: {
+        Args: {
+          new_role: Database["public"]["Enums"]["app_role"]
+          target_profile_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

@@ -6,11 +6,18 @@ import type { Database } from "@/lib/supabase/types";
 import type { UpsertEmployeeInput } from "@/lib/zod/employees";
 
 export type EmployeeRow = Database["public"]["Tables"]["employee"]["Row"];
+export type AppRole = Database["public"]["Enums"]["app_role"];
 
-export type ProfileOption = {
+/**
+ * A login account an owner may link to an employee. `role` is the current
+ * app-access role (owner/manager/staff); `linkedEmployeeId` is the employee it
+ * is already linked to, or null when free to link.
+ */
+export type LinkableAccount = {
   id: string;
-  name: string;
-  role: string | null;
+  email: string;
+  role: AppRole;
+  linkedEmployeeId: string | null;
 };
 
 /** All employees for this tenant, ordered by name (A→Z). */
@@ -25,19 +32,22 @@ export async function listEmployees(): Promise<EmployeeRow[]> {
   return data ?? [];
 }
 
-/** Profiles in this tenant not yet linked to any employee record. */
-export async function listUnlinkedProfiles(): Promise<ProfileOption[]> {
+/**
+ * The login accounts in this tenant that an owner may link (owner-only at the
+ * database via the SECURITY DEFINER RPC — returns empty for any other role).
+ * Each carries its email + current access role and, if already linked, the
+ * employee id so the edit form can keep showing the currently-linked account.
+ */
+export async function listLinkableAccounts(): Promise<LinkableAccount[]> {
   const supabase = await createClient();
-
-  const [{ data: profiles }, { data: linked }] = await Promise.all([
-    supabase.from("profile").select("id, name, role"),
-    supabase.from("employee").select("profile_id").not("profile_id", "is", null),
-  ]);
-
-  const linkedIds = new Set((linked ?? []).map((e) => e.profile_id!));
-  return (profiles ?? [])
-    .filter((p) => !linkedIds.has(p.id))
-    .map((p) => ({ id: p.id, name: p.name, role: p.role }));
+  const { data, error } = await supabase.rpc("list_linkable_accounts");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    email: row.email ?? "",
+    role: row.role,
+    linkedEmployeeId: row.linked_employee_id ?? null,
+  }));
 }
 
 export async function insertEmployee(

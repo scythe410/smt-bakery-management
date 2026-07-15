@@ -5,6 +5,90 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — feat: link employees to existing login accounts
+
+### Context
+
+The blank-slate handoff kept the three login accounts (owner@/manager@/staff@) and
+their profiles but removed employee HR records. This lets the owner re-create
+employee records and link each to an existing account, keeping login access
+(`profile.role`) in sync with the assigned access level. Owner-only throughout
+(consistent with CF5 + FN2; employee mutations were already `requireRole(["owner"])`).
+
+### Schema — migration `20260715140000_employee_account_linking.sql`
+
+- **UNIQUE (`employee.profile_id`)** — one employee per account. NULLs exempt (many
+  HR-only records allowed). The FK was already `profile_id → profile ON DELETE SET
+  NULL` on the profile side (migration 002), so deleting an employee never cascades
+  to the profile/auth user — it frees the account to re-link.
+- **`private.employee_profile_same_tenant()`** BEFORE INSERT/UPDATE trigger — rejects a
+  `profile_id` whose business differs from the employee's. SECURITY DEFINER (owner
+  can't SELECT sibling profiles under the read-own RLS, so an invoker check would
+  wrongly reject a legit same-tenant link). Closes the cross-tenant hole at the DB,
+  not just the app path.
+- **`public.list_linkable_accounts()`** — owner-only SECURITY DEFINER RPC returning
+  every tenant profile's `id`, `email` (from `auth.users`, not exposed via the Data
+  API), current `role`, and `linked_employee_id`. Empty set for any non-owner.
+- **`public.set_account_role(target, new_role)`** — owner-only SECURITY DEFINER RPC
+  that syncs a linked account's `profile.role`. Guards (all RAISE): caller must be
+  owner; target must be same-tenant; **never the caller's own account**; **never
+  demote an owner account**. `profile.role` is otherwise frozen (migration 001), so
+  the RPC sets a transaction-local GUC (`app.authorized_role_change` = target id)
+  that the freeze trigger honours for exactly that one profile, then **clears it
+  immediately** after the UPDATE.
+
+All four surfaces are pinned `search_path = ''`; the two public RPCs `revoke all …
+from public` + `grant execute … to authenticated`.
+
+### App
+
+- `lib/db/queries/employees.ts` — replaced `listUnlinkedProfiles` (which, under the
+  read-own profile RLS, could only ever see the owner's own row — a latent bug) with
+  `listLinkableAccounts()` calling the RPC; new `LinkableAccount` type (email + role +
+  linkedEmployeeId). Selector `getLinkableAccounts`; `EmployeeListItem` now carries
+  `profileId`.
+- Form (`employee-form.tsx`): the "Login account" selector lists linkable accounts as
+  `email (Role)` plus "Unlinked (HR record only)"; edit mode also offers the account
+  already linked to that employee. A new **Access level** select appears only when an
+  account is chosen — manager/staff for normal accounts, locked to Owner (disabled +
+  hidden input) for an owner account so it can't be demoted.
+- Server action (`actions.ts`): parses `access_role`; after insert/update, calls
+  `set_account_role` unless the target is the owner's own account. `23505` →
+  `errorAlreadyLinked`. New i18n keys (en + si): access level label/hint, access-role
+  names, already-linked + role-sync errors; `loginAccountNone` reworded to "Unlinked
+  (HR record only)".
+
+### Decisions
+
+- **Access level is a distinct field from the free-text job title** (`employee.role`).
+  Job title stays HR display ("Head Baker", "Cashier"); Access level maps to the
+  `profile.role` enum. Mapping arbitrary job-title text to an enum would be fragile,
+  so the owner picks the access level explicitly. Owner promotion is not offered in
+  this form (options are manager/staff) — owner accounts stay owner.
+- Unlinking (`profile_id → null`) changes only the HR link: `set_account_role` is
+  skipped when there's no target, so the account keeps its role and login.
+
+### Verify (Supabase CLI, linked project, `BEGIN … ROLLBACK`, JWT-impersonated)
+
+`supabase/tests/employee_account_linking.sql` (committed, 11 checks, RAISE-on-fail):
+owner sees 3 accounts w/ emails; link Manager→manager@ and Cashier→staff@ with role
+sync (manager@=manager, staff@=staff); duplicate link rejected (UNIQUE);
+cross-tenant/unknown rejected (trigger); owner can't change own role; non-owner sees
+0 accounts and can't change roles; freeze holds outside the RPC (GUC doesn't leak);
+delete frees the account and leaves profile + auth user intact. Migration validated in
+a rolled-back txn first, then `supabase db push`; regenerated `lib/supabase/types.ts`
+(`--schema public`). `tsc --noEmit` + eslint clean. Re-confirmed the instance is still
+blank (0 employees; manager@/staff@ roles unchanged) after every test.
+
+### Deviations / open questions
+
+- One robustness fix surfaced during testing: the authorization GUC initially persisted
+  for the rest of the transaction, so a later same-txn update could also change that
+  profile's role. In production each RPC is its own txn (no leak), but the RPC now
+  clears the GUC right after the UPDATE regardless. No open questions.
+
+---
+
 ## 2026-07-15 — test: cli crud and deletion coverage for all entities
 
 ### Context

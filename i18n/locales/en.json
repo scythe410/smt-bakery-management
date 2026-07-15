@@ -664,7 +664,9 @@
       "salary": "Monthly salary (LKR)",
       "salaryPlaceholder": "e.g. 45000",
       "loginAccount": "Login account",
-      "loginAccountNone": "No login account",
+      "loginAccountNone": "Unlinked (HR record only)",
+      "accessLevel": "Access level",
+      "accessLevelHint": "Sets what this account can access after login.",
       "permissionsLabel": "Permissions",
       "shiftLabel": "Shift schedule",
       "shiftHoursPlaceholder": "09:00-17:00",
@@ -673,7 +675,14 @@
       "cancel": "Cancel",
       "deleteConfirm": "Remove {{name}} from the team?",
       "errorRequired": "Name is required.",
+      "errorAlreadyLinked": "That account is already linked to another employee.",
+      "errorRoleSync": "Saved, but couldn't update the account's access. Try again.",
       "errorGeneric": "Could not save. Try again."
+    },
+    "accessRole": {
+      "owner": "Owner",
+      "manager": "Manager",
+      "staff": "Staff"
     },
     "deleteError": "Could not remove employee.",
     "roleUnset": "No role set",

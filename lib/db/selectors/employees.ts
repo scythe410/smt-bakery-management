@@ -5,10 +5,10 @@
 
 import "server-only";
 import { cache } from "react";
-import { listEmployees, listUnlinkedProfiles, type ProfileOption } from "@/lib/db/queries/employees";
+import { listEmployees, listLinkableAccounts, type LinkableAccount } from "@/lib/db/queries/employees";
 import { parsePermissions, parseShiftSchedule, type ShiftDay } from "@/lib/employees/employee-config";
 
-export type { ProfileOption };
+export type { LinkableAccount };
 
 export type PayStatus = "paid" | "pending" | "not_set";
 
@@ -23,6 +23,8 @@ export type EmployeeListItem = {
   shift: ShiftDay[];
   /** True when this employee is linked to a login account (profile_id set). */
   hasLogin: boolean;
+  /** The linked login account's profile id, or null when HR-record only. */
+  profileId: string | null;
   /** Monthly salary in LKR minor units, or null when not configured. */
   salaryCents: number | null;
   /** Current-period pay status. */
@@ -63,6 +65,7 @@ async function loadEmployeeList(): Promise<EmployeeList> {
     permissions: parsePermissions(r.permissions),
     shift: parseShiftSchedule(r.shift_schedule),
     hasLogin: r.profile_id !== null,
+    profileId: r.profile_id,
     salaryCents: r.salary_cents ?? null,
     payStatus: toPayStatus(r.pay_status),
     paidAt: r.paid_at ?? null,
@@ -89,5 +92,5 @@ async function loadEmployeeList(): Promise<EmployeeList> {
 /** The Employees list + payroll summary for this tenant. React-`cache()`d per request. */
 export const getEmployeeList = cache((): Promise<EmployeeList> => loadEmployeeList());
 
-/** Profiles not yet linked to an employee record. React-`cache()`d per request. */
-export const getUnlinkedProfiles = cache((): Promise<ProfileOption[]> => listUnlinkedProfiles());
+/** Login accounts an owner may link to an employee. React-`cache()`d per request. */
+export const getLinkableAccounts = cache((): Promise<LinkableAccount[]> => listLinkableAccounts());

@@ -12,7 +12,7 @@ import { markEmployeePaid, deleteEmployee } from "@/app/(app)/employees/actions"
 import { useAppContext } from "@/components/app/app-provider";
 import { formatLKR } from "@/lib/format";
 import type { EmployeeListItem, PayrollSummary, PayStatus } from "@/lib/db/selectors/employees";
-import type { ProfileOption } from "@/lib/db/queries/employees";
+import type { LinkableAccount } from "@/lib/db/queries/employees";
 
 const KNOWN_PERMISSIONS = new Set([
   "all",
@@ -85,11 +85,11 @@ function SalaryCell({
 export function EmployeesList({
   items,
   payroll,
-  unlinkedProfiles,
+  linkableAccounts,
 }: {
   items: EmployeeListItem[];
   payroll: PayrollSummary;
-  unlinkedProfiles: ProfileOption[];
+  linkableAccounts: LinkableAccount[];
 }) {
   const { t } = useTranslation();
   const { profile } = useAppContext();
@@ -116,7 +116,7 @@ export function EmployeesList({
       <Card>
         <EmployeeForm
           mode={editingEmp ? { kind: "edit", employee: editingEmp } : { kind: "create" }}
-          unlinkedProfiles={unlinkedProfiles}
+          linkableAccounts={linkableAccounts}
           onDone={() => {
             setCreating(false);
             setEditingEmp(null);

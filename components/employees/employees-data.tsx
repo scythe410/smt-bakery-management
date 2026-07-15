@@ -1,10 +1,10 @@
-import { getEmployeeList, getUnlinkedProfiles } from "@/lib/db/selectors/employees";
+import { getEmployeeList, getLinkableAccounts } from "@/lib/db/selectors/employees";
 import { EmployeesList } from "@/components/employees/employees-list";
 
 export async function EmployeesData() {
-  const [{ items, payroll }, unlinkedProfiles] = await Promise.all([
+  const [{ items, payroll }, linkableAccounts] = await Promise.all([
     getEmployeeList(),
-    getUnlinkedProfiles(),
+    getLinkableAccounts(),
   ]);
-  return <EmployeesList items={items} payroll={payroll} unlinkedProfiles={unlinkedProfiles} />;
+  return <EmployeesList items={items} payroll={payroll} linkableAccounts={linkableAccounts} />;
 }

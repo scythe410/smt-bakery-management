@@ -48,6 +48,12 @@ function parseFormData(formData: FormData) {
     salaryRaw && salaryRaw !== "" ? Math.round(parseInt(salaryRaw, 10) * 100) : null;
   const profileIdRaw = (formData.get("profile_id") as string | null)?.trim();
   const profileId = profileIdRaw && profileIdRaw !== "" ? profileIdRaw : null;
+  const accessRoleRaw = (formData.get("access_role") as string | null)?.trim();
+  // Access role only applies to a linked account; drop it when HR-record only.
+  const accessRole =
+    profileId && (accessRoleRaw === "owner" || accessRoleRaw === "manager" || accessRoleRaw === "staff")
+      ? accessRoleRaw
+      : null;
 
   const PERM_KEYS = ["all", "orders", "inventory", "menu", "bookings", "reports", "finance", "settings"] as const;
   const permissions: Record<string, boolean> = {};
@@ -67,7 +73,38 @@ function parseFormData(formData: FormData) {
     }
   }
 
-  return { name, role, salaryCents, profileId, permissions, shift };
+  return { name, role, salaryCents, profileId, accessRole, permissions, shift };
+}
+
+/**
+ * Sync a linked account's access role onto its profile (owner-only). Runs
+ * through the SECURITY DEFINER `set_account_role` RPC, which re-checks owner +
+ * tenant, refuses the caller's own account, and never demotes an owner account.
+ * Skipped for the owner's own account. Returns an i18n error key on failure.
+ */
+async function syncAccountRole(
+  ownProfileId: string,
+  targetProfileId: string | null,
+  accessRole: "owner" | "manager" | "staff" | null,
+): Promise<string | null> {
+  if (!targetProfileId || !accessRole) return null;
+  if (targetProfileId === ownProfileId) return null; // never change own role
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_account_role", {
+    target_profile_id: targetProfileId,
+    new_role: accessRole,
+  });
+  if (error) return "employees.form.errorRoleSync";
+  return null;
+}
+
+/** Map a caught DB error to a friendly form error key. */
+function toFormError(err: unknown): string {
+  if (err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "23505") {
+    return "employees.form.errorAlreadyLinked";
+  }
+  return "employees.form.errorGeneric";
 }
 
 export async function createEmployee(
@@ -87,9 +124,12 @@ export async function createEmployee(
 
   try {
     await insertEmployee(profile.business_id, parsed.data);
-  } catch {
-    return { error: "employees.form.errorGeneric" };
+  } catch (err) {
+    return { error: toFormError(err) };
   }
+
+  const syncError = await syncAccountRole(profile.id, parsed.data.profileId, parsed.data.accessRole);
+  if (syncError) return { error: syncError };
 
   revalidatePath("/employees");
   return { ok: true };
@@ -116,9 +156,12 @@ export async function editEmployee(
 
   try {
     await updateEmployee(parsed.data.employeeId, profile.business_id, dataParsed.data);
-  } catch {
-    return { error: "employees.form.errorGeneric" };
+  } catch (err) {
+    return { error: toFormError(err) };
   }
+
+  const syncError = await syncAccountRole(profile.id, dataParsed.data.profileId, dataParsed.data.accessRole);
+  if (syncError) return { error: syncError };
 
   revalidatePath("/employees");
   return { ok: true };

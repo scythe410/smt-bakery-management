@@ -664,7 +664,9 @@
       "salary": "මාසික වැටුප (රු.)",
       "salaryPlaceholder": "උදා: 45000",
       "loginAccount": "පිවිසුම් ගිණුම",
-      "loginAccountNone": "පිවිසුම් ගිණුමක් නැත",
+      "loginAccountNone": "සම්බන්ධ නැත (HR වාර්තාව පමණි)",
+      "accessLevel": "ප්‍රවේශ මට්ටම",
+      "accessLevelHint": "පිවිසීමෙන් පසු මෙම ගිණුමට ප්‍රවේශ විය හැකි දේ සකසයි.",
       "permissionsLabel": "අවසරයන්",
       "shiftLabel": "වැඩ වේලාව",
       "shiftHoursPlaceholder": "09:00-17:00",
@@ -673,7 +675,14 @@
       "cancel": "අවලංගු කරන්න",
       "deleteConfirm": "{{name}} කණ්ඩායමෙන් ඉවත් කරන්නද?",
       "errorRequired": "නම අවශ්‍යයි.",
+      "errorAlreadyLinked": "එම ගිණුම දැනටමත් වෙනත් සේවකයෙකුට සම්බන්ධ කර ඇත.",
+      "errorRoleSync": "සුරැකිණි, නමුත් ගිණුමේ ප්‍රවේශය යාවත්කාලීන කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "errorGeneric": "සුරැකිය නොහැකි විය. නැවත උත්සාහ කරන්න."
+    },
+    "accessRole": {
+      "owner": "හිමිකරු",
+      "manager": "කළමනාකරු",
+      "staff": "කාර්ය මණ්ඩලය"
     },
     "deleteError": "සේවකයා ඉවත් කිරීමට නොහැකි විය.",
     "roleUnset": "තනතුරක් නැත",

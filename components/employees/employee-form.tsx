@@ -5,16 +5,18 @@ import { useTranslation } from "react-i18next";
 import { createEmployee, editEmployee, type EmpFormState } from "@/app/(app)/employees/actions";
 import { WEEKDAYS } from "@/lib/employees/employee-config";
 import type { EmployeeListItem } from "@/lib/db/selectors/employees";
-import type { ProfileOption } from "@/lib/db/queries/employees";
+import type { LinkableAccount } from "@/lib/db/queries/employees";
 
 const FIELD =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
 const PERM_KEYS = ["orders", "inventory", "menu", "bookings", "reports", "finance", "settings"] as const;
 
+const ACCESS_ROLES = ["owner", "manager", "staff"] as const;
+
 type Props = {
   mode: { kind: "create" } | { kind: "edit"; employee: EmployeeListItem };
-  unlinkedProfiles: ProfileOption[];
+  linkableAccounts: LinkableAccount[];
   onDone: () => void;
 };
 
@@ -29,9 +31,20 @@ function initialShift(emp?: EmployeeListItem): Record<string, string> {
   return Object.fromEntries(emp.shift.map(({ day, hours }) => [day, hours]));
 }
 
-export function EmployeeForm({ mode, unlinkedProfiles, onDone }: Props) {
+export function EmployeeForm({ mode, linkableAccounts, onDone }: Props) {
   const { t } = useTranslation();
   const emp = mode.kind === "edit" ? mode.employee : undefined;
+
+  // Accounts offerable in this form: those not yet linked, plus the one already
+  // linked to the employee being edited (so it stays selected).
+  const availableAccounts = linkableAccounts.filter(
+    (a) => a.linkedEmployeeId === null || (emp != null && a.linkedEmployeeId === emp.id),
+  );
+
+  const [selectedProfileId, setSelectedProfileId] = useState<string>(emp?.profileId ?? "");
+  const selectedAccount = availableAccounts.find((a) => a.id === selectedProfileId);
+  const isOwnerAccount = selectedAccount?.role === "owner";
+  const [accessRole, setAccessRole] = useState<string>(selectedAccount?.role ?? "staff");
 
   const boundAction =
     mode.kind === "edit"
@@ -75,10 +88,12 @@ export function EmployeeForm({ mode, unlinkedProfiles, onDone }: Props) {
     });
   }
 
-  const profilesForSelect =
-    mode.kind === "edit" && emp?.hasLogin
-      ? unlinkedProfiles
-      : unlinkedProfiles;
+  function onSelectAccount(id: string) {
+    setSelectedProfileId(id);
+    const acct = availableAccounts.find((a) => a.id === id);
+    // Default the access level to the account's current role on selection.
+    if (acct) setAccessRole(acct.role);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,17 +159,55 @@ export function EmployeeForm({ mode, unlinkedProfiles, onDone }: Props) {
           <select
             id="emp-profile"
             name="profile_id"
-            defaultValue=""
+            value={selectedProfileId}
+            onChange={(e) => onSelectAccount(e.target.value)}
             className={`${FIELD} w-full`}
           >
             <option value="">{t("employees.form.loginAccountNone")}</option>
-            {profilesForSelect.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}{p.role ? ` (${p.role})` : ""}
+            {availableAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.email} ({t(`employees.accessRole.${a.role}`)})
               </option>
             ))}
           </select>
         </div>
+
+        {/* Access level (only when linked to an account) */}
+        {selectedProfileId !== "" && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-label text-ink font-medium" htmlFor="emp-access-role">
+              {t("employees.form.accessLevel")}
+            </label>
+            {isOwnerAccount ? (
+              <>
+                <select
+                  id="emp-access-role"
+                  disabled
+                  value="owner"
+                  className={`${FIELD} w-full opacity-60`}
+                >
+                  <option value="owner">{t("employees.accessRole.owner")}</option>
+                </select>
+                <input type="hidden" name="access_role" value="owner" />
+              </>
+            ) : (
+              <select
+                id="emp-access-role"
+                name="access_role"
+                value={accessRole}
+                onChange={(e) => setAccessRole(e.target.value)}
+                className={`${FIELD} w-full`}
+              >
+                {ACCESS_ROLES.filter((r) => r !== "owner").map((r) => (
+                  <option key={r} value={r}>
+                    {t(`employees.accessRole.${r}`)}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="text-caption text-faint">{t("employees.form.accessLevelHint")}</p>
+          </div>
+        )}
 
         {/* Permissions */}
         <div className="flex flex-col gap-2">
