@@ -5,6 +5,109 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-15 — chore: blank-slate data for client handoff
+
+### Context
+
+Handing the instance to the bakery for real use. A prior manual purge (SQL Editor,
+`chore: log demo data purge`) had already emptied the domain tables, but it left no
+committed, re-runnable artifact. This prompt turns that into a proper versioned,
+idempotent, tenant-scoped reset script, applied via the CLI, with a backup and a
+full authenticated empty-state walk-through.
+
+### Backup (rollback safety net)
+
+- `supabase db dump` was unavailable — it shells out to `pg_dump` inside Docker, and
+  Docker Desktop isn't running here. `psql`/`pg_dump` are not installed either.
+- Since all domain data was already empty, the only state worth preserving is the
+  **retained** rows the reset must never touch. Snapshotted them as JSON via
+  `supabase db query --linked`:
+  - `supabase/.temp/backups/pre-reset-20260715-075902.business.json`
+  - `supabase/.temp/backups/pre-reset-20260715-075902.profiles.json`
+  - `supabase/.temp/backups/pre-reset-20260715-075902.authusers.json`
+  - (`supabase/.temp/` is gitignored — the backups stay local, not committed.)
+- Target confirmed before any write: linked project `samanthas-bakery`
+  (ref `fixyqbmdqvyiukdliijo`), business `Samantha's Bakery`
+  (id `11111111-1111-1111-1111-111111111111`).
+
+### What changed
+
+**`supabase/reset-to-blank.sql`** (new, committed)
+- Single transaction, tenant-scoped (resolves the business_id by name, raises if
+  absent), idempotent (empty-table DELETEs are no-ops; the config UPDATE is absolute).
+- Deletes all business DATA in FK-safe order: `stock_movement`, `stock_count_line`,
+  `stock_day`, `order_item`, `order`, `expense`, `booking`, `recipe_line`, `menu_item`,
+  `inventory_item`, `commission_rule`, `notification`, `employee`, `customer`.
+- Resets tenant config: `order_seq → 0`, `logo_url → null`, `tax_config` and
+  `notification_preferences` back to their blank defaults. Keeps `name`, `currency`
+  (LKR), `timezone` (Asia/Colombo), `locale_default` (en).
+- Applied to the hosted project with `supabase db query --linked -f ...` (Management
+  API — `db push` does not run ad-hoc scripts, and psql/Docker aren't available).
+
+**Removed strays (untracked, never committed):**
+- `supabase/migrations/nuke_demo_data.sql` — the old one-shot purge script had been
+  left loose inside `migrations/` (wrong place; not a timestamped migration). Deleted;
+  superseded by `reset-to-blank.sql`.
+
+### What was wiped vs. kept
+
+- **Wiped:** all 14 domain tables → 0 rows (verified: stock ledger/counts, orders +
+  items, expenses, bookings, recipes, menu, inventory, commission rules, notifications,
+  employees, customers).
+- **Kept:** the `business` row (1), all 3 `profile` rows, and the 3 auth users
+  (`owner@` / `manager@` / `staff@samanthas.demo`, all email-confirmed). Employee rows
+  were deleted, which clears their account links automatically (the link lives on
+  `employee`), leaving the accounts free to re-link to new employee records (HD3).
+
+### Verification (empty app is stable)
+
+Real authenticated walk-through, not just a build. Built prod (`next build`, 16 routes,
+clean), started `next start`, minted a genuine owner session via `@supabase/ssr`
+`signInWithPassword` (owner@samanthas.demo), and curled every screen against the
+now-empty hosted DB:
+
+| Screen | HTTP | Notes |
+|---|---|---|
+| `/` | 307 | → `/dashboard` (expected) |
+| dashboard, finance, reports | 200 | zeros; no non-zero money anywhere |
+| inventory, inventory/audit, inventory/stock-take | 200 | empty; low-stock count 0 |
+| menu, orders, bookings, employees, settings | 200 | empty states render |
+| `/api/reports/pdf?type=daily_sales` / `end_of_day` | 200 | valid 1-page PDFs on empty data |
+
+- Auth gate confirmed: authed → 200, no cookie → 307 to `/login`.
+- No non-zero `LKR` figure on any page; every screen carries an empty-state marker.
+- Owner bottom-nav shows all 9 sections (dashboard, finance, reports, inventory, menu,
+  orders, bookings, employees, settings) — correct for `owner`.
+- Server log clean — no runtime errors/exceptions across the whole sweep.
+- The `"404: This page could not be found."` string appears in every route's RSC flight
+  payload (Next's not-found fallback shipped in the segment tree) — it is **not** an
+  actual 404; every tested route returned 200 with real content. Noted so it isn't
+  mistaken for a failure on re-runs.
+
+### Decisions & deviations
+
+- **`order_seq = 0`** per the handoff brief → the client's first real order is **ORD-1**.
+  The migration default is 1000 (first order ORD-1001) and the earlier purge reset to
+  1000; starting at 0 is an intentional, documented deviation for a fresh instance.
+  Flagged in a comment in the script. If the client prefers an "established" look
+  (ORD-1001), set `order_seq` back to 1000.
+- Included `customer` in the wipe even though the brief's enumerated list omitted it —
+  sample customers are demo business data and the brief says remove **all** of it.
+- `tax_config`/`notification_preferences` were already at their canonical blank defaults
+  from the prior purge; the reset re-asserts them so the script is complete and
+  self-sufficient on a fresh DB.
+
+### Open questions
+
+- `NEXT_PUBLIC_SITE_URL` in `.env.local` is `http://localhost:3000` (local dev value).
+  Out of scope here, but before the client goes live this and `config.toml [auth].site_url`
+  should point at the production URL (CLAUDE.md §7.11) so email confirmation/recovery
+  links resolve correctly.
+- `orders/[id]/bill` wasn't exercised — there are no orders to bill on an empty instance;
+  it's a per-order screen, not an empty-state screen.
+
+---
+
 ## 2026-07-15 — chore: purge all demo data for production handoff
 
 ### Context
