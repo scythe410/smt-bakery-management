@@ -17,6 +17,8 @@ export type ExpenseEntry = {
   category: string;
   amountCents: number;
   note: string | null;
+  /** Profile id (= auth uid) of the user who created this row — used to gate per-row delete for the staff role. */
+  createdBy: string | null;
 };
 
 export type ExpenseLedger = {
@@ -37,6 +39,7 @@ async function loadExpenseLedger(input: PeriodInput): Promise<ExpenseLedger> {
       category: e.category,
       amountCents: e.amount_cents,
       note: e.note,
+      createdBy: e.created_by,
     }))
     // Newest first for a ledger.
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));

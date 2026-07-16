@@ -8,23 +8,76 @@
 // so it always reconciles with Overview. Categories and notes are business data,
 // shown as entered (not translated, CLAUDE.md §3).
 
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState, useActionState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AddExpenseForm } from "@/components/finance/add-expense-form";
+import { deleteExpense, type DeleteExpenseState } from "@/app/(app)/finance/actions";
 import { formatLKR } from "@/lib/format";
 import type { ExpenseEntry } from "@/lib/db/selectors/expenses";
+import type { AppRole } from "@/lib/access";
+
+function DeleteExpenseRow({ entry }: { entry: ExpenseEntry }) {
+  const { t } = useTranslation();
+  const [confirming, setConfirming] = useState(false);
+  const [state, formAction, pending] = useActionState<DeleteExpenseState, FormData>(
+    deleteExpense,
+    {},
+  );
+
+  if (confirming) {
+    return (
+      <form action={formAction} className="flex shrink-0 items-center gap-1">
+        <input type="hidden" name="id" value={entry.id} />
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="border-border-strong text-muted text-caption hover:bg-surface-2 rounded-[var(--radius)] border px-2 py-1 transition-colors"
+        >
+          {t("finance.expenses.deleteConfirmNo")}
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="bg-danger text-brand-white text-caption rounded-[var(--radius)] px-2 py-1 font-semibold transition-colors hover:opacity-90 disabled:opacity-50"
+        >
+          {pending ? t("finance.expenses.deleting") : t("finance.expenses.deleteConfirmYes")}
+        </button>
+        {state.error ? (
+          <span role="alert" className="text-caption text-danger">
+            {t(state.error)}
+          </span>
+        ) : null}
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      aria-label={t("finance.expenses.delete")}
+      className="text-faint hover:text-danger shrink-0 rounded p-1 transition-colors"
+    >
+      <Trash2 className="size-4" aria-hidden />
+    </button>
+  );
+}
 
 export function ExpensesLedger({
   entries,
   totalCents,
   categories,
+  userId,
+  role,
 }: {
   entries: ExpenseEntry[];
   totalCents: number;
   categories: string[];
+  userId: string;
+  role: AppRole;
 }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
@@ -41,6 +94,12 @@ export function ExpensesLedger({
   }, [entries, category, query]);
 
   const isFiltered = category !== "" || query.trim() !== "";
+
+  function canDelete(entry: ExpenseEntry): boolean {
+    if (role === "owner" || role === "manager") return true;
+    // staff: only entries they created
+    return entry.createdBy === userId;
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -105,7 +164,7 @@ export function ExpensesLedger({
                   key={e.id}
                   className="border-border flex items-start justify-between gap-3 border-b py-3 last:border-0 last:pb-0"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <StatusPill tone="neutral" label={e.category} />
                       <span className="text-caption text-muted tabular-nums">{e.date}</span>
@@ -114,9 +173,12 @@ export function ExpensesLedger({
                       <p className="text-caption text-muted mt-1 truncate">{e.note}</p>
                     ) : null}
                   </div>
-                  <span className="text-label text-ink shrink-0 tabular-nums">
-                    {formatLKR(e.amountCents)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-label text-ink tabular-nums">
+                      {formatLKR(e.amountCents)}
+                    </span>
+                    {canDelete(e) ? <DeleteExpenseRow entry={e} /> : null}
+                  </div>
                 </li>
               ))}
             </ul>

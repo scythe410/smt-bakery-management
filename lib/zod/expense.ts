@@ -19,3 +19,5 @@ export const addExpenseSchema = z
   .strict();
 
 export type AddExpenseInput = z.infer<typeof addExpenseSchema>;
+
+export const deleteExpenseSchema = z.object({ id: z.string().uuid() }).strict();

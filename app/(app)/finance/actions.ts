@@ -7,7 +7,7 @@ import { requireRole, rolesFor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents } from "@/lib/money";
-import { addExpenseSchema } from "@/lib/zod/expense";
+import { addExpenseSchema, deleteExpenseSchema } from "@/lib/zod/expense";
 
 export type AddExpenseState = { ok?: boolean; error?: string };
 
@@ -47,6 +47,35 @@ export async function addExpense(
   // Refresh both expense surfaces so the new row + totals appear wherever it was
   // added: Finance (owner) and the standalone /expenses ledger (staff). The
   // Overview / Dashboard figures come from the data cache (`expenses` tag).
+  revalidatePath("/finance");
+  revalidatePath("/expenses");
+  revalidateBusinessTags(profile.business_id, ["expenses"]);
+  return { ok: true };
+}
+
+export type DeleteExpenseState = { ok?: boolean; error?: string };
+
+export async function deleteExpense(
+  _prevState: DeleteExpenseState,
+  formData: FormData,
+): Promise<DeleteExpenseState> {
+  const profile = await requireRole(EXPENSE_WRITE_ROLES);
+  if (!profile.business_id) return { error: "finance.expenses.deleteError" };
+
+  const parsed = deleteExpenseSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) return { error: "finance.expenses.deleteError" };
+
+  const supabase = await createClient();
+  // RLS enforces the permission: staff can only delete their own rows; owner/manager
+  // can delete any row within their tenant. The .eq('business_id') filter is an
+  // additional defence-in-depth guard — RLS already scopes by tenant.
+  const { error } = await supabase
+    .from("expense")
+    .delete()
+    .eq("id", parsed.data.id)
+    .eq("business_id", profile.business_id);
+  if (error) return { error: "finance.expenses.deleteError" };
+
   revalidatePath("/finance");
   revalidatePath("/expenses");
   revalidateBusinessTags(profile.business_id, ["expenses"]);

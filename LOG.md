@@ -5,6 +5,46 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-16 — feat: delete expenses
+
+### What changed
+
+- **`lib/zod/expense.ts`** — added `deleteExpenseSchema` (`z.string().uuid()` id, strict).
+- **`lib/db/selectors/expenses.ts`** — added `createdBy: string | null` to `ExpenseEntry`
+  (mapped from `e.created_by`); used client-side to gate the delete button for the staff role
+  (staff can only see the trash icon on rows they own).
+- **`app/(app)/finance/actions.ts`** — added `deleteExpense` server action (`useActionState`-
+  compatible signature). Validates the id with Zod, issues a `.delete()` scoped by both `id`
+  and `business_id` (defence-in-depth on top of RLS), then revalidates `/finance`, `/expenses`,
+  and the `expenses` cache tag so Finance/Reports totals update immediately.
+- **`components/finance/expenses-ledger.tsx`** — each expense row now has a trash icon
+  (`Trash2`). First click enters an inline confirm state (showing "Delete / Cancel" buttons
+  within the row, as a hidden form); second click submits the `deleteExpense` action. The
+  `DeleteExpenseRow` sub-component holds its own `useActionState` so error state is
+  per-row. `canDelete(entry)` returns true for owner/manager always, and for staff only when
+  `entry.createdBy === userId`.
+- **`components/finance/expenses-tab.tsx`** — fetches `getProfile()` in parallel with the
+  ledger and passes `userId` / `role` down to `ExpensesLedger`.
+- **i18n** — added `finance.expenses.delete`, `deleteConfirmYes`, `deleteConfirmNo`,
+  `deleting`, `deleteError` to `en.json` and `si.json`.
+
+### Decisions
+
+- **No new migration** — RLS already covers deletion: `expense: owner/manager access`
+  (`FOR ALL`) lets owner/manager delete any tenant row; `expense: staff delete own` limits
+  staff to `created_by = auth.uid()`. Both were added in prior migrations.
+- **Hard-delete** — confirmed fine (no downstream FK references to `expense.id`).
+- **Finance/Reports recompute automatically** — both aggregate from live `expense` rows via
+  the cache tag; revalidating the tag on delete is sufficient.
+- **Inline confirm over a modal** — keeps the interaction self-contained in the row, matches
+  the mobile-first constraint, and avoids a new Sheet/Dialog dependency.
+
+### Open questions
+
+None.
+
+---
+
 ## 2026-07-16 — feat: finished-good stock with production alerts
 
 ### Context

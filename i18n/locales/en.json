@@ -113,7 +113,12 @@
       "empty": "No expenses recorded for this period. Add the first one.",
       "noMatch": "No expenses match your filters.",
       "showing": "Showing {{shown}} of {{total}}",
-      "addError": "Couldn't save that expense. Check the fields and try again."
+      "addError": "Couldn't save that expense. Check the fields and try again.",
+      "delete": "Delete expense",
+      "deleteConfirmYes": "Delete",
+      "deleteConfirmNo": "Cancel",
+      "deleting": "Deleting…",
+      "deleteError": "Couldn't delete that expense."
     },
     "platform": {
       "subtitle": "Commission taken per order source, from your commission rules.",
