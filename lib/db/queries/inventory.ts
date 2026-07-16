@@ -22,3 +22,20 @@ export async function listInventoryItems(): Promise<InventoryItemRow[]> {
   if (error) throw error;
   return data ?? [];
 }
+
+/**
+ * FINISHED_GOOD-kind items for this tenant (name A→Z) — the Production view's
+ * stock list. Low-stock (production-alert) is derived in the selector from
+ * qty_on_hand <= low_stock_threshold, the same rule as the production_alert view.
+ */
+export async function listFinishedGoodItems(): Promise<InventoryItemRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .select("*")
+    .eq("kind", "finished_good")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}

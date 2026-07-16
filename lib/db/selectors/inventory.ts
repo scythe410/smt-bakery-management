@@ -9,7 +9,7 @@
 
 import "server-only";
 import { cache } from "react";
-import { listInventoryItems } from "@/lib/db/queries/inventory";
+import { listInventoryItems, listFinishedGoodItems } from "@/lib/db/queries/inventory";
 import { categoryOrder } from "@/lib/inventory-config";
 import type { InventoryCategory, InventoryKind } from "@/lib/inventory-config";
 
@@ -79,3 +79,46 @@ async function loadInventoryList(): Promise<InventoryList> {
 
 /** The Inventory list for this tenant. React-`cache()`d per request. */
 export const getInventoryList = cache((): Promise<InventoryList> => loadInventoryList());
+
+// --- Production view (finished-good lane, CLAUDE.md §4 FT3) ------------------
+
+export type FinishedGood = {
+  id: string;
+  name: string;
+  /** Units currently in stock (produced − sold). May be negative (stock lies). */
+  qtyOnHand: number;
+  unit: string;
+  /** Reorder point: qty_on_hand <= threshold ⇒ a production alert. */
+  lowStockThreshold: number;
+  /** qty_on_hand <= low_stock_threshold — same rule as the production_alert view. */
+  needsBatch: boolean;
+};
+
+export type ProductionView = {
+  /** All finished goods (name A→Z) — the produce-batch list. */
+  items: FinishedGood[];
+  /** The subset at/below threshold — the "make another batch" alerts. */
+  alerts: FinishedGood[];
+};
+
+async function loadProductionView(): Promise<ProductionView> {
+  const rows = await listFinishedGoodItems();
+
+  const items: FinishedGood[] = rows.map((r) => {
+    const qtyOnHand = toNumberOrNull(r.qty_on_hand) ?? 0;
+    const lowStockThreshold = toNumberOrNull(r.low_stock_threshold) ?? 0;
+    return {
+      id: r.id,
+      name: r.name,
+      qtyOnHand,
+      unit: r.unit,
+      lowStockThreshold,
+      needsBatch: qtyOnHand <= lowStockThreshold,
+    };
+  });
+
+  return { items, alerts: items.filter((i) => i.needsBatch) };
+}
+
+/** The Production view for this tenant. React-`cache()`d per request. */
+export const getProductionView = cache((): Promise<ProductionView> => loadProductionView());

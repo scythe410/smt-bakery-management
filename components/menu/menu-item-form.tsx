@@ -19,14 +19,14 @@ import {
   type MenuActionState,
 } from "@/app/(app)/menu/actions";
 import { RecipeEditor } from "@/components/menu/recipe-editor";
-import type { IngredientOption } from "@/lib/db/selectors/menu";
+import type { IngredientOption, FinishedGoodOption } from "@/lib/db/selectors/menu";
 import type { RecipeLineRow } from "@/lib/db/queries/menu";
 
 const FIELD =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
 export type MenuItemFormMode =
-  | { kind: "create" }
+  | { kind: "create"; finishedGoods: FinishedGoodOption[] }
   | {
       kind: "edit";
       id: string;
@@ -36,8 +36,10 @@ export type MenuItemFormMode =
       initialIsAvailable: boolean;
       initialItemCode: number;
       initialImageUrl: string | null;
+      initialTrackedInventoryItemId: string | null;
       recipeLines: RecipeLineRow[];
       ingredients: IngredientOption[];
+      finishedGoods: FinishedGoodOption[];
     };
 
 export function MenuItemForm({
@@ -51,6 +53,18 @@ export function MenuItemForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<"details" | "recipe">("details");
   const [pickedName, setPickedName] = useState<string | null>(null);
+
+  // Sold-from-stock link. A menu item is EITHER made-to-order (recipe) OR
+  // sold-from-stock (tracked finished good), never both (CLAUDE.md §4 FT3). We gate
+  // the two surfaces against each other in the UI; the DB triggers are the real
+  // guard. `hasRecipe` disables the tracked-good picker; a chosen good disables the
+  // Recipe tab.
+  const finishedGoods = mode.finishedGoods;
+  const hasRecipe = mode.kind === "edit" && mode.recipeLines.length > 0;
+  const [trackedId, setTrackedId] = useState(
+    mode.kind === "edit" ? (mode.initialTrackedInventoryItemId ?? "") : "",
+  );
+  const soldFromStock = trackedId !== "";
 
   const boundAction =
     mode.kind === "edit"
@@ -79,23 +93,30 @@ export function MenuItemForm({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Tab bar — only show Recipe tab in edit mode (item must exist first). */}
+      {/* Tab bar — only show Recipe tab in edit mode (item must exist first). The
+          Recipe tab is disabled while the item is sold-from-stock (mutually
+          exclusive with a recipe). */}
       {isEdit && (
         <div className="border-border flex gap-0 rounded-[var(--radius)] border p-0.5">
-          {(["details", "recipe"] as const).map((t2) => (
-            <button
-              key={t2}
-              type="button"
-              onClick={() => setTab(t2)}
-              className={`text-label flex-1 rounded-[calc(var(--radius)-2px)] py-1.5 font-medium transition-colors ${
-                tab === t2
-                  ? "bg-brand text-brand-white"
-                  : "text-muted hover:text-ink"
-              }`}
-            >
-              {t(`menu.form.tab.${t2}`)}
-            </button>
-          ))}
+          {(["details", "recipe"] as const).map((t2) => {
+            const disabled = t2 === "recipe" && soldFromStock;
+            return (
+              <button
+                key={t2}
+                type="button"
+                disabled={disabled}
+                title={disabled ? t("menu.form.recipeDisabledHint") : undefined}
+                onClick={() => setTab(t2)}
+                className={`text-label flex-1 rounded-[calc(var(--radius)-2px)] py-1.5 font-medium transition-colors disabled:opacity-40 ${
+                  tab === t2
+                    ? "bg-brand text-brand-white"
+                    : "text-muted hover:text-ink"
+                }`}
+              >
+                {t(`menu.form.tab.${t2}`)}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -170,6 +191,30 @@ export function MenuItemForm({
               className="text-brand focus-visible:ring-brand/40 size-4 rounded outline-none focus-visible:ring-2"
             />
             <span className="text-label text-ink">{t("menu.form.available")}</span>
+          </label>
+
+          {/* Sold-from-stock (finished good) link. Setting this makes the item
+              sold-from-stock — each sale decrements the finished good — instead of
+              made-to-order. Mutually exclusive with a recipe. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-caption text-muted">{t("menu.form.trackedGood")}</span>
+            <select
+              name="trackedInventoryItemId"
+              value={trackedId}
+              disabled={hasRecipe}
+              onChange={(e) => setTrackedId(e.target.value)}
+              className={`${FIELD} disabled:opacity-50`}
+            >
+              <option value="">{t("menu.form.trackedGoodNone")}</option>
+              {finishedGoods.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-caption text-faint">
+              {hasRecipe ? t("menu.form.trackedGoodHasRecipeHint") : t("menu.form.trackedGoodHint")}
+            </span>
           </label>
 
           {/* Image upload */}

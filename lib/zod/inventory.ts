@@ -39,3 +39,19 @@ export const barcodeLookupSchema = z
   .string()
   .trim()
   .regex(/^\d{8,14}$/);
+
+/**
+ * Produce-batch input: add N units of a finished good to stock (the morning
+ * "make 20" step). qty is a positive decimal on the item's stocking unit
+ * (numeric(12,3) in the ledger). The DB RPC re-checks the item is a finished good
+ * and re-derives business_id from the session — never trusted from the client.
+ */
+export const produceBatchSchema = z
+  .object({
+    inventoryItemId: z.string().uuid(),
+    qty: z.coerce.number().positive().finite().max(1_000_000_000),
+    note: z.string().trim().max(200).optional(),
+  })
+  .strict();
+
+export type ProduceBatchInput = z.infer<typeof produceBatchSchema>;

@@ -25,6 +25,16 @@ export const upsertMenuItemSchema = z
       .transform((v) => v === "true" || v === "on" || v === "1"),
     // 0 = auto-assign via DB trigger; otherwise must be a positive integer.
     itemCode: z.coerce.number().int().min(0).max(9999).optional().default(0),
+    // Optional link to a finished_good inventory item → this menu item is
+    // SOLD-FROM-STOCK (decrement the good per sale) instead of made-to-order.
+    // Empty string (the "None / made to order" option) → undefined → NULL. The
+    // action + DB triggers enforce kind = finished_good and no-recipe mutual
+    // exclusion; the client value is never trusted for identity.
+    trackedInventoryItemId: z
+      .string()
+      .uuid()
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
   })
   .strict();
 

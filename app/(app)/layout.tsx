@@ -32,7 +32,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="bg-surface mx-auto flex min-h-dvh max-w-[430px] flex-col">
         {/* print:hidden — only the receipt content prints, not app chrome. */}
         <div className="print:hidden">
-          <AppHeader unreadCount={badges.notificationsUnread} />
+          {/* The bell carries unread notifications + production alerts (finished
+              goods needing a batch) — one attention count (CLAUDE.md §4 FT3). */}
+          <AppHeader unreadCount={badges.notificationsUnread + badges.productionAlerts} />
         </div>
         {/* Bottom padding clears the fixed nav (~64px) plus the iOS safe area.
             On print the nav is hidden so print:pb-4 removes the excess gap. */}

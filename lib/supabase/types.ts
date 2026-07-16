@@ -388,6 +388,7 @@ export type Database = {
           item_code: number
           name: string
           price_cents: number
+          tracked_inventory_item_id: string | null
           updated_at: string
         }
         Insert: {
@@ -400,6 +401,7 @@ export type Database = {
           item_code?: number
           name: string
           price_cents?: number
+          tracked_inventory_item_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -412,6 +414,7 @@ export type Database = {
           item_code?: number
           name?: string
           price_cents?: number
+          tracked_inventory_item_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -421,6 +424,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "business"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_tracked_good_fk"
+            columns: ["tracked_inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_item"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "menu_item_tracked_good_fk"
+            columns: ["tracked_inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "menu_item_tracked_good_fk"
+            columns: ["tracked_inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "merchandise_sale_price"
+            referencedColumns: ["inventory_item_id", "business_id"]
+          },
+          {
+            foreignKeyName: "menu_item_tracked_good_fk"
+            columns: ["tracked_inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "production_alert"
+            referencedColumns: ["id", "business_id"]
           },
         ]
       }
@@ -685,6 +716,13 @@ export type Database = {
             referencedColumns: ["inventory_item_id", "business_id"]
           },
           {
+            foreignKeyName: "recipe_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "production_alert"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
             foreignKeyName: "recipe_line_menu_item_id_business_id_fkey"
             columns: ["menu_item_id", "business_id"]
             isOneToOne: false
@@ -758,6 +796,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "merchandise_sale_price"
             referencedColumns: ["inventory_item_id", "business_id"]
+          },
+          {
+            foreignKeyName: "stock_count_line_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "production_alert"
+            referencedColumns: ["id", "business_id"]
           },
           {
             foreignKeyName: "stock_count_line_stock_day_id_business_id_fkey"
@@ -903,6 +948,13 @@ export type Database = {
             referencedColumns: ["inventory_item_id", "business_id"]
           },
           {
+            foreignKeyName: "stock_movement_inventory_item_id_business_id_fkey"
+            columns: ["inventory_item_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "production_alert"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
             foreignKeyName: "stock_movement_ref_order_id_business_id_fkey"
             columns: ["ref_order_id", "business_id"]
             isOneToOne: false
@@ -958,6 +1010,41 @@ export type Database = {
           business_id?: string | null
           inventory_item_id?: string | null
           price_cents?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_item_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_alert: {
+        Row: {
+          business_id: string | null
+          id: string | null
+          low_stock_threshold: number | null
+          name: string | null
+          qty_on_hand: number | null
+          unit: string | null
+        }
+        Insert: {
+          business_id?: string | null
+          id?: string | null
+          low_stock_threshold?: number | null
+          name?: string | null
+          qty_on_hand?: number | null
+          unit?: string | null
+        }
+        Update: {
+          business_id?: string | null
+          id?: string | null
+          low_stock_threshold?: number | null
+          name?: string | null
+          qty_on_hand?: number | null
+          unit?: string | null
         }
         Relationships: [
           {
@@ -1077,6 +1164,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      produce_batch: {
+        Args: { p_inventory_item_id: string; p_note?: string; p_qty: number }
+        Returns: {
+          barcode: string | null
+          business_id: string
+          category: Database["public"]["Enums"]["inventory_category"]
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["inventory_kind"]
+          low_stock_threshold: number
+          name: string
+          qty_on_hand: number
+          sale_price_cents: number | null
+          sku: string | null
+          unit: string
+          unit_cost_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "inventory_item"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_account_role: {
         Args: {
           new_role: Database["public"]["Enums"]["app_role"]
@@ -1124,7 +1236,7 @@ export type Database = {
         | "syrups_toppings"
         | "merch"
         | "other"
-      inventory_kind: "ingredient" | "merchandise"
+      inventory_kind: "ingredient" | "merchandise" | "finished_good"
       order_source:
         | "dine_in"
         | "walk_in"
@@ -1142,6 +1254,7 @@ export type Database = {
         | "restock"
         | "count_adjust"
         | "manual"
+        | "production"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1280,7 +1393,7 @@ export const Constants = {
         "merch",
         "other",
       ],
-      inventory_kind: ["ingredient", "merchandise"],
+      inventory_kind: ["ingredient", "merchandise", "finished_good"],
       order_source: [
         "dine_in",
         "walk_in",
@@ -1299,6 +1412,7 @@ export const Constants = {
         "restock",
         "count_adjust",
         "manual",
+        "production",
       ],
     },
   },

@@ -154,7 +154,8 @@
     },
     "kind": {
       "ingredient": "Ingredient",
-      "merchandise": "Merchandise"
+      "merchandise": "Merchandise",
+      "finished_good": "Finished good"
     },
     "scan": {
       "action": "Scan to Add",
@@ -598,6 +599,7 @@
     "deleteConfirm": "Delete this item? This cannot be undone.",
     "recipeCount_one": "{{count}} ingredient",
     "recipeCount_other": "{{count}} ingredients",
+    "soldFromStock": "Sold from stock",
     "status": {
       "available": "Available",
       "unavailable": "Unavailable"
@@ -627,6 +629,11 @@
       "category": "Category",
       "categoryPlaceholder": "e.g. Bakery, Beverages",
       "available": "Available",
+      "trackedGood": "Sold from stock (finished good)",
+      "trackedGoodNone": "None — made to order",
+      "trackedGoodHint": "Link a finished good to sell this item from produced stock instead of a recipe.",
+      "trackedGoodHasRecipeHint": "This item has a recipe. Clear the recipe to sell it from stock instead.",
+      "recipeDisabledHint": "This item is sold from stock, so it can't also have a recipe.",
       "image": "Image",
       "imageChoose": "Choose image…",
       "imageChange": "Change image",
@@ -636,7 +643,8 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "error": "Couldn't save that item. Check the fields and try again.",
-      "errorCodeDuplicate": "That item code is already in use. Choose a different code."
+      "errorCodeDuplicate": "That item code is already in use. Choose a different code.",
+      "errorTrackedConflict": "A menu item is either made to order or sold from stock, not both. Clear its recipe first."
     },
     "recipe": {
       "empty": "No ingredients linked yet.",
@@ -649,10 +657,36 @@
       "saving": "Saving…",
       "error": "Couldn't save the recipe. Check the fields and try again.",
       "errorNotFound": "One of those ingredients wasn't found.",
-      "errorNotIngredient": "Only ingredient-type inventory items can be linked to a recipe."
+      "errorNotIngredient": "Only ingredient-type inventory items can be linked to a recipe.",
+      "errorTracked": "This item is sold from stock. Remove its finished-good link to add a recipe."
     },
     "error": {
       "title": "Couldn't load the menu.",
+      "body": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  },
+  "production": {
+    "nav": "Production",
+    "inStock": "{{qty}} {{unit}} in stock",
+    "produce": "Produce",
+    "producing": "Producing…",
+    "qtyLabel": "Batch quantity for {{name}}",
+    "qtyPlaceholder": "Qty",
+    "error": "Couldn't record that batch. Check the quantity and try again.",
+    "alerts": {
+      "title_one": "{{count}} item needs a batch",
+      "title_other": "{{count}} items need a batch",
+      "left": "{{qty}} {{unit}} left",
+      "hint": "Produce another batch to restock.",
+      "none": "All finished goods are above their reorder level."
+    },
+    "empty": {
+      "title": "No finished goods yet.",
+      "body": "Add an inventory item with type \"Finished good\", then produce batches here."
+    },
+    "errorState": {
+      "title": "Couldn't load production.",
       "body": "Check your connection and try again.",
       "retry": "Retry"
     }

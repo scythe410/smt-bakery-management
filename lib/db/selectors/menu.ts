@@ -5,7 +5,12 @@
 
 import "server-only";
 import { cache } from "react";
-import { listAllMenuItems, listAllRecipeLines, listIngredientItems } from "@/lib/db/queries/menu";
+import {
+  listAllMenuItems,
+  listAllRecipeLines,
+  listIngredientItems,
+  listFinishedGoodItems,
+} from "@/lib/db/queries/menu";
 import type { InventoryItemRow } from "@/lib/db/queries/menu";
 
 export type MenuItem = {
@@ -17,10 +22,19 @@ export type MenuItem = {
   imageUrl: string | null;
   isAvailable: boolean;
   recipeLineCount: number;
+  /** Linked finished_good (sold-from-stock), or null when made-to-order. */
+  trackedInventoryItemId: string | null;
   createdAt: string;
 };
 
 export type IngredientOption = {
+  id: string;
+  name: string;
+  unit: string;
+};
+
+/** A finished_good pickable as a menu item's sold-from-stock link. */
+export type FinishedGoodOption = {
   id: string;
   name: string;
   unit: string;
@@ -50,6 +64,7 @@ async function loadMenuList(): Promise<MenuList> {
     imageUrl: r.image_url,
     isAvailable: r.is_available,
     recipeLineCount: lineCounts.get(r.id) ?? 0,
+    trackedInventoryItemId: r.tracked_inventory_item_id,
     createdAt: r.created_at,
   }));
 
@@ -65,5 +80,11 @@ export const getMenuList = cache((): Promise<MenuList> => loadMenuList());
 /** INGREDIENT-kind inventory items for the recipe editor. */
 export async function getIngredientOptions(): Promise<IngredientOption[]> {
   const rows: InventoryItemRow[] = await listIngredientItems();
+  return rows.map((r) => ({ id: r.id, name: r.name, unit: r.unit }));
+}
+
+/** FINISHED_GOOD-kind items for the menu item's sold-from-stock selector. */
+export async function getFinishedGoodOptions(): Promise<FinishedGoodOption[]> {
+  const rows: InventoryItemRow[] = await listFinishedGoodItems();
   return rows.map((r) => ({ id: r.id, name: r.name, unit: r.unit }));
 }

@@ -9,7 +9,11 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateBusinessTags } from "@/lib/db/cache";
 import { toCents } from "@/lib/money";
-import { addInventoryItemSchema, barcodeLookupSchema } from "@/lib/zod/inventory";
+import {
+  addInventoryItemSchema,
+  barcodeLookupSchema,
+  produceBatchSchema,
+} from "@/lib/zod/inventory";
 import { lookupProduct, type ProductLookupResult } from "@/lib/inventory/product-lookup";
 import type { Database } from "@/lib/supabase/types";
 
@@ -70,4 +74,37 @@ export async function lookupBarcode(code: string): Promise<ProductLookupResult> 
   const parsed = barcodeLookupSchema.safeParse(code);
   if (!parsed.success) return { found: false };
   return lookupProduct(parsed.data);
+}
+
+export type ProduceBatchState = { ok?: boolean; error?: string };
+
+/**
+ * Produce a batch (+qty) of a finished good — the morning "make 20" step
+ * (CLAUDE.md §4 FT3). Operational: any tenant member (owner/manager/staff) may
+ * run it. Identity + the finished-good check are enforced by the SECURITY INVOKER
+ * `produce_batch` RPC under RLS; the client value is never trusted. Revalidates
+ * the inventory tag so the finished-good qty, the low-stock/production badges, and
+ * the bell alert count all refresh.
+ */
+export async function produceBatch(
+  input: { inventoryItemId: string; qty: number; note?: string },
+): Promise<ProduceBatchState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "production.error" };
+
+  const parsed = produceBatchSchema.safeParse(input);
+  if (!parsed.success) return { error: "production.error" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("produce_batch", {
+    p_inventory_item_id: parsed.data.inventoryItemId,
+    p_qty: parsed.data.qty,
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error) return { error: "production.error" };
+
+  revalidatePath("/inventory/production");
+  revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
+  return { ok: true };
 }

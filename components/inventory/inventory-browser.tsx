@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, ScanLine, AlertTriangle, ClipboardList, ClipboardCheck } from "lucide-react";
+import { Plus, ScanLine, AlertTriangle, ClipboardList, ClipboardCheck, Croissant } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -132,6 +132,15 @@ export function InventoryBrowser({
           {t("stock.nav.audit")}
         </Link>
       </div>
+
+      {/* Finished-good production lane: produce batches + reorder alerts (FT3) */}
+      <Link
+        href="/inventory/production"
+        className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+      >
+        <Croissant className="size-4" aria-hidden />
+        {t("production.nav")}
+      </Link>
 
       {scanning ? (
         <Card>

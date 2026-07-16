@@ -19,7 +19,11 @@ export const INVENTORY_CATEGORIES: readonly InventoryCategory[] = [
   "other",
 ] as const;
 
-export const INVENTORY_KINDS: readonly InventoryKind[] = ["ingredient", "merchandise"] as const;
+export const INVENTORY_KINDS: readonly InventoryKind[] = [
+  "ingredient",
+  "merchandise",
+  "finished_good",
+] as const;
 
 /** Sort key so a set of present categories renders in the fixed enum order. */
 export function categoryOrder(category: InventoryCategory): number {

@@ -94,3 +94,18 @@ export async function listIngredientItems(): Promise<InventoryItemRow[]> {
   if (error) throw error;
   return data ?? [];
 }
+
+/**
+ * FINISHED_GOOD-kind inventory items only — the valid targets for a menu item's
+ * tracked (sold-from-stock) link per CLAUDE.md §4 FT3. Ordered by name.
+ */
+export async function listFinishedGoodItems(): Promise<InventoryItemRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .select("*")
+    .eq("kind", "finished_good")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}

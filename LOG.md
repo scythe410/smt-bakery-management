@@ -5,6 +5,112 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-16 — feat: finished-good stock with production alerts
+
+### Context
+
+The client wants stock tracking + a reorder alert for **produced finished goods**
+— items the bakery makes in batches and sells from stock (hot dogs, pastries):
+produce 20 in the morning, each sale counts it down, and an alert when it runs low
+so they know to make another batch. This is a **third inventory lane** (FT3)
+alongside `ingredient` (recipe-deducted) and `merchandise` (daily count). The catch
+(FT1): a finished good must decrement per sale through the **one** append-only
+`stock_movement` ledger — no parallel bookkeeping — and a menu item must be **either**
+made-to-order (recipe) **or** sold-from-stock (a tracked good), never both, or it
+double-counts.
+
+### Schema — migrations `20260716090000` (enum) + `20260716091000` (schema)
+
+- **Enum values in their own migration** (018a): `inventory_kind += 'finished_good'`,
+  `stock_movement_reason += 'production'`. Postgres can't *use* a new enum value in
+  the same transaction that adds it, and each migration file is its own txn — so the
+  adds are split out and 018b consumes them. `IF NOT EXISTS` ⇒ idempotent.
+- **`menu_item.tracked_inventory_item_id`** (018b) — nullable composite FK
+  `(id, business_id) → inventory_item` (cross-tenant link impossible), `ON DELETE SET
+  NULL` on that column only (mirrors `order.customer_id`). When set, the item is
+  sold-from-stock.
+- **Made-to-order XOR sold-from-stock, enforced both ways.** A trigger on `menu_item`
+  rejects a tracked good that isn't `finished_good` **or** when the item already has a
+  recipe; a trigger on `recipe_line` rejects a line whose menu item has a tracked good.
+  Both raise `23514`. The finished good is an **OUTPUT**, so it is never routed through
+  `recipe_line` (that stays ingredient INPUTS only — FT2.1 already blocks non-ingredient
+  kinds there).
+- **`deduct_order_sale` extended to two lanes** in one idempotent insert: the ingredient
+  lane (recipe BOM × qty, unchanged) `UNION ALL` the finished-good lane (tracked good,
+  1:1 per unit), aggregated per item so an item can never emit two `sale` rows for one
+  order (matches FT1's unique key). **`reverse_order_sale` is untouched** — it mirrors
+  every `sale` for the order, so it already reverses finished-good sales on
+  cancel/refund. This rides on MF2's `order_sync_stock` status trigger.
+- **`produce_batch(item, qty, note)`** — the morning "make N" step: a `production`
+  movement (+qty) the apply trigger folds into `qty_on_hand`. SECURITY INVOKER (RLS in
+  force, any tenant member may run it); rejects a non-finished-good target and a
+  non-positive qty. `revoke all from public` + `grant execute to authenticated`.
+- **`production_alert` view** — `finished_good` items at/below `low_stock_threshold`
+  (the low-stock rule, scoped to the lane). Derived from current stock, so it is
+  inherently **deduped** (one row per item). `security_invoker`.
+
+### App
+
+- **Config/queries/selectors**: `INVENTORY_KINDS += finished_good`;
+  `listFinishedGoodItems` (menu + inventory queries); `getFinishedGoodOptions`
+  (menu-item selector); `getProductionView` (finished goods + derived alerts, the
+  same `qty ≤ threshold` rule as the view). `MenuItem` carries
+  `trackedInventoryItemId`.
+- **Menu form** (`menu-item-form.tsx`): a "Sold from stock (finished good)" select
+  (`name=trackedInventoryItemId`). Choosing one disables the Recipe tab; an item that
+  already has a recipe disables the picker — the UI mirrors the DB's mutual exclusion.
+  The action threads `tracked_inventory_item_id` through create/update and maps `23514`
+  → `menu.form.errorTrackedConflict`; `upsertRecipeLines` maps it →
+  `menu.recipe.errorTracked`. Menu row shows "Sold from stock" vs the ingredient count.
+- **Production view** — new `/inventory/production` route (page + loading + error),
+  `ProductionPanel`: an alerts card ("Hot Dogs: 8 left — make another batch") + a
+  per-item **Produce** control calling the `produceBatch` action (Zod-validated;
+  RLS/finished-good check in the RPC). A "Production" link joins Daily Count / Audit in
+  the inventory toolbar. Empty/loading/error states; en + si i18n throughout.
+- **Bell fed (deduped)**: `ShellBadges.productionAlerts` (head-count on
+  `production_alert`); the header bell shows `notificationsUnread + productionAlerts`.
+  The view reads `inventory_item`, so the existing `inventory` cache tag already
+  invalidates it on a produce/sale — no new tag.
+
+### Role
+
+Operational — owner/manager/staff all see production alerts and can produce batches
+(`requireProfile`, RLS tenant-scoped). No revenue is exposed anywhere in the lane
+(consistent with CF5): the panel shows counts only.
+
+### Decisions
+
+- **Finished-good sales reuse the `sale`/`sale_reversal` reasons** (not a new pair), so
+  FT1's reversal, idempotency, and the End-of-Day billing cross-check all apply with no
+  change. `production` is a distinct reason (the +N batch), analogous to `restock`.
+- **Alerts are derived, not event rows.** No `notification` inserts on threshold
+  crossing — the alert *is* the current-stock view, so it's self-deduping and always
+  accurate; folding its count into the bell "feeds the bell" without an event log.
+- Left `seed.sql` alone (the handoff instance is blank; the feature is exercised by the
+  test, not seeded demo data).
+
+### Verify — `supabase/tests/finished_good_stock.sql` (10 checks, RAISE-on-fail)
+
+Rolled-back, JWT-impersonated, self-provisioning: `produce_batch(+20)` → qty 20, one
+`production`; sell 10 via an order → complete deducts exactly once (→10, one `sale`
+−10); at 10 (≤ threshold) it appears in `production_alert`, re-complete is a no-op;
+cancel restores exactly once (→20, one `sale_reversal`) and clears the alert; a
+sold-from-stock item can't take a recipe and a recipe item can't take a tracked good
+(both raise); `produce_batch` rejects a non-finished-good; a finished good can't be a
+recipe ingredient (FT2.1); **staff** can produce a batch (→25); `qty_on_hand` reconciles
+to the ledger sum. Both migrations pushed to the linked project; types regenerated
+(`gen types --linked --schema public`). `tsc --noEmit` + eslint clean (one pre-existing
+`document.tsx` alt-text warning, unrelated); both locale JSONs parse.
+
+### Open questions
+
+- None. If the client later wants a per-batch **cost** captured (e.g. a batch that
+  consumes ingredients), that would be a `production` movement paired with ingredient
+  `count_adjust`/`manual` deductions — out of scope here (quantity-only, cost basis is
+  cash, per §4).
+
+---
+
 ## 2026-07-16 — feat: staff access to expenses only
 
 ### Context

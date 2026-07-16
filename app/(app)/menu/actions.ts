@@ -20,6 +20,9 @@ import { getRecipeLines } from "@/lib/db/queries/menu";
 export type MenuActionState = { ok?: boolean; error?: string };
 
 const UNIQUE_VIOLATION = "23505";
+// Raised by the DB guards when a menu item would have BOTH a recipe and a tracked
+// finished good, or the tracked item isn't a finished_good (CLAUDE.md §4 FT3).
+const CHECK_VIOLATION = "23514";
 
 function revalidateMenu(businessId: string) {
   revalidatePath("/menu");
@@ -41,6 +44,7 @@ export async function createMenuItem(
     category: formData.get("category") || undefined,
     isAvailable: formData.get("isAvailable") ?? "true",
     itemCode: formData.get("itemCode") || 0,
+    trackedInventoryItemId: formData.get("trackedInventoryItemId") || "",
   });
   if (!parsed.success) return { error: "menu.form.error" };
 
@@ -55,12 +59,14 @@ export async function createMenuItem(
       category: parsed.data.category ?? null,
       is_available: parsed.data.isAvailable,
       item_code: parsed.data.itemCode === 0 ? undefined : parsed.data.itemCode,
+      tracked_inventory_item_id: parsed.data.trackedInventoryItemId ?? null,
     })
     .select("id")
     .single();
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return { error: "menu.form.errorCodeDuplicate" };
+    if (error.code === CHECK_VIOLATION) return { error: "menu.form.errorTrackedConflict" };
     return { error: "menu.form.error" };
   }
 
@@ -90,6 +96,7 @@ export async function updateMenuItem(
     category: formData.get("category") || undefined,
     isAvailable: formData.get("isAvailable") ?? "true",
     itemCode: formData.get("itemCode") || 0,
+    trackedInventoryItemId: formData.get("trackedInventoryItemId") || "",
   });
   if (!parsed.success) return { error: "menu.form.error" };
 
@@ -102,11 +109,13 @@ export async function updateMenuItem(
       category: parsed.data.category ?? null,
       is_available: parsed.data.isAvailable,
       item_code: parsed.data.itemCode === 0 ? undefined : parsed.data.itemCode,
+      tracked_inventory_item_id: parsed.data.trackedInventoryItemId ?? null,
     })
     .eq("id", id);
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return { error: "menu.form.errorCodeDuplicate" };
+    if (error.code === CHECK_VIOLATION) return { error: "menu.form.errorTrackedConflict" };
     return { error: "menu.form.error" };
   }
 
@@ -235,7 +244,12 @@ export async function upsertRecipeLines(
     });
 
     const { error: insertError } = await supabase.from("recipe_line").insert(inserts);
-    if (insertError) return { error: "menu.recipe.error" };
+    if (insertError) {
+      // The menu item is sold-from-stock (tracked finished good) → it can't also
+      // carry a recipe (CLAUDE.md §4 FT3). Surface a specific, fixable message.
+      if (insertError.code === CHECK_VIOLATION) return { error: "menu.recipe.errorTracked" };
+      return { error: "menu.recipe.error" };
+    }
   } else {
     // Empty lines = clear the recipe.
     const { error: deleteError } = await supabase

@@ -21,18 +21,20 @@ import {
   loadRecipeLinesForItem,
 } from "@/app/(app)/menu/actions";
 import { formatLKR } from "@/lib/format";
-import type { MenuItem, IngredientOption } from "@/lib/db/selectors/menu";
+import type { MenuItem, IngredientOption, FinishedGoodOption } from "@/lib/db/selectors/menu";
 
 export function MenuBrowser({
   items,
   unavailableCount,
   categories,
   ingredients,
+  finishedGoods,
 }: {
   items: MenuItem[];
   unavailableCount: number;
   categories: string[];
   ingredients: IngredientOption[];
+  finishedGoods: FinishedGoodOption[];
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -74,8 +76,10 @@ export function MenuBrowser({
       initialIsAvailable: item.isAvailable,
       initialItemCode: item.itemCode,
       initialImageUrl: item.imageUrl,
+      initialTrackedInventoryItemId: item.trackedInventoryItemId,
       recipeLines: lines,
       ingredients,
+      finishedGoods,
     };
     setEditMode(mode);
   }
@@ -169,7 +173,7 @@ export function MenuBrowser({
       {creating && (
         <Card className="p-4">
           <h2 className="text-h2 text-ink mb-3 font-semibold">{t("menu.form.titleCreate")}</h2>
-          <MenuItemForm mode={{ kind: "create" }} onDone={closeCreate} />
+          <MenuItemForm mode={{ kind: "create", finishedGoods }} onDone={closeCreate} />
         </Card>
       )}
 
@@ -219,7 +223,9 @@ export function MenuBrowser({
                   {item.category ? (
                     <span className="text-caption text-muted truncate">{item.category}</span>
                   ) : null}
-                  {item.recipeLineCount > 0 ? (
+                  {item.trackedInventoryItemId ? (
+                    <span className="text-caption text-muted">{t("menu.soldFromStock")}</span>
+                  ) : item.recipeLineCount > 0 ? (
                     <span className="text-caption text-muted">
                       {t("menu.recipeCount", { count: item.recipeLineCount })}
                     </span>

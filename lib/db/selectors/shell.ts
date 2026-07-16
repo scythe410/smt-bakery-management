@@ -12,6 +12,12 @@ import { businessTags } from "@/lib/db/cache";
 export type ShellBadges = {
   /** Unread notifications → header bell badge. */
   notificationsUnread: number;
+  /**
+   * Finished goods at/below their reorder threshold → production alerts
+   * ("make another batch"). Derived from current stock, so it is inherently
+   * deduped (one per item); folded into the header bell count (CLAUDE.md §4 FT3).
+   */
+  productionAlerts: number;
   /** qty_on_hand <= low_stock_threshold → Inventory nav badge (CLAUDE.md §5). */
   inventoryLowStock: number;
   /** Menu items currently unavailable ("sold out") → Menu nav badge. */
@@ -20,6 +26,7 @@ export type ShellBadges = {
 
 const EMPTY_BADGES: ShellBadges = {
   notificationsUnread: 0,
+  productionAlerts: 0,
   inventoryLowStock: 0,
   menuAttention: 0,
 };
@@ -29,13 +36,21 @@ function loadShellBadges(businessId: string): Promise<ShellBadges> {
     async (): Promise<ShellBadges> => {
       const supabase = createServiceClient();
 
-      const [notif, lowStock, menu] = await Promise.all([
+      const [notif, production, lowStock, menu] = await Promise.all([
         // head + exact count: no rows transferred, just the number.
         supabase
           .from("notification")
           .select("id", { count: "exact", head: true })
           .eq("business_id", businessId)
           .eq("is_read", false),
+        // Production alerts: finished goods at/below threshold. The
+        // production_alert view applies the column-vs-column rule; a head count
+        // returns just the number (CLAUDE.md §4 FT3). Reads inventory_item, so the
+        // `inventory` cache tag below already invalidates it on a produce/sale.
+        supabase
+          .from("production_alert")
+          .select("id", { count: "exact", head: true })
+          .eq("business_id", businessId),
         // Low-stock (qty_on_hand <= low_stock_threshold) is a column-vs-column
         // comparison PostgREST can't express as a filter, so it lives in the
         // inventory_low_stock view; a head count returns just the number — no
@@ -53,6 +68,7 @@ function loadShellBadges(businessId: string): Promise<ShellBadges> {
 
       return {
         notificationsUnread: notif.count ?? 0,
+        productionAlerts: production.count ?? 0,
         inventoryLowStock: lowStock.count ?? 0,
         menuAttention: menu.count ?? 0,
       };
