@@ -8,16 +8,23 @@
 //     10–30 ms/char), of a plausible code length, terminated by Enter. Any slow
 //     gap restarts the buffer, so a human keystroke can never accumulate into a
 //     "code" — length-1 buffers never fire.
-//   * While an editable field is focused we bail entirely (the operator is
-//     typing) — so the hook only captures in the idle fixed-counter state where
-//     nothing editable holds focus. That also means the scanned characters never
-//     land in / pollute a field: an inert target (body/button) swallows them and
-//     we replay the decoded code to `onScan`.
 //
-// It complements the camera scanner (components/inventory/scan-to-add.tsx) and,
-// unlike the camera, needs no permission — it's the primary mode at a fixed
-// counter. Reused by the Inventory scan-to-add flow, the daily merchandise count,
-// and the ingredient audit.
+// Two focus modes:
+//   * DEFAULT (`captureInEditable: false`): while an editable field is focused we
+//     bail (the operator is typing). This is the fixed-counter idle mode — nothing
+//     editable holds focus, so the scanned characters land on an inert target
+//     (body/button) and never pollute a field. Used by the Inventory receive flow.
+//   * ALWAYS-ON (`captureInEditable: true`): capture EVEN while an input is
+//     focused — the billing counter, where the search box may hold focus but the
+//     scanner must still work. We tell a scanner burst from human typing purely by
+//     timing: once a burst is going (gap ≤ interKeyMs) we `preventDefault` each key
+//     so the burst never enters the field, and swallow the terminating Enter. Only
+//     the burst's FIRST character can leak into the field (we can't yet know it is
+//     a scan); the caller clears it in `onScan` (e.g. resets the search box). No
+//     human sustains sub-50 ms/char, so this never eats real typing.
+//
+// It complements the camera scanner and, unlike the camera, needs no permission —
+// it's the primary mode at a fixed counter.
 
 import { useEffect, useRef } from "react";
 
@@ -32,6 +39,12 @@ export type UseBarcodeScannerOptions = {
   maxLength?: number;
   /** Max gap (ms) between keys to still count as one scan burst (default 50). */
   interKeyMs?: number;
+  /**
+   * Capture the burst EVEN while an editable field is focused (always-on billing).
+   * Burst keys are `preventDefault`ed so they don't enter the field; only the
+   * first char can leak (clear it in `onScan`). Default false (bail on editable).
+   */
+  captureInEditable?: boolean;
 };
 
 /** A focused element the operator is typing into — leave those keys alone. */
@@ -47,6 +60,7 @@ export function useBarcodeScanner({
   minLength = 6,
   maxLength = 64,
   interKeyMs = 50,
+  captureInEditable = false,
 }: UseBarcodeScannerOptions): void {
   // Keep the latest callback without re-subscribing the listener every render.
   const onScanRef = useRef(onScan);
@@ -71,8 +85,9 @@ export function useBarcodeScanner({
         reset();
         return;
       }
-      // Don't fight a human typing into a field — only capture in the idle state.
-      if (isEditableTarget(e.target)) {
+      // Default mode: don't fight a human typing into a field — only capture in the
+      // idle state. Always-on mode captures regardless (timing tells scan apart).
+      if (!captureInEditable && isEditableTarget(e.target)) {
         reset();
         return;
       }
@@ -82,8 +97,9 @@ export function useBarcodeScanner({
       if (e.key === "Enter") {
         const code = buffer;
         reset();
-        // Only a plausible, burst-fast code counts as a scan; swallow its Enter
-        // so it can't double as a submit, then hand the code off.
+        // Only a plausible, burst-fast code counts as a scan; swallow its Enter so
+        // it can't double as a submit, then hand the code off. A non-qualifying
+        // Enter (human, or a short buffer) is left alone to reach the form.
         if (code.length >= minLength && code.length <= maxLength) {
           e.preventDefault();
           e.stopPropagation();
@@ -97,15 +113,24 @@ export function useBarcodeScanner({
       // uppercase char); e.key already carries the resolved character.
       if (e.key.length !== 1) return;
 
-      // A human-speed gap means this isn't part of a scan burst — start over from
-      // this key so slow keystrokes can never build up into a code.
-      const gap = lastTime === 0 ? 0 : now - lastTime;
+      // A human-speed gap means this isn't part of an in-flight burst — start over
+      // from this key so slow keystrokes can never build up into a code.
+      const gap = lastTime === 0 ? Infinity : now - lastTime;
+      const continuesBurst = buffer.length > 0 && gap <= interKeyMs;
       if (gap > interKeyMs) buffer = "";
       buffer += e.key;
       lastTime = now;
+
+      // Always-on mode: keep a fast burst's characters OUT of the focused field.
+      // The first char (buffer was empty) is let through — we can't yet know it's a
+      // scan — and the caller wipes it in onScan. Every subsequent burst key is
+      // suppressed. Human typing (gap > interKeyMs) is never suppressed.
+      if (captureInEditable && continuesBurst) {
+        e.preventDefault();
+      }
     }
 
     document.addEventListener("keydown", handleKeydown, true);
     return () => document.removeEventListener("keydown", handleKeydown, true);
-  }, [enabled, minLength, maxLength, interKeyMs]);
+  }, [enabled, minLength, maxLength, interKeyMs, captureInEditable]);
 }

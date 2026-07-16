@@ -12,29 +12,27 @@
 // Quick-add: cashier types an item code (integer) and presses Enter — the item is
 // added with qty 1. Falls back to name-substring search if no code matches.
 // Qty for in-cart items is directly editable (CF2 pattern: type="text").
+//
+// Barcode checkout: the scanner is ALWAYS ON here (CLAUDE.md §4). A USB/Bluetooth
+// keyboard-wedge scan (useBarcodeScanner, captureInEditable so it works even with
+// the search box focused) OR an optional camera scan maps the barcode to its
+// sold-from-stock menu item and adds a line (qty increments on repeat scans of the
+// same item). On order completion the item's stock DECREMENTS via the FT1 ledger.
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Search, X } from "lucide-react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, Minus, Plus, ScanBarcode, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { createOrder, type CreateOrderState } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
-import {
-  ORDER_SOURCES,
-  PAYMENT_METHODS,
-  PAYMENT_STATUSES,
-} from "@/lib/orders/order-config";
+import { ORDER_SOURCES, PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/orders/order-config";
+import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
+import { useCameraScanner, type CameraScannerError } from "@/lib/hooks/use-camera-scanner";
 import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
 
 const FIELD_CLASS =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
-export function NewOrderForm({
-  menu,
-  onDone,
-}: {
-  menu: NewOrderMenuItem[];
-  onDone: () => void;
-}) {
+export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDone: () => void }) {
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -44,6 +42,20 @@ export function NewOrderForm({
   const [qtyRaw, setQtyRaw] = useState<Record<string, string>>({});
   // Quick-add / search query.
   const [quickAdd, setQuickAdd] = useState("");
+
+  // Barcode checkout state. The wedge scanner is always on; the camera is optional.
+  const [scanMsg, setScanMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [camError, setCamError] = useState<CameraScannerError | null>(null);
+  const [camAttempt, setCamAttempt] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // barcode → menu item id, for sold-from-stock items (finished_good / merchandise).
+  const menuByBarcode = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of menu) if (m.barcode) map.set(m.barcode, m.id);
+    return map;
+  }, [menu]);
 
   const [state, formAction, pending] = useActionState<CreateOrderState, FormData>(createOrder, {});
 
@@ -73,6 +85,47 @@ export function NewOrderForm({
     searchRef.current?.focus();
   }
 
+  // Add a menu item from a scanned barcode (wedge or camera). Dedupe identical
+  // reads within a short window so a camera held on one code (many frames) or a
+  // double-trigger doesn't spam the cart; a deliberate re-scan after the window
+  // increments the qty. An unknown barcode is surfaced, not silently dropped.
+  const lastScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const addByBarcode = useCallback(
+    (raw: string) => {
+      const code = raw.trim();
+      if (!code) return;
+      const now = Date.now();
+      if (lastScanRef.current.code === code && now - lastScanRef.current.at < 1200) return;
+      lastScanRef.current = { code, at: now };
+
+      const id = menuByBarcode.get(code);
+      if (id) {
+        addItem(id);
+        const name = menu.find((m) => m.id === id)?.name ?? "";
+        setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name }) });
+      } else {
+        // Clear any first-character leak from the focused search box, then warn.
+        setQuickAdd("");
+        setScanMsg({ tone: "warn", text: t("orders.new.scanUnknown", { code }) });
+      }
+    },
+    // addItem/menu are stable enough (menuByBarcode derives from menu); reads are
+    // via state updaters, so a captured closure stays correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [menuByBarcode, menu],
+  );
+
+  // Keyboard-wedge scanner — ALWAYS ON, and captures even while the search box is
+  // focused (billing counter). The camera path is optional (toggle below).
+  useBarcodeScanner({ onScan: addByBarcode, captureInEditable: true });
+  useCameraScanner({
+    videoRef,
+    enabled: cameraOn,
+    restartKey: camAttempt,
+    onDecode: addByBarcode,
+    onError: (e) => setCamError(e),
+  });
+
   function bump(id: string, delta: number) {
     const next = Math.max(0, (qtyById[id] ?? 0) + delta);
     setQtyById((prev) => {
@@ -96,8 +149,16 @@ export function NewOrderForm({
   function commitQty(id: string) {
     const parsed = parseInt(qtyRaw[id] ?? "", 10);
     if (!isFinite(parsed) || parsed <= 0) {
-      setQtyById((prev) => { const c = { ...prev }; delete c[id]; return c; });
-      setQtyRaw((prev) => { const c = { ...prev }; delete c[id]; return c; });
+      setQtyById((prev) => {
+        const c = { ...prev };
+        delete c[id];
+        return c;
+      });
+      setQtyRaw((prev) => {
+        const c = { ...prev };
+        delete c[id];
+        return c;
+      });
     } else {
       setQtyById((prev) => ({ ...prev, [id]: parsed }));
       setQtyRaw((prev) => ({ ...prev, [id]: String(parsed) }));
@@ -144,6 +205,64 @@ export function NewOrderForm({
         </label>
       </div>
 
+      {/* Barcode checkout — wedge scanner always on; camera optional */}
+      <div className="border-border bg-surface-2 flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-caption text-muted inline-flex items-center gap-1.5">
+            <ScanBarcode className="size-4" aria-hidden />
+            {t("orders.new.scanReady")}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setCamError(null);
+              setCameraOn((v) => !v);
+              setCamAttempt((a) => a + 1);
+            }}
+            aria-pressed={cameraOn}
+            className={`text-caption inline-flex h-8 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
+              cameraOn
+                ? "border-brand text-brand bg-[var(--red-tint)]"
+                : "border-border-strong text-ink hover:bg-surface"
+            }`}
+          >
+            <Camera className="size-3.5" aria-hidden />
+            {cameraOn ? t("orders.new.scanCameraOff") : t("orders.new.scanCameraOn")}
+          </button>
+        </div>
+
+        {cameraOn && !camError ? (
+          <div className="border-border relative aspect-video overflow-hidden rounded-[var(--radius)] border bg-black">
+            <video
+              ref={videoRef}
+              className="size-full object-cover"
+              playsInline
+              muted
+              aria-label={t("inventory.scan.viewfinderLabel")}
+            />
+            <div
+              className="border-brand-white/80 pointer-events-none absolute inset-6 rounded-[var(--radius)] border-2"
+              aria-hidden
+            />
+          </div>
+        ) : null}
+
+        {camError ? (
+          <p role="alert" className="text-caption text-danger">
+            {t(`inventory.scan.error.${camError}`)}
+          </p>
+        ) : null}
+
+        {scanMsg ? (
+          <p
+            role="status"
+            className={`text-caption ${scanMsg.tone === "ok" ? "text-success" : "text-danger"}`}
+          >
+            {scanMsg.text}
+          </p>
+        ) : null}
+      </div>
+
       {/* Quick-add / item picker */}
       <div className="flex flex-col gap-1.5">
         <span className="text-caption text-muted">{t("orders.new.items")}</span>
@@ -155,7 +274,7 @@ export function NewOrderForm({
             {/* Code / name search bar */}
             <div className="relative">
               <Search
-                className="text-muted absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                className="text-muted absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
                 aria-hidden
               />
               <input
@@ -176,9 +295,12 @@ export function NewOrderForm({
               {quickAdd ? (
                 <button
                   type="button"
-                  onClick={() => { setQuickAdd(""); searchRef.current?.focus(); }}
+                  onClick={() => {
+                    setQuickAdd("");
+                    searchRef.current?.focus();
+                  }}
                   aria-label={t("orders.new.clearSearch")}
-                  className="text-muted hover:text-ink absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
+                  className="text-muted hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
@@ -249,9 +371,7 @@ export function NewOrderForm({
                             className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
                           />
                         ) : (
-                          <span className="text-faint w-9 text-center text-sm tabular-nums">
-                            —
-                          </span>
+                          <span className="text-faint w-9 text-center text-sm tabular-nums">—</span>
                         )}
 
                         <button

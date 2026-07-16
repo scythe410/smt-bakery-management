@@ -13,20 +13,16 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image as ImageIcon } from "lucide-react";
-import {
-  createMenuItem,
-  updateMenuItem,
-  type MenuActionState,
-} from "@/app/(app)/menu/actions";
+import { createMenuItem, updateMenuItem, type MenuActionState } from "@/app/(app)/menu/actions";
 import { RecipeEditor } from "@/components/menu/recipe-editor";
-import type { IngredientOption, FinishedGoodOption } from "@/lib/db/selectors/menu";
+import type { IngredientOption, SoldFromStockOption } from "@/lib/db/selectors/menu";
 import type { RecipeLineRow } from "@/lib/db/queries/menu";
 
 const FIELD =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
 export type MenuItemFormMode =
-  | { kind: "create"; finishedGoods: FinishedGoodOption[] }
+  | { kind: "create"; soldFromStock: SoldFromStockOption[] }
   | {
       kind: "edit";
       id: string;
@@ -39,16 +35,10 @@ export type MenuItemFormMode =
       initialTrackedInventoryItemId: string | null;
       recipeLines: RecipeLineRow[];
       ingredients: IngredientOption[];
-      finishedGoods: FinishedGoodOption[];
+      soldFromStock: SoldFromStockOption[];
     };
 
-export function MenuItemForm({
-  mode,
-  onDone,
-}: {
-  mode: MenuItemFormMode;
-  onDone: () => void;
-}) {
+export function MenuItemForm({ mode, onDone }: { mode: MenuItemFormMode; onDone: () => void }) {
   const { t } = useTranslation();
   const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<"details" | "recipe">("details");
@@ -59,22 +49,16 @@ export function MenuItemForm({
   // the two surfaces against each other in the UI; the DB triggers are the real
   // guard. `hasRecipe` disables the tracked-good picker; a chosen good disables the
   // Recipe tab.
-  const finishedGoods = mode.finishedGoods;
+  const trackedOptions = mode.soldFromStock;
   const hasRecipe = mode.kind === "edit" && mode.recipeLines.length > 0;
   const [trackedId, setTrackedId] = useState(
     mode.kind === "edit" ? (mode.initialTrackedInventoryItemId ?? "") : "",
   );
   const soldFromStock = trackedId !== "";
 
-  const boundAction =
-    mode.kind === "edit"
-      ? updateMenuItem.bind(null, mode.id)
-      : createMenuItem;
+  const boundAction = mode.kind === "edit" ? updateMenuItem.bind(null, mode.id) : createMenuItem;
 
-  const [state, formAction, pending] = useActionState<MenuActionState, FormData>(
-    boundAction,
-    {},
-  );
+  const [state, formAction, pending] = useActionState<MenuActionState, FormData>(boundAction, {});
 
   // Derive: once the action succeeds the label shows reset without setState in effect.
   const imageName = state.ok ? null : pickedName;
@@ -86,8 +70,7 @@ export function MenuItemForm({
     }
   }, [state.ok, onDone]);
 
-  const defaultPrice =
-    mode.kind === "edit" ? (mode.initialPriceCents / 100).toFixed(2) : "";
+  const defaultPrice = mode.kind === "edit" ? (mode.initialPriceCents / 100).toFixed(2) : "";
 
   const isEdit = mode.kind === "edit";
 
@@ -108,9 +91,7 @@ export function MenuItemForm({
                 title={disabled ? t("menu.form.recipeDisabledHint") : undefined}
                 onClick={() => setTab(t2)}
                 className={`text-label flex-1 rounded-[calc(var(--radius)-2px)] py-1.5 font-medium transition-colors disabled:opacity-40 ${
-                  tab === t2
-                    ? "bg-brand text-brand-white"
-                    : "text-muted hover:text-ink"
+                  tab === t2 ? "bg-brand text-brand-white" : "text-muted hover:text-ink"
                 }`}
               >
                 {t(`menu.form.tab.${t2}`)}
@@ -206,9 +187,9 @@ export function MenuItemForm({
               className={`${FIELD} disabled:opacity-50`}
             >
               <option value="">{t("menu.form.trackedGoodNone")}</option>
-              {finishedGoods.map((g) => (
+              {trackedOptions.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name}
+                  {g.name} · {t(`inventory.kind.${g.kind}`)}
                 </option>
               ))}
             </select>
@@ -223,9 +204,10 @@ export function MenuItemForm({
             <label className="border-border hover:bg-surface-2 flex h-10 cursor-pointer items-center gap-2 rounded-[var(--radius)] border px-3 transition-colors">
               <ImageIcon className="text-muted size-4" aria-hidden />
               <span className="text-label text-muted truncate">
-                {imageName ?? (isEdit && mode.initialImageUrl
-                  ? t("menu.form.imageChange")
-                  : t("menu.form.imageChoose"))}
+                {imageName ??
+                  (isEdit && mode.initialImageUrl
+                    ? t("menu.form.imageChange")
+                    : t("menu.form.imageChoose"))}
               </span>
               <input
                 type="file"

@@ -5,6 +5,104 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-16 — feat: barcode receive + billing with merchandise decrement on sale
+
+### Context
+
+The client resells bought-in packaged goods (soft drinks, snacks, water): stock **in**
+by scanning on receipt, stock **out** by scanning at billing. The existing scanner
+(keyboard-wedge + camera + own-catalog lookup) wasn't usable for this: (1) the camera
+hard-failed on a laptop, (2) the wedge bailed the moment any input was focused — so it
+couldn't work at a billing counter — and (3) it was wired only into "add a new catalog
+item," not into receiving or billing. Merchandise also had **no** sale path: it was
+daily-count-only, never decremented per sale.
+
+### Model change (CLAUDE.md §4 updated)
+
+`merchandise` now = bought-in resale goods, **received by scan** (`restock` movement) and
+**decremented per billed sale 1:1** — the SAME sold-from-stock machinery finished goods
+use. The FT2 daily count stays but for merchandise is now a periodic **audit**
+(`count_adjust`), not the revenue source (revenue = billed orders). An item is still in
+exactly one lane. `menu_item.tracked_inventory_item_id` may now point at a `finished_good`
+**or** a `merchandise` item; recipe-XOR-tracked-good is unchanged.
+
+### Scanner capture fixes
+
+- **`lib/hooks/use-camera-scanner.ts`** _(new)_ — centralizes the zxing camera decode
+  (was inline in scan-to-add). Key fix: `facingMode: { ideal: "environment" }` instead of a
+  hard `"environment"` constraint, which is unsatisfiable on a single-camera laptop and
+  threw `OverconstrainedError` → the camera never started (the #1 demo-machine failure).
+  Lazy-imports zxing; always tears the stream down on cleanup; `restartKey` forces a retry.
+- **`lib/hooks/use-barcode-scanner.ts`** — added a `captureInEditable` mode. Default
+  (fixed-counter) still bails while a field is focused; always-on mode (billing) captures a
+  wedge burst **even with the search box focused**, `preventDefault`ing the fast burst so it
+  never enters the field (only the first char can leak; the caller clears it). Timing
+  (≤50 ms/char) tells a scanner apart from a human — no human sustains that, so real typing
+  is never eaten.
+
+### Stock-IN (receive) — Inventory
+
+- **`components/inventory/scan-receive.tsx`** _(new, replaces scan-to-add.tsx)_ — a "Receive
+  Stock" flow: scan a barcode → known item → a qty stepper (default 1) → `receiveStock`
+  posts a `restock` (+qty); unknown → the own-catalog create form (prefilled, defaults to
+  `merchandise`), so saving with an opening qty stocks it. Camera + wedge + manual entry all
+  funnel one pipeline. Repeatable without leaving.
+- **`receive_stock(item, qty, note)` RPC** (migration 019) + **`receiveStock`** action +
+  `receiveStockSchema`. SECURITY INVOKER, RLS-scoped, re-derives business_id; posts one
+  `restock` movement (the apply trigger folds it into qty_on_hand).
+- Inventory browser: the scan button is now "Receive Stock" (`PackagePlus`); barcode index
+  carries `{id,name,unit,qtyOnHand}` for a known-item restock.
+
+### Stock-OUT (billing) — Orders
+
+- **`components/orders/new-order-form.tsx`** — the wedge scanner is **always on**
+  (`captureInEditable`) and an **optional camera** toggle sits above the picker. A scanned
+  barcode maps to its sold-from-stock menu item and adds a line (repeat scans bump qty; a
+  1.2 s dedupe stops a held camera from spamming). Unknown barcodes are surfaced, not
+  dropped. On completion the ledger deducts (`sale`), reversing on cancel — unchanged
+  `deduct_order_sale`/`reverse_order_sale`, which already key off `tracked_inventory_item_id`
+  kind-agnostically.
+- **`getNewOrderMenu`** now attaches each menu item's tracked-item barcode
+  (`listBarcodesByItemIds`) so billing can resolve a scan → menu item.
+
+### Enable merchandise as a tracked good
+
+- Migration 019 relaxes `enforce_menu_item_tracked_good` to allow `finished_good` **or**
+  `merchandise`. The menu form's picker now offers both (renamed
+  `getFinishedGoodOptions`→`getSoldFromStockOptions`, `FinishedGoodOption`→
+  `SoldFromStockOption` with a `kind` label); i18n `menu.form.trackedGood` generalized.
+- **`seed.sql`** — 3 merchandise soft drinks (barcodes + retail prices) + 3 sold-from-stock
+  menu items linked to them. Sprite sits one sale above its threshold so a single completed
+  order trips the low-stock alert (demo).
+
+### Decisions
+
+- **Reused the finished-good sale lane** rather than a new merchandise deduction path —
+  `deduct_order_sale` already handles any `tracked_inventory_item_id` regardless of kind, so
+  only the enforce trigger's kind check needed relaxing. One ledger, one deduction path.
+- **Low-stock for merchandise needs no new surface** — `inventory_low_stock` (migration 007)
+  is kind-agnostic, so the Inventory nav badge + Low-Stock pill already fire once merchandise
+  decrements. Verified against the live DB (rolled back): sale 10→2, item appears in
+  `inventory_low_stock`, cancel restores to 10.
+- **Restock RPC is kind-generic** — `restock` is a legitimate inbound for any stock-carrying
+  item; the receive UI is oriented to merchandise but the RPC isn't artificially limited.
+
+### Verified
+
+Migration + a sale/reverse cycle run against the linked DB in a `BEGIN…ROLLBACK`: merchandise
+link accepted, decrement 1:1 on sale, presence in the low-stock view, reversal restores stock,
+`receive_stock` created. `tsc --noEmit` and `eslint` clean.
+
+### Open questions / follow-ups
+
+- **The migration is not pushed to the hosted project.** Run `supabase db push` (and reseed)
+  to make these features live on the demo instance.
+- End-of-Day stock-take (Reports) still computes a merchandise revenue column from the
+  physical count; with sales now billed through orders that column is best read as an audit
+  cross-check, not primary revenue. Left as-is this prompt.
+
+---
+
 ## 2026-07-16 — feat: past orders history with detail and reprint
 
 ### What changed

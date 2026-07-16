@@ -4,15 +4,15 @@
 import {
   getMenuList,
   getIngredientOptions,
-  getFinishedGoodOptions,
+  getSoldFromStockOptions,
 } from "@/lib/db/selectors/menu";
 import { MenuBrowser } from "@/components/menu/menu-browser";
 
 export async function MenuList() {
-  const [{ items, unavailableCount, categories }, ingredients, finishedGoods] = await Promise.all([
+  const [{ items, unavailableCount, categories }, ingredients, soldFromStock] = await Promise.all([
     getMenuList(),
     getIngredientOptions(),
-    getFinishedGoodOptions(),
+    getSoldFromStockOptions(),
   ]);
   return (
     <MenuBrowser
@@ -20,7 +20,7 @@ export async function MenuList() {
       unavailableCount={unavailableCount}
       categories={categories}
       ingredients={ingredients}
-      finishedGoods={finishedGoods}
+      soldFromStock={soldFromStock}
     />
   );
 }

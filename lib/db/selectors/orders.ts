@@ -15,6 +15,7 @@ import {
   type OrderWithItems,
 } from "@/lib/db/queries/orders";
 import { listAvailableMenuItems } from "@/lib/db/queries/menu";
+import { listBarcodesByItemIds } from "@/lib/db/queries/inventory";
 import { zonedDateKey, zonedWallTimeToUtcIso } from "@/lib/db/period";
 import { ACTIVE_STATUSES, ARCHIVED_STATUSES, tabForStatus } from "@/lib/orders/order-config";
 import type {
@@ -145,16 +146,30 @@ export type NewOrderMenuItem = {
   itemCode: number;
   priceCents: number;
   category: string | null;
+  /**
+   * Barcode of the tracked sold-from-stock item (finished_good / merchandise), or
+   * null for made-to-order items. Lets billing quick-add this menu item by scanning
+   * the physical product's barcode (CLAUDE.md §4).
+   */
+  barcode: string | null;
 };
 
 /** Available menu items for the new-order picker. React-`cache()`d per request. */
 export const getNewOrderMenu = cache(async (): Promise<NewOrderMenuItem[]> => {
   const rows = await listAvailableMenuItems();
+  // Attach the tracked item's barcode so a scan at billing maps to its menu item.
+  const trackedIds = rows
+    .map((m) => m.tracked_inventory_item_id)
+    .filter((id): id is string => id != null);
+  const barcodeByItemId = await listBarcodesByItemIds([...new Set(trackedIds)]);
   return rows.map((m) => ({
     id: m.id,
     name: m.name,
     itemCode: m.item_code,
     priceCents: m.price_cents,
     category: m.category,
+    barcode: m.tracked_inventory_item_id
+      ? (barcodeByItemId.get(m.tracked_inventory_item_id) ?? null)
+      : null,
   }));
 });

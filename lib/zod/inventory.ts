@@ -55,3 +55,20 @@ export const produceBatchSchema = z
   .strict();
 
 export type ProduceBatchInput = z.infer<typeof produceBatchSchema>;
+
+/**
+ * Receive-stock input: add N units of an existing inventory item to stock (the
+ * scan-on-receipt step for bought-in resale goods). qty is a positive decimal on
+ * the item's stocking unit (numeric(12,3) in the ledger). The DB RPC re-derives
+ * business_id from the session and resolves the item under RLS — never trusted
+ * from the client.
+ */
+export const receiveStockSchema = z
+  .object({
+    inventoryItemId: z.string().uuid(),
+    qty: z.coerce.number().positive().finite().max(1_000_000_000),
+    note: z.string().trim().max(200).optional(),
+  })
+  .strict();
+
+export type ReceiveStockInput = z.infer<typeof receiveStockSchema>;

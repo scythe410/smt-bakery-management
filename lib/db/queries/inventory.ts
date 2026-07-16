@@ -24,6 +24,22 @@ export async function listInventoryItems(): Promise<InventoryItemRow[]> {
 }
 
 /**
+ * Barcodes for a set of inventory item ids (RLS-scoped) as a code→barcode map.
+ * The new-order selector uses it to attach each sold-from-stock menu item's tracked
+ * barcode, so billing can quick-add by scan (CLAUDE.md §4). Ids not found or with a
+ * null barcode are simply absent from the map.
+ */
+export async function listBarcodesByItemIds(ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (ids.length === 0) return map;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("inventory_item").select("id, barcode").in("id", ids);
+  if (error) throw error;
+  for (const row of data ?? []) if (row.barcode) map.set(row.id, row.barcode);
+  return map;
+}
+
+/**
  * FINISHED_GOOD-kind items for this tenant (name A→Z) — the Production view's
  * stock list. Low-stock (production-alert) is derived in the selector from
  * qty_on_hand <= low_stock_threshold, the same rule as the production_alert view.

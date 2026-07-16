@@ -21,20 +21,20 @@ import {
   loadRecipeLinesForItem,
 } from "@/app/(app)/menu/actions";
 import { formatLKR } from "@/lib/format";
-import type { MenuItem, IngredientOption, FinishedGoodOption } from "@/lib/db/selectors/menu";
+import type { MenuItem, IngredientOption, SoldFromStockOption } from "@/lib/db/selectors/menu";
 
 export function MenuBrowser({
   items,
   unavailableCount,
   categories,
   ingredients,
-  finishedGoods,
+  soldFromStock,
 }: {
   items: MenuItem[];
   unavailableCount: number;
   categories: string[];
   ingredients: IngredientOption[];
-  finishedGoods: FinishedGoodOption[];
+  soldFromStock: SoldFromStockOption[];
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -79,7 +79,7 @@ export function MenuBrowser({
       initialTrackedInventoryItemId: item.trackedInventoryItemId,
       recipeLines: lines,
       ingredients,
-      finishedGoods,
+      soldFromStock,
     };
     setEditMode(mode);
   }
@@ -119,7 +119,7 @@ export function MenuBrowser({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("menu.searchPlaceholder")}
-          className="border-border text-label focus-visible:ring-brand/40 h-9 flex-1 rounded-[var(--radius)] border bg-surface px-3 outline-none focus-visible:ring-2"
+          className="border-border text-label focus-visible:ring-brand/40 bg-surface h-9 flex-1 rounded-[var(--radius)] border px-3 outline-none focus-visible:ring-2"
         />
         <button
           type="button"
@@ -138,7 +138,7 @@ export function MenuBrowser({
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="border-border text-caption text-ink focus-visible:ring-brand/40 h-8 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2"
+            className="border-border text-caption text-ink focus-visible:ring-brand/40 bg-surface h-8 rounded-[var(--radius)] border px-2 outline-none focus-visible:ring-2"
           >
             <option value="">{t("menu.filter.allCategories")}</option>
             {categories.map((c) => (
@@ -154,9 +154,9 @@ export function MenuBrowser({
           type="button"
           onClick={() => setShowUnavailable((v) => !v)}
           aria-pressed={!showUnavailable}
-          className={`text-caption flex h-8 items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+          className={`text-caption focus-visible:ring-brand/40 flex h-8 items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
             !showUnavailable
-              ? "border-brand bg-[var(--red-tint)] text-brand"
+              ? "border-brand text-brand bg-[var(--red-tint)]"
               : "border-border-strong text-ink hover:bg-surface-2"
           }`}
         >
@@ -173,7 +173,7 @@ export function MenuBrowser({
       {creating && (
         <Card className="p-4">
           <h2 className="text-h2 text-ink mb-3 font-semibold">{t("menu.form.titleCreate")}</h2>
-          <MenuItemForm mode={{ kind: "create", finishedGoods }} onDone={closeCreate} />
+          <MenuItemForm mode={{ kind: "create", soldFromStock }} onDone={closeCreate} />
         </Card>
       )}
 
@@ -213,7 +213,7 @@ export function MenuBrowser({
               {/* Main row */}
               <div className="flex items-center gap-3 p-3">
                 {/* Code chip */}
-                <span className="border-border text-caption text-muted tabular-nums flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border font-medium">
+                <span className="border-border text-caption text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border font-medium tabular-nums">
                   {item.itemCode}
                 </span>
 
@@ -233,7 +233,7 @@ export function MenuBrowser({
                 </div>
 
                 {/* Price */}
-                <span className="text-label text-ink tabular-nums shrink-0 font-semibold">
+                <span className="text-label text-ink shrink-0 font-semibold tabular-nums">
                   {formatLKR(item.priceCents)}
                 </span>
 
@@ -255,7 +255,9 @@ export function MenuBrowser({
                   disabled={toggling === item.id}
                   className="text-caption text-muted hover:text-ink flex-1 py-2 transition-colors disabled:opacity-40"
                 >
-                  {item.isAvailable ? t("menu.action.markUnavailable") : t("menu.action.markAvailable")}
+                  {item.isAvailable
+                    ? t("menu.action.markUnavailable")
+                    : t("menu.action.markAvailable")}
                 </button>
                 {/* Edit */}
                 <button

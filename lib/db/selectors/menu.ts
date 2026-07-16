@@ -9,9 +9,10 @@ import {
   listAllMenuItems,
   listAllRecipeLines,
   listIngredientItems,
-  listFinishedGoodItems,
+  listSoldFromStockItems,
 } from "@/lib/db/queries/menu";
 import type { InventoryItemRow } from "@/lib/db/queries/menu";
+import type { InventoryKind } from "@/lib/inventory-config";
 
 export type MenuItem = {
   id: string;
@@ -33,11 +34,13 @@ export type IngredientOption = {
   unit: string;
 };
 
-/** A finished_good pickable as a menu item's sold-from-stock link. */
-export type FinishedGoodOption = {
+/** An item pickable as a menu item's sold-from-stock link (finished_good or
+ *  merchandise). `kind` labels which lane it is. */
+export type SoldFromStockOption = {
   id: string;
   name: string;
   unit: string;
+  kind: InventoryKind;
 };
 
 export type MenuList = {
@@ -83,8 +86,9 @@ export async function getIngredientOptions(): Promise<IngredientOption[]> {
   return rows.map((r) => ({ id: r.id, name: r.name, unit: r.unit }));
 }
 
-/** FINISHED_GOOD-kind items for the menu item's sold-from-stock selector. */
-export async function getFinishedGoodOptions(): Promise<FinishedGoodOption[]> {
-  const rows: InventoryItemRow[] = await listFinishedGoodItems();
-  return rows.map((r) => ({ id: r.id, name: r.name, unit: r.unit }));
+/** Sold-from-stock items (finished_good + merchandise) for the menu item's tracked
+ *  selector. */
+export async function getSoldFromStockOptions(): Promise<SoldFromStockOption[]> {
+  const rows: InventoryItemRow[] = await listSoldFromStockItems();
+  return rows.map((r) => ({ id: r.id, name: r.name, unit: r.unit, kind: r.kind }));
 }

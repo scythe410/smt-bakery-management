@@ -12,12 +12,19 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, ScanLine, AlertTriangle, ClipboardList, ClipboardCheck, Croissant } from "lucide-react";
+import {
+  Plus,
+  PackagePlus,
+  AlertTriangle,
+  ClipboardList,
+  ClipboardCheck,
+  Croissant,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AddItemForm } from "@/components/inventory/add-item-form";
-import { ScanToAdd } from "@/components/inventory/scan-to-add";
+import { ScanReceive, type ReceiveTarget } from "@/components/inventory/scan-receive";
 import type { InventoryListItem } from "@/lib/db/selectors/inventory";
 import type { InventoryCategory } from "@/lib/inventory-config";
 
@@ -41,10 +48,13 @@ export function InventoryBrowser({
   const [query, setQuery] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
 
-  // code → existing item name, so a re-scan is recognised as already stocked.
+  // code → the existing item to restock on a receive scan; an unknown code falls
+  // through to the create flow.
   const barcodeIndex = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const it of items) if (it.barcode) map.set(it.barcode, it.name);
+    const map = new Map<string, ReceiveTarget>();
+    for (const it of items)
+      if (it.barcode)
+        map.set(it.barcode, { id: it.id, name: it.name, unit: it.unit, qtyOnHand: it.qtyOnHand });
     return map;
   }, [items]);
 
@@ -69,9 +79,9 @@ export function InventoryBrowser({
           onClick={() => setLowOnly((v) => !v)}
           aria-pressed={lowOnly}
           disabled={lowStockCount === 0}
-          className={`rounded-pill text-label focus-visible:ring-brand/40 inline-flex h-8 items-center gap-1.5 border px-3 font-medium outline-none transition-colors focus-visible:ring-2 disabled:opacity-50 ${
+          className={`rounded-pill text-label focus-visible:ring-brand/40 inline-flex h-8 items-center gap-1.5 border px-3 font-medium transition-colors outline-none focus-visible:ring-2 disabled:opacity-50 ${
             lowOnly
-              ? "border-brand bg-[var(--red-tint)] text-brand"
+              ? "border-brand text-brand bg-[var(--red-tint)]"
               : "border-border-strong text-ink hover:bg-surface-2"
           }`}
         >
@@ -110,8 +120,8 @@ export function InventoryBrowser({
           aria-expanded={scanning}
           className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-1 rounded-[var(--radius)] border px-3 font-medium transition-colors"
         >
-          <ScanLine className="size-4" aria-hidden />
-          {t("inventory.scan.action")}
+          <PackagePlus className="size-4" aria-hidden />
+          {t("inventory.receive.action")}
         </button>
       </div>
 
@@ -119,14 +129,14 @@ export function InventoryBrowser({
       <div className="flex gap-2">
         <Link
           href="/inventory/stock-take"
-          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium transition-colors outline-none focus-visible:ring-2"
         >
           <ClipboardList className="size-4" aria-hidden />
           {t("stock.nav.stockTake")}
         </Link>
         <Link
           href="/inventory/audit"
-          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+          className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium transition-colors outline-none focus-visible:ring-2"
         >
           <ClipboardCheck className="size-4" aria-hidden />
           {t("stock.nav.audit")}
@@ -136,7 +146,7 @@ export function InventoryBrowser({
       {/* Finished-good production lane: produce batches + reorder alerts (FT3) */}
       <Link
         href="/inventory/production"
-        className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium outline-none transition-colors focus-visible:ring-2"
+        className="border-border-strong text-ink text-label hover:bg-surface-2 focus-visible:ring-brand/40 flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius)] border font-medium transition-colors outline-none focus-visible:ring-2"
       >
         <Croissant className="size-4" aria-hidden />
         {t("production.nav")}
@@ -144,7 +154,7 @@ export function InventoryBrowser({
 
       {scanning ? (
         <Card>
-          <ScanToAdd barcodeIndex={barcodeIndex} onClose={() => setScanning(false)} />
+          <ScanReceive barcodeIndex={barcodeIndex} onClose={() => setScanning(false)} />
         </Card>
       ) : null}
 

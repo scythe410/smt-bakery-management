@@ -209,6 +209,22 @@
       "title": "Couldn't load inventory.",
       "body": "Check your connection and try again.",
       "retry": "Retry"
+    },
+    "receive": {
+      "action": "Receive Stock",
+      "title": "Receive Stock",
+      "hint": "Scan each item's barcode as goods arrive to add them to stock.",
+      "inStock": "In stock: {{qty}} {{unit}}",
+      "qtyLabel": "Quantity received",
+      "add": "Add to stock",
+      "adding": "Adding…",
+      "added": "Added to stock.",
+      "scanAgain": "Scan another",
+      "done": "Done",
+      "increase": "Increase quantity",
+      "decrease": "Decrease quantity",
+      "unknown": "New barcode. Fill in the details to add it to your catalog.",
+      "error": "Couldn't receive stock. Try again."
     }
   },
   "orders": {
@@ -282,7 +298,12 @@
       "saving": "Creating…",
       "cancel": "Cancel",
       "error": "Couldn't create that order. Check the fields and try again.",
-      "invalidItem": "One of those items is no longer available. Remove it and try again."
+      "invalidItem": "One of those items is no longer available. Remove it and try again.",
+      "scanReady": "Scanner ready — scan a barcode to add",
+      "scanCameraOn": "Camera",
+      "scanCameraOff": "Stop camera",
+      "scanAdded": "Added {{name}}",
+      "scanUnknown": "No item for barcode {{code}}"
     },
     "detail": {
       "back": "Orders",
@@ -640,9 +661,9 @@
       "category": "Category",
       "categoryPlaceholder": "e.g. Bakery, Beverages",
       "available": "Available",
-      "trackedGood": "Sold from stock (finished good)",
+      "trackedGood": "Sold from stock",
       "trackedGoodNone": "None — made to order",
-      "trackedGoodHint": "Link a finished good to sell this item from produced stock instead of a recipe.",
+      "trackedGoodHint": "Link a finished good or resale item to sell this item from stock instead of a recipe.",
       "trackedGoodHasRecipeHint": "This item has a recipe. Clear the recipe to sell it from stock instead.",
       "recipeDisabledHint": "This item is sold from stock, so it can't also have a recipe.",
       "image": "Image",

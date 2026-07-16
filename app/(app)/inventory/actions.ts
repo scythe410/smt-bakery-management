@@ -13,6 +13,7 @@ import {
   addInventoryItemSchema,
   barcodeLookupSchema,
   produceBatchSchema,
+  receiveStockSchema,
 } from "@/lib/zod/inventory";
 import { lookupProduct, type ProductLookupResult } from "@/lib/inventory/product-lookup";
 import type { Database } from "@/lib/supabase/types";
@@ -86,9 +87,11 @@ export type ProduceBatchState = { ok?: boolean; error?: string };
  * the inventory tag so the finished-good qty, the low-stock/production badges, and
  * the bell alert count all refresh.
  */
-export async function produceBatch(
-  input: { inventoryItemId: string; qty: number; note?: string },
-): Promise<ProduceBatchState> {
+export async function produceBatch(input: {
+  inventoryItemId: string;
+  qty: number;
+  note?: string;
+}): Promise<ProduceBatchState> {
   const profile = await requireProfile();
   if (!profile.business_id) return { error: "production.error" };
 
@@ -107,4 +110,37 @@ export async function produceBatch(
   revalidatePath("/inventory");
   revalidateBusinessTags(profile.business_id, ["inventory"]);
   return { ok: true };
+}
+
+export type ReceiveStockState = { ok?: boolean; error?: string; qtyOnHand?: number };
+
+/**
+ * Receive goods into stock (+qty) — the scan-on-receipt step for bought-in resale
+ * goods (CLAUDE.md §4). Operational: any tenant member (owner/manager/staff) may
+ * run it. Identity + the item resolution are enforced by the SECURITY INVOKER
+ * `receive_stock` RPC under RLS; the client value is never trusted. Revalidates
+ * the inventory tag so qty_on_hand, the low-stock pill, and the nav badge refresh.
+ */
+export async function receiveStock(input: {
+  inventoryItemId: string;
+  qty: number;
+  note?: string;
+}): Promise<ReceiveStockState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "inventory.receive.error" };
+
+  const parsed = receiveStockSchema.safeParse(input);
+  if (!parsed.success) return { error: "inventory.receive.error" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("receive_stock", {
+    p_inventory_item_id: parsed.data.inventoryItemId,
+    p_qty: parsed.data.qty,
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error || !data) return { error: "inventory.receive.error" };
+
+  revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
+  return { ok: true, qtyOnHand: Number(data.qty_on_hand) };
 }

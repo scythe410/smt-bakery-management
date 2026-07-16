@@ -162,6 +162,16 @@ insert into public.inventory_item
 update public.inventory_item set sale_price_cents =  95000 where id = 'dddddddd-0000-0000-0000-000000000020';  -- Tote Bag    LKR 950
 update public.inventory_item set sale_price_cents = 120000 where id = 'dddddddd-0000-0000-0000-000000000021';  -- Coffee Mug  LKR 1,200
 
+-- Bought-in resale goods (merchandise sold-from-stock, migration 019): received by
+-- scan on receipt, DECREMENTED per billed sale 1:1, low-stock alerted. Barcodes are
+-- scannable at both receipt and billing. Sprite sits one sale above its threshold so
+-- a single completed order trips the low-stock alert (demo).
+insert into public.inventory_item
+  (id, business_id, name, kind, category, qty_on_hand, unit, unit_cost_cents, low_stock_threshold, barcode, sku, sale_price_cents) values
+('dddddddd-0000-0000-0000-000000000023', '11111111-1111-1111-1111-111111111111', 'Coca-Cola 330ml',     'merchandise', 'beverages', 24.000, 'unit', 12000, 6.000, '5449000000996', 'MRC-COK', 25000),
+('dddddddd-0000-0000-0000-000000000024', '11111111-1111-1111-1111-111111111111', 'Sprite 330ml',        'merchandise', 'beverages',  7.000, 'unit', 12000, 6.000, '5449000014535', 'MRC-SPR', 25000),
+('dddddddd-0000-0000-0000-000000000025', '11111111-1111-1111-1111-111111111111', 'Bottled Water 500ml', 'merchandise', 'beverages', 30.000, 'unit',  6000, 8.000, '4791111111118', 'MRC-WTR', 12000);
+
 -- ---------------------------------------------------------------------------
 -- 5. Menu (12 items) with prices
 -- ---------------------------------------------------------------------------
@@ -177,7 +187,19 @@ insert into public.menu_item (id, business_id, name, price_cents, category, is_a
 ('eeeeeeee-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', 'Ceylon Milk Tea',      40000, 'Beverages', true),
 ('eeeeeeee-0000-0000-0000-000000000010', '11111111-1111-1111-1111-111111111111', 'Strawberry Milkshake', 68000, 'Beverages', true),
 ('eeeeeeee-0000-0000-0000-000000000011', '11111111-1111-1111-1111-111111111111', 'Caramel Macchiato',    62000, 'Beverages', true),
-('eeeeeeee-0000-0000-0000-000000000012', '11111111-1111-1111-1111-111111111111', 'Cinnamon Roll',        48000, 'Pastries',  true);
+('eeeeeeee-0000-0000-0000-000000000012', '11111111-1111-1111-1111-111111111111', 'Cinnamon Roll',        48000, 'Pastries',  true),
+-- Sold-from-stock drinks (linked to merchandise stock below): no recipe; each sale
+-- decrements the tracked good 1:1. Priced at the merchandise retail price.
+('eeeeeeee-0000-0000-0000-000000000013', '11111111-1111-1111-1111-111111111111', 'Coca-Cola 330ml',     25000, 'Beverages', true),
+('eeeeeeee-0000-0000-0000-000000000014', '11111111-1111-1111-1111-111111111111', 'Sprite 330ml',        25000, 'Beverages', true),
+('eeeeeeee-0000-0000-0000-000000000015', '11111111-1111-1111-1111-111111111111', 'Bottled Water 500ml', 12000, 'Beverages', true);
+
+-- Link each drink menu item to its merchandise stock (sold-from-stock, migration
+-- 019). Done as an UPDATE after both rows exist; the enforce trigger checks the
+-- tracked item is merchandise/finished_good and the menu item has no recipe.
+update public.menu_item set tracked_inventory_item_id = 'dddddddd-0000-0000-0000-000000000023' where id = 'eeeeeeee-0000-0000-0000-000000000013';
+update public.menu_item set tracked_inventory_item_id = 'dddddddd-0000-0000-0000-000000000024' where id = 'eeeeeeee-0000-0000-0000-000000000014';
+update public.menu_item set tracked_inventory_item_id = 'dddddddd-0000-0000-0000-000000000025' where id = 'eeeeeeee-0000-0000-0000-000000000015';
 
 -- ---------------------------------------------------------------------------
 -- 6. Recipe lines (BOM) — power auto stock deduction + COGS. qty is per unit sold.
