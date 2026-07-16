@@ -38,7 +38,7 @@ export default async function OrderBillPage({ params }: { params: Promise<{ id: 
       {/* Action bar — hidden when printing so only the receipt appears */}
       <div className="flex items-center gap-2 print:hidden">
         <Link
-          href="/orders"
+          href={`/orders/${id}`}
           className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-2 rounded-[var(--radius)] border px-3 font-medium transition-colors"
         >
           <ArrowLeft className="size-4" aria-hidden />

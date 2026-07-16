@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Printer } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
@@ -299,47 +299,48 @@ export function OrdersBrowser({
               {items.map((o) => (
                 <li
                   key={o.id}
-                  className="border-border flex flex-col gap-1.5 border-b py-3 last:border-0 last:pb-0"
+                  className="border-border flex flex-col border-b last:border-0"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-label text-ink font-semibold tabular-nums">
-                      {o.orderNo}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Link
-                        href={`/orders/${o.id}/bill`}
-                        aria-label={t("orders.bill.printBillFor", { no: o.orderNo })}
-                        className="text-muted hover:text-ink transition-colors"
-                      >
-                        <Printer className="size-4" aria-hidden />
-                      </Link>
+                  {/* Tappable info block — navigates to order detail */}
+                  <Link
+                    href={`/orders/${o.id}`}
+                    className="flex flex-col gap-1.5 py-3 hover:bg-surface-2 -mx-4 px-4 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-label text-ink font-semibold tabular-nums">
-                        {formatLKR(o.totalCents)}
+                        {o.orderNo}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="text-label text-ink font-semibold tabular-nums">
+                          {formatLKR(o.totalCents)}
+                        </span>
+                        <ChevronRight className="text-faint size-4" aria-hidden />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <StatusPill tone="neutral" label={t(`source.${o.source}`)} />
+                      <span className="text-caption text-muted truncate">
+                        {o.customerName ?? "—"}
+                      </span>
+                      <span className="text-faint" aria-hidden>
+                        ·
+                      </span>
+                      <span className="text-caption text-muted tabular-nums">
+                        {t("orders.itemsCount", { count: o.itemCount })}
                       </span>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                    <StatusPill tone="neutral" label={t(`source.${o.source}`)} />
-                    <span className="text-caption text-muted truncate">
-                      {o.customerName ?? "—"}
-                    </span>
-                    <span className="text-faint" aria-hidden>
-                      ·
-                    </span>
-                    <span className="text-caption text-muted tabular-nums">
-                      {t("orders.itemsCount", { count: o.itemCount })}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {o.paymentMethod ? (
-                      <StatusPill tone="neutral" label={t(`orders.payment.${o.paymentMethod}`)} />
-                    ) : null}
-                    <StatusPill
-                      tone={PAYMENT_STATUS_TONE[o.paymentStatus] ?? "neutral"}
-                      label={t(`orders.paymentStatus.${o.paymentStatus}`)}
-                    />
-                    <StatusPill tone={STATUS_TONE[o.status]} label={t(`orders.status.${o.status}`)} />
-                  </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {o.paymentMethod ? (
+                        <StatusPill tone="neutral" label={t(`orders.payment.${o.paymentMethod}`)} />
+                      ) : null}
+                      <StatusPill
+                        tone={PAYMENT_STATUS_TONE[o.paymentStatus] ?? "neutral"}
+                        label={t(`orders.paymentStatus.${o.paymentStatus}`)}
+                      />
+                      <StatusPill tone={STATUS_TONE[o.status]} label={t(`orders.status.${o.status}`)} />
+                    </div>
+                  </Link>
+                  {/* Status action buttons — outside the link, only for active orders */}
                   <OrderRowActions
                     order={o}
                     onChanged={() => setReloadToken((n) => n + 1)}
@@ -402,7 +403,7 @@ function OrderRowActions({
   }
 
   return (
-    <div className="mt-0.5 flex flex-col gap-1">
+    <div className="flex flex-col gap-1 pb-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {targets.map((target) => {
           const meta = STATUS_ACTION_META[target];

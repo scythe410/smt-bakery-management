@@ -11,6 +11,7 @@ import "server-only";
 import { getBusiness } from "@/lib/auth";
 import { getOrderWithItems } from "@/lib/db/queries/orders";
 import { formatLKR } from "@/lib/format";
+import type { OrderStatus } from "@/lib/orders/order-config";
 
 // ── Shared data shape ─────────────────────────────────────────────────────────
 
@@ -56,6 +57,8 @@ export type OrderBillData = {
   // Payment
   paymentMethod: string | null;
   paymentStatus: string;
+  // Order status — used by the detail view; the bill doesn't render it
+  status: OrderStatus;
 };
 
 // ── Fetcher ────────────────────────────────────────────────────────────────────
@@ -117,5 +120,6 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
     totalFmt: formatLKR(order.total_cents),
     paymentMethod: order.payment_method,
     paymentStatus: order.payment_status,
+    status: order.status as OrderStatus,
   };
 }

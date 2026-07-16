@@ -284,6 +284,12 @@
       "error": "Couldn't create that order. Check the fields and try again.",
       "invalidItem": "One of those items is no longer available. Remove it and try again."
     },
+    "detail": {
+      "back": "Orders",
+      "reprintBill": "Reprint Bill",
+      "items": "Items",
+      "totals": "Totals"
+    },
     "bill": {
       "printBillFor": "Print bill for {{no}}",
       "back": "Back",

@@ -5,6 +5,58 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-16 — feat: past orders history with detail and reprint
+
+### What changed
+
+- **`lib/db/selectors/order-bill.ts`** — added `status: OrderStatus` to `OrderBillData` and
+  populated it from `order.status`. The bill component ignores it; the detail view uses it for
+  the status pill. No extra DB call: the existing `getOrderBillData` fetch already returns the
+  full order row.
+- **`components/orders/order-detail.tsx`** _(new)_ — client component rendering the full order
+  detail: action bar (← Orders + Reprint Bill), order header card (order_no, date, source,
+  customer, status pill), line items card (name_snapshot + qty × unit_price per row), and
+  totals card (subtotal, optional platform commission, total, payment method + payment status
+  pills). Pure layout — all money arrives pre-formatted from `OrderBillData`; no `formatLKR`
+  calls in the component.
+- **`app/(app)/orders/[id]/page.tsx`** _(new)_ — server component at the new route. Calls
+  `requireProfile()` + `getOrderBillData(id)` (RLS-scoped), 404s on unknown/foreign orders,
+  and renders `<OrderDetail>`. `force-dynamic` (session-dependent).
+- **`app/(app)/orders/[id]/loading.tsx`** _(new)_ — shape-matched skeleton for the detail
+  page (action bar + three card outlines), consistent with DESIGN.md §6.
+- **`app/(app)/orders/[id]/bill/page.tsx`** — back-link updated from `/orders` →
+  `/orders/${id}` so the print-then-back flow returns to the detail page, not the list.
+- **`components/orders/orders-browser.tsx`** — each order row is now a tappable `<Link>` to
+  `/orders/${o.id}` (the detail page). The printer icon and nested-interactive conflict are
+  resolved by removing the icon from the list; reprint is accessible via the detail page.
+  The info block (3 rows) is wrapped in the link; `OrderRowActions` (status transition
+  buttons for active orders) remains as a separate non-link section below. A `ChevronRight`
+  icon trails the total to signal navigability.
+- **i18n** — added `orders.detail.back`, `reprintBill`, `items`, `totals` to `en.json` and
+  `si.json`.
+
+### Decisions
+
+- **No new DB query** — `getOrderBillData` already fetches everything the detail view needs;
+  adding `status` to its return type was sufficient. The bill and detail share one fetch path.
+- **One route, two surfaces** — `/orders/[id]` = app-chrome detail view;
+  `/orders/[id]/bill` = print-ready receipt. Detail → Reprint → back to detail is the
+  intended flow.
+- **Printer icon removed from list rows** — the icon was the only interactive element on
+  each row and conflicted with wrapping the row in a `<Link>`. Removing it simplifies the
+  row (fewer interactive elements = better touch target) and keeps the reprint path on the
+  detail page.
+- **No `[id]/error.tsx`** — the parent `orders/error.tsx` boundary catches errors from the
+  `[id]` segment (Next.js App Router error boundary propagation). No duplication needed.
+- **Archived tab = Past Orders** — no separate `/orders/history` route. The Archived tab
+  IS the history; the detail page serves both active and archived orders consistently.
+
+### Open questions
+
+None.
+
+---
+
 ## 2026-07-16 — feat: delete expenses
 
 ### What changed
