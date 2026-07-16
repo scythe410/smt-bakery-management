@@ -46,12 +46,17 @@ export type OrderBillData = {
   customerName: string | null;
   // Line items (snapshotted at sale time — never re-read from menu_item)
   lines: OrderBillLine[];
-  // Financials (integer cents)
+  // Financials (integer cents). subtotal = gross (pre-discount); total = net.
   subtotalCents: number;
+  /** Whole-order discount percentage applied (0 = none). */
+  discountPct: number;
+  /** Resulting discount in cents (= round(subtotal × pct/100)). */
+  discountCents: number;
   commissionCents: number;
   totalCents: number;
   // Pre-formatted
   subtotalFmt: string;
+  discountFmt: string;
   commissionFmt: string;
   totalFmt: string;
   // Payment
@@ -113,9 +118,12 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
     customerName: order.customer_name,
     lines,
     subtotalCents: order.subtotal_cents,
+    discountPct: order.discount_pct,
+    discountCents: order.discount_cents,
     commissionCents: order.commission_cents,
     totalCents: order.total_cents,
     subtotalFmt: formatLKR(order.subtotal_cents),
+    discountFmt: formatLKR(order.discount_cents),
     commissionFmt: formatLKR(order.commission_cents),
     totalFmt: formatLKR(order.total_cents),
     paymentMethod: order.payment_method,

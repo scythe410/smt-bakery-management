@@ -24,7 +24,12 @@ import { Camera, Minus, Plus, ScanBarcode, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { createOrder, type CreateOrderState } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
-import { ORDER_SOURCES, PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/orders/order-config";
+import {
+  DISCOUNT_PCTS,
+  ORDER_SOURCES,
+  PAYMENT_METHODS,
+  PAYMENT_STATUSES,
+} from "@/lib/orders/order-config";
 import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
 import { useCameraScanner, type CameraScannerError } from "@/lib/hooks/use-camera-scanner";
 import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
@@ -42,6 +47,10 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
   const [qtyRaw, setQtyRaw] = useState<Record<string, string>>({});
   // Quick-add / search query.
   const [quickAdd, setQuickAdd] = useState("");
+  // Whole-order quick discount (0 = none). The server RECOMPUTES the actual
+  // discount + net total from stored prices; this is only the selected rate and
+  // the on-screen estimate (CLAUDE.md §7.7).
+  const [discountPct, setDiscountPct] = useState<number>(0);
 
   // Barcode checkout state. The wedge scanner is always on; the camera is optional.
   const [scanMsg, setScanMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
@@ -178,6 +187,11 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
 
   const itemsJson = JSON.stringify(lines);
   const totalQty = lines.reduce((n, l) => n + l.qty, 0);
+
+  // On-screen discount/net estimate. Round-half-up on positive cents matches the
+  // server's round(subtotal × pct / 100). Authoritative figures come from the RPC.
+  const discountCents = Math.round((estimatedCents * discountPct) / 100);
+  const netCents = estimatedCents - discountCents;
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -392,14 +406,57 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
         )}
       </div>
 
+      {/* Quick discount — applied to the subtotal; server recomputes the net total */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-caption text-muted mr-auto">{t("orders.new.discount")}</span>
+        {DISCOUNT_PCTS.map((pct) => {
+          const active = discountPct === pct;
+          return (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => setDiscountPct(pct)}
+              aria-pressed={active}
+              className={`text-caption h-8 min-w-[44px] rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
+                active
+                  ? "border-brand text-brand bg-[var(--red-tint)]"
+                  : "border-border-strong text-ink hover:bg-surface-2"
+              }`}
+            >
+              {pct === 0 ? t("orders.new.discountNone") : t("orders.new.discountPct", { pct })}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Estimated total — server recomputes the authoritative figure on save */}
-      <div className="bg-surface-2 flex items-center justify-between rounded-[var(--radius)] px-3 py-2">
-        <span className="text-caption text-muted">
-          {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
-        </span>
-        <span className="text-label text-ink font-semibold tabular-nums">
-          {formatLKR(estimatedCents)}
-        </span>
+      <div className="bg-surface-2 flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2">
+        {discountPct > 0 ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-caption text-muted">{t("orders.bill.subtotal")}</span>
+              <span className="text-caption text-ink tabular-nums">
+                {formatLKR(estimatedCents)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-caption text-muted">
+                {t("orders.bill.discount", { pct: discountPct })}
+              </span>
+              <span className="text-brand-ember text-caption tabular-nums">
+                - {formatLKR(discountCents)}
+              </span>
+            </div>
+          </>
+        ) : null}
+        <div className="flex items-center justify-between">
+          <span className="text-caption text-muted">
+            {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
+          </span>
+          <span className="text-label text-ink font-semibold tabular-nums">
+            {formatLKR(netCents)}
+          </span>
+        </div>
       </div>
 
       {/* Payment method + status (below items — cashier picks items first) */}
@@ -427,6 +484,7 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
       </div>
 
       <input type="hidden" name="items" value={itemsJson} readOnly />
+      <input type="hidden" name="discountPct" value={discountPct} readOnly />
 
       {state.error ? (
         <p role="alert" className="text-caption text-danger">

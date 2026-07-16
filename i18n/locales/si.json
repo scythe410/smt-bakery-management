@@ -291,6 +291,9 @@
       "clearSearch": "සෙවුම ඉවත් කරන්න",
       "noMatch": "'{{query}}' ට ගැළපෙන අයිතම නැත",
       "qtyFor": "{{name}} සඳහා ප්‍රමාණය",
+      "discount": "වට්ටම",
+      "discountNone": "නැත",
+      "discountPct": "{{pct}}%",
       "estTotal": "ඇස්තමේන්තුගත එකතුව",
       "itemsCount_one": "අයිතම {{count}}",
       "itemsCount_other": "අයිතම {{count}}",
@@ -321,6 +324,7 @@
       "customer": "පාරිභෝගිකයා",
       "walkIn": "ඍජු පාරිභෝගිකයා",
       "subtotal": "මුළු",
+      "discount": "වට්ටම {{pct}}%",
       "commission": "වේදිකා ගාස්තු",
       "total": "එකතුව",
       "payment": "ගෙවීම",
@@ -411,6 +415,12 @@
       "commission": "කොමිස්",
       "netRevenue": "ශුද්ධ ආදායම",
       "orders": "ඇණවුම්"
+    },
+    "discounts": {
+      "title": "වට්ටම්",
+      "grossSales": "දළ විකුණුම්",
+      "discount": "වට්ටම්",
+      "revenue": "ආදායම"
     },
     "breakdown": {
       "bySource": "මූලාශ්‍රය අනුව",

@@ -291,6 +291,9 @@
       "clearSearch": "Clear search",
       "noMatch": "No items match '{{query}}'",
       "qtyFor": "Quantity for {{name}}",
+      "discount": "Discount",
+      "discountNone": "None",
+      "discountPct": "{{pct}}%",
       "estTotal": "Estimated total",
       "itemsCount_one": "{{count}} item",
       "itemsCount_other": "{{count}} items",
@@ -321,6 +324,7 @@
       "customer": "Customer",
       "walkIn": "Walk-in",
       "subtotal": "Subtotal",
+      "discount": "Discount {{pct}}%",
       "commission": "Platform fee",
       "total": "Total",
       "payment": "Payment",
@@ -411,6 +415,12 @@
       "commission": "Commission",
       "netRevenue": "Net Revenue",
       "orders": "Orders"
+    },
+    "discounts": {
+      "title": "Discounts",
+      "grossSales": "Gross sales",
+      "discount": "Discounts",
+      "revenue": "Revenue"
     },
     "breakdown": {
       "bySource": "By Source",

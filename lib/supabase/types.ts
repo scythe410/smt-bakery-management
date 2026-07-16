@@ -500,6 +500,8 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          discount_cents: number
+          discount_pct: number
           id: string
           order_no: string
           payment_method: Database["public"]["Enums"]["payment_method"] | null
@@ -516,6 +518,8 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          discount_cents?: number
+          discount_pct?: number
           id?: string
           order_no: string
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
@@ -532,6 +536,8 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          discount_cents?: number
+          discount_pct?: number
           id?: string
           order_no?: string
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
@@ -1106,6 +1112,7 @@ export type Database = {
       create_order: {
         Args: {
           p_customer_name: string
+          p_discount_pct?: number
           p_items: Json
           p_payment_method: Database["public"]["Enums"]["payment_method"]
           p_payment_status: Database["public"]["Enums"]["payment_status"]
@@ -1117,6 +1124,8 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          discount_cents: number
+          discount_pct: number
           id: string
           order_no: string
           payment_method: Database["public"]["Enums"]["payment_method"] | null
@@ -1232,6 +1241,8 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          discount_cents: number
+          discount_pct: number
           id: string
           order_no: string
           payment_method: Database["public"]["Enums"]["payment_method"] | null

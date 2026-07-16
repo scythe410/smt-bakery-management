@@ -64,6 +64,7 @@ export async function createOrder(
     customerName: formData.get("customerName") || undefined,
     paymentMethod: formData.get("paymentMethod"),
     paymentStatus: formData.get("paymentStatus"),
+    discountPct: formData.get("discountPct") ?? 0,
     items: itemsRaw,
   });
   if (!parsed.success) return { error: "orders.new.error" };
@@ -74,6 +75,7 @@ export async function createOrder(
     p_customer_name: parsed.data.customerName ?? "",
     p_payment_method: parsed.data.paymentMethod as Enums["payment_method"],
     p_payment_status: parsed.data.paymentStatus as Enums["payment_status"],
+    p_discount_pct: parsed.data.discountPct,
     p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
   });
 

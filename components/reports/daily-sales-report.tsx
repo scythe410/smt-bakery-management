@@ -11,6 +11,7 @@ import { getDailyReport } from "@/lib/db/selectors/reports";
 import { singleDayPeriod, type ReportType } from "@/lib/reports/report-params";
 import { getBusiness, getCurrentLanguage } from "@/lib/auth";
 import { getT } from "@/i18n/server";
+import { formatLKR } from "@/lib/format";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { StatCard } from "@/components/ui/stat-card";
 import { ReportBreakdowns } from "@/components/reports/report-breakdowns";
@@ -49,11 +50,63 @@ export async function DailySalesReport({
         <StatCard labelKey="reports.stats.orders" count={report.orders} tone="ink" />
       </div>
 
+      {/* Discount reconciliation — only when discounts were given in the window.
+          Gross sales − discounts = revenue keeps the honest figures reconciling
+          (revenue is the net amount actually collected). */}
+      {report.discountCents > 0 ? (
+        <div className="border-border bg-surface shadow-card flex flex-col gap-1.5 rounded-[var(--radius)] border p-4">
+          <p className="text-caption text-muted tracking-wide uppercase">
+            {t("reports.discounts.title")}
+          </p>
+          <ReconRow
+            label={t("reports.discounts.grossSales")}
+            value={formatLKR(report.grossSalesCents)}
+          />
+          <ReconRow
+            label={t("reports.discounts.discount")}
+            value={`- ${formatLKR(report.discountCents)}`}
+            ember
+          />
+          <div className="border-border-strong mt-0.5 border-t pt-1.5">
+            <ReconRow
+              label={t("reports.discounts.revenue")}
+              value={formatLKR(report.revenueCents)}
+              bold
+            />
+          </div>
+        </div>
+      ) : null}
+
       <ReportBreakdowns bySource={report.bySource} byPayment={report.byPayment} />
 
       <ReportDetail rows={report.rows} reportType={reportType} date={date} />
 
       <ReportNote />
+    </div>
+  );
+}
+
+function ReconRow({
+  label,
+  value,
+  bold = false,
+  ember = false,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  ember?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className={`text-label ${bold ? "text-ink font-bold" : "text-muted"}`}>{label}</span>
+      <span
+        className={`text-label tabular-nums ${
+          bold ? "text-ink font-bold" : ember ? "text-brand-ember" : "text-ink"
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

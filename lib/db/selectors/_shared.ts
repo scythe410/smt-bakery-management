@@ -10,11 +10,16 @@
 //   * REALIZED revenue = orders with status 'completed'. Pending orders are not
 //     yet money in the till; cancelled/refunded orders are not sales. Both are
 //     still counted in the status breakdown, but neither contributes revenue.
-//   * Gross revenue      = Σ order.total_cents over completed orders.
-//   * Platform commission = Σ round(subtotal × rate_bps / 10000) over completed
-//     orders, using commission_rule per source. Recomputed here from stored
-//     subtotals + rules — never trusting a client-sent figure (CLAUDE.md §7.7).
-//   * Net revenue        = gross − commission (what the business keeps of sales).
+//   * Gross sales        = Σ order.subtotal_cents over completed orders (the LIST
+//     value, before any whole-order discount).
+//   * Discounts          = Σ order.discount_cents over completed orders.
+//   * Revenue            = Σ order.total_cents = gross sales − discounts (the NET
+//     amount actually collected — what "revenue" means everywhere).
+//   * Platform commission = Σ round(total × rate_bps / 10000) over completed
+//     orders, using commission_rule per source. Recomputed here from stored NET
+//     totals + rules — the commission base is what the customer pays (net of the
+//     discount), never trusting a client-sent figure (CLAUDE.md §7.7).
+//   * Net revenue        = revenue − commission (what the business keeps of sales).
 //   * COGS (estimated)   = Σ over completed line items of unitCogs × qty, where
 //     unitCogs = round(Σ recipe.qty × ingredient.unit_cost_cents). Labelled an
 //     estimate because it is derived from the BOM, not from actual lot costs.
@@ -70,15 +75,17 @@ export function unitCogsMap(lines: RecipeCostLine[]): Map<string, number> {
 // --- Per-order derivation ---------------------------------------------------
 
 /**
- * Commission for one order, recomputed from its stored subtotal and the rule for
- * its source. We do not read order.commission_cents: recomputing is the rule
- * (CLAUDE.md §7.7), and it keeps every screen consistent with the current rules.
+ * Commission for one order, recomputed from its stored NET total and the rule for
+ * its source. The base is total_cents (subtotal − discount) — what the customer
+ * actually pays — so a whole-order discount correctly reduces the platform's cut.
+ * We do not read order.commission_cents: recomputing is the rule (CLAUDE.md §7.7),
+ * and it keeps every screen consistent with the current rules.
  */
 export function orderCommissionCents(
-  order: Pick<OrderWithItems, "subtotal_cents" | "source">,
+  order: Pick<OrderWithItems, "total_cents" | "source">,
   rates: Map<OrderSource, number>,
 ): number {
-  return applyRateBps(order.subtotal_cents, rates.get(order.source) ?? 0);
+  return applyRateBps(order.total_cents, rates.get(order.source) ?? 0);
 }
 
 /** Estimated COGS for one order: Σ unitCogs(menu_item) × qty over its lines. */
@@ -117,6 +124,11 @@ export type StatusCounts = {
 export type OrderAggregate = {
   /** Count of realized (completed) orders. */
   orders: number;
+  /** Σ subtotal_cents — gross sales (list value, before whole-order discounts). */
+  grossSalesCents: number;
+  /** Σ discount_cents — total whole-order discounts given. */
+  discountCents: number;
+  /** Σ total_cents — REVENUE actually collected (= grossSales − discounts). */
   grossCents: number;
   commissionCents: number;
   netCents: number;
@@ -143,6 +155,8 @@ export function aggregateOrders(
   const grossByDay = new Map<string, number>();
 
   let orderCount = 0;
+  let grossSalesCents = 0;
+  let discountCents = 0;
   let grossCents = 0;
   let commissionCents = 0;
   let cogsCents = 0;
@@ -155,6 +169,8 @@ export function aggregateOrders(
     const cogs = orderCogsCents(order, unitCogs);
 
     orderCount += 1;
+    grossSalesCents = add(grossSalesCents, order.subtotal_cents);
+    discountCents = add(discountCents, order.discount_cents);
     grossCents = add(grossCents, gross);
     commissionCents = add(commissionCents, commission);
     cogsCents = add(cogsCents, cogs);
@@ -184,6 +200,8 @@ export function aggregateOrders(
 
   return {
     orders: orderCount,
+    grossSalesCents,
+    discountCents,
     grossCents,
     commissionCents,
     netCents: grossCents - commissionCents,

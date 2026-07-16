@@ -29,6 +29,7 @@ const PAYMENT_STATUS_TONE: Record<PaymentStatus, Tone> = {
 export function OrderDetail({ data, orderId }: { data: OrderBillData; orderId: string }) {
   const { t } = useTranslation();
   const showCommission = data.commissionCents > 0;
+  const showDiscount = data.discountCents > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -100,6 +101,12 @@ export function OrderDetail({ data, orderId }: { data: OrderBillData; orderId: s
         <p className="text-h2 text-ink">{t("orders.detail.totals")}</p>
         <div className="flex flex-col gap-1.5">
           <TotalRow label={t("orders.bill.subtotal")} value={data.subtotalFmt} />
+          {showDiscount ? (
+            <TotalRow
+              label={t("orders.bill.discount", { pct: data.discountPct })}
+              value={`- ${data.discountFmt}`}
+            />
+          ) : null}
           {showCommission ? (
             <TotalRow label={t("orders.bill.commission")} value={data.commissionFmt} />
           ) : null}

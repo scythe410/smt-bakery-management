@@ -286,8 +286,9 @@ insert into public.commission_rule (business_id, source, rate_bps) values
 --    Generated relative to now() so Dashboard "today" is always populated.
 --    Internal consistency by construction:
 --      subtotal_cents  = Σ(qty × unit_price_cents) of the order's items
---      commission_cents = round(subtotal × rate_bps / 10000)
---      total_cents      = subtotal_cents
+--      discount_cents  = round(subtotal × discount_pct / 100)   -- occasional
+--      total_cents      = subtotal_cents − discount_cents        -- NET
+--      commission_cents = round(total × rate_bps / 10000)        -- on the net base
 --    Today (d=0) is forced to 6 orders: 3 completed, 2 pending, 1 cancelled,
 --    so the Dashboard 2×2 grid (Total/Completed/Pending/Cancelled) is non-trivial.
 -- ---------------------------------------------------------------------------
@@ -326,6 +327,7 @@ declare
   v_source public.order_source; v_rate int;
   v_status public.order_status; v_pay public.payment_method; v_paystat public.payment_status;
   v_subtotal int; v_commission int; v_qty int;
+  v_discount_pct int; v_discount int; v_total int;
   v_created timestamptz;
   v_order_id uuid;
   v_customer_id uuid; v_customer_name text;
@@ -375,7 +377,18 @@ begin
         it_price   := it_price || m_prices[item_idx];
       end loop;
 
-      v_commission := round(v_subtotal::numeric * v_rate / 10000.0);
+      -- occasional whole-order discount, to demo the feature end-to-end. Today's
+      -- first (completed) order always carries one so the receipt + Reports
+      -- reconciliation are populated on load.
+      if d = 0 and k = 1 then v_discount_pct := 15;
+      elsif seq % 9 = 0 then  v_discount_pct := 10;
+      elsif seq % 13 = 0 then v_discount_pct := 15;
+      elsif seq % 17 = 0 then v_discount_pct := 20;
+      else v_discount_pct := 0;
+      end if;
+      v_discount   := round(v_subtotal::numeric * v_discount_pct / 100.0);
+      v_total      := v_subtotal - v_discount;
+      v_commission := round(v_total::numeric * v_rate / 10000.0);
 
       -- status: today mixes states; history is settled (completed, rare cancel)
       if d = 0 then
@@ -405,11 +418,11 @@ begin
 
       insert into public."order" (
         business_id, order_no, source, customer_id, customer_name,
-        subtotal_cents, commission_cents, total_cents,
+        subtotal_cents, discount_pct, discount_cents, commission_cents, total_cents,
         payment_method, payment_status, status, created_at, updated_at
       ) values (
         v_biz, 'ORD-' || (1000 + seq)::text, v_source, v_customer_id, v_customer_name,
-        v_subtotal, v_commission, v_subtotal,
+        v_subtotal, v_discount_pct, v_discount, v_commission, v_total,
         v_pay, v_paystat, v_status, v_created, v_created
       ) returning id into v_order_id;
 

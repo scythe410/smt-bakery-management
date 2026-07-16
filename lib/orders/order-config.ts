@@ -26,6 +26,14 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = ["cash", "card", "onlin
 
 export const PAYMENT_STATUSES: readonly PaymentStatus[] = ["unpaid", "paid", "refunded"] as const;
 
+// Quick whole-order discount percentages (CF: cashier taps one, or clears to 0).
+// ONE ordered source of truth for the new-order buttons, the Zod schema, and the
+// DB CHECK/RPC guard (migration 021). 0 = no discount. A whole-order percentage,
+// not per-line (flagged in LOG as the assumption). Applied to the subtotal; the
+// server recomputes discount_cents + the net total (never trusts the client).
+export const DISCOUNT_PCTS = [0, 10, 15, 20] as const;
+export type DiscountPct = (typeof DISCOUNT_PCTS)[number];
+
 export type OrderTab = "active" | "archived";
 
 // CLAUDE.md §4: order.status drives the Active/Archived tabs. Active = still open

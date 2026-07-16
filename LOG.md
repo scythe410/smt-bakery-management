@@ -5,6 +5,74 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — feat: order discount buttons (10/15/20 percent)
+
+### Context
+
+Quick cashier discounts on an order: **10% / 15% / 20%**, plus a **None** (clear) option.
+A **whole-order** percentage against the subtotal — *not* per-line (assumption; flagged below).
+Like every money figure, the client is never trusted (CLAUDE.md §3/§7.7): the form sends only the
+selected percentage; the server recomputes discount + net total from stored prices.
+
+### Money model (migration 021 — `20260717090000_order_discount.sql`)
+
+- New `order.discount_pct smallint` (0/10/15/20) + `order.discount_cents integer`, both stored so
+  the figure is **auditable** and the bill can render it. Guards at the DB (defence in depth):
+  `discount_pct in (0,10,15,20)`, `discount_cents >= 0`, `discount_cents <= subtotal_cents`, and the
+  invariant **`total_cents = subtotal_cents - discount_cents`** (`order_total_is_net`).
+- `subtotal_cents` = GROSS (Σ line qty × price); `discount_cents = round(subtotal × pct/100)`;
+  `total_cents` = NET (what the customer pays). Applied to the subtotal, quantity/COGS untouched.
+- **`public.create_order` gains `p_discount_pct int default 0`.** Adding a param overloads rather
+  than replaces, so the old 5-arg signature is dropped first; the 6-arg version is re-granted to
+  `authenticated`. Existing 5-arg callers (SQL tests) still resolve via the default → 0 discount.
+
+### Commission moved onto the NET base (deliberate)
+
+`orderCommissionCents` and the RPC now compute commission on **`total_cents`** (net) instead of
+`subtotal_cents`. A platform's cut is charged on what the customer actually pays. **No-op for every
+existing row and the seed** (0% ⇒ total == subtotal), so nothing reconciles differently until a
+discount is applied. It is *required* for internal consistency: Finance "Platform Earnings" shows
+Σ total_cents as the base commission is charged on, so the base **used** must equal the base **shown**.
+
+### Honest reporting (gross / discount / net all reconcile)
+
+- `aggregateOrders` now also sums `grossSalesCents` (Σ subtotal) and `discountCents` (Σ discount);
+  the existing `grossCents` (Σ total) is REVENUE = gross sales − discounts. Revenue therefore already
+  reflects the discounted (net) amount with no change to how it is summed.
+- Daily Sales report surfaces a **Gross sales − Discounts = Revenue** reconciliation card (rendered
+  only when discounts exist in the window). The referenced-but-unbuilt Tax Report will read the same
+  aggregate; §8 honesty is preserved — the discount is an explicit labeled line, revenue is unmodified.
+
+### UI / bill / detail
+
+- **new-order-form**: a discount button row (None/10%/15%/20%, segmented, DESIGN active = red-tint);
+  the estimate block breaks out Subtotal / Discount / net Total when a discount is picked. Hidden
+  `discountPct` field; on-screen figure is an estimate, RPC is authoritative.
+- **order-bill** + **order-detail**: a "Discount 15% − LKR X" line between subtotal and total, shown
+  only when `discount_cents > 0`. Heavier CF4 receipt weights unchanged.
+- `newOrderSchema` gains `discountPct` (coerced, must be one of `DISCOUNT_PCTS`, default 0);
+  `DISCOUNT_PCTS` is the one shared source of truth (form + Zod + DB). i18n keys added to en + si.
+- **seed**: an occasional whole-order discount across history; today's first completed order is always
+  15% so the receipt + Reports reconciliation are populated on load.
+
+### Verified
+
+`tsc --noEmit` + `eslint` clean; locale JSON parses. Migration DDL + the discount-aware `create_order`
+run against the **linked** DB inside `BEGIN…ROLLBACK` with JWT impersonation: the `order_total_is_net`
+CHECK applied cleanly to all existing rows (so it's safe on prod data), and a 15% uber_eats order on a
+30000 subtotal produced discount 4500, net total 25500, commission 7650 (30% on the net base) —
+pass=true. Invalid percentages (e.g. 7) are rejected by the RPC.
+
+### Assumptions / open questions
+
+- **Whole-order percentage discount, not per-line.** If the client wants per-item or fixed-amount
+  discounts, that's a follow-up (would need a per-line field or a discount_cents override + a
+  matching bill layout).
+- **Migration 021 (and 020) are not pushed to the hosted project.** Run `supabase db push` + reseed
+  to make discounts live on the demo instance.
+
+---
+
 ## 2026-07-16 — feat: barcode receive + billing with merchandise decrement on sale
 
 ### Context

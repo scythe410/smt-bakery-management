@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import {
+  DISCOUNT_PCTS,
   ORDER_SOURCES,
   ORDER_STATUSES,
   PAYMENT_METHODS,
@@ -18,6 +19,15 @@ export const newOrderSchema = z
     customerName: z.string().trim().max(120).optional(),
     paymentMethod: z.enum(PAYMENT_METHODS as unknown as [string, ...string[]]),
     paymentStatus: z.enum(PAYMENT_STATUSES as unknown as [string, ...string[]]),
+    // Whole-order discount: one of the fixed quick-buttons (default 0 = none).
+    // Coerced because it arrives as a FormData string. The server RECOMPUTES the
+    // discount_cents + net total from stored prices — this only picks the rate.
+    discountPct: z.coerce
+      .number()
+      .refine((n) => (DISCOUNT_PCTS as readonly number[]).includes(n), {
+        message: "invalid discount",
+      })
+      .default(0),
     // The order's lines: a menu item id + an integer quantity. At least one line.
     items: z
       .array(

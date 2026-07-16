@@ -53,7 +53,11 @@ export type ReportRow = {
 };
 
 export type DailyReport = {
-  /** Gross revenue over realized orders. */
+  /** Gross sales over realized orders (list value, before whole-order discounts). */
+  grossSalesCents: number;
+  /** Whole-order discounts given over the same orders. */
+  discountCents: number;
+  /** Revenue over realized orders (net of discounts = grossSales − discounts). */
   revenueCents: number;
   /** Platform commission over the same orders. */
   commissionCents: number;
@@ -95,6 +99,8 @@ function summarizeDailyReport(
   }));
 
   return {
+    grossSalesCents: agg.grossSalesCents,
+    discountCents: agg.discountCents,
     revenueCents: agg.grossCents,
     commissionCents: agg.commissionCents,
     netRevenueCents: agg.netCents,

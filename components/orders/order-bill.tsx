@@ -18,6 +18,7 @@ import type { OrderBillData } from "@/lib/db/selectors/order-bill";
 export function OrderBill({ data }: { data: OrderBillData }) {
   const { t } = useTranslation();
   const showCommission = data.commissionCents > 0;
+  const showDiscount = data.discountCents > 0;
 
   return (
     <div
@@ -88,6 +89,12 @@ export function OrderBill({ data }: { data: OrderBillData }) {
       {/* ── Totals ─────────────────────────────────────────────────────────── */}
       <div className="mb-3 flex flex-col gap-1 text-sm">
         <Row label={t("orders.bill.subtotal")} value={data.subtotalFmt} />
+        {showDiscount && (
+          <Row
+            label={t("orders.bill.discount", { pct: data.discountPct })}
+            value={`- ${data.discountFmt}`}
+          />
+        )}
         {showCommission && (
           <Row label={t("orders.bill.commission")} value={data.commissionFmt} />
         )}
