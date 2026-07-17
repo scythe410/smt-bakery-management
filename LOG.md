@@ -5,6 +5,70 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — feat: leftover report and return for daily finished goods
+
+### Context
+
+Daily-renewal finished goods (rolls, buns) don't carry over: the bakery makes N in the morning
+(MF4/FT3 `produce_batch`), sells them down, and whatever is left at end of day is pulled from stock
+so the next day opens fresh from the new batch. Added the end-of-day **leftover report** + a
+**Return** control on the finished-good lane (`/inventory/production`). Honest accounting
+(CLAUDE.md §4, §8): returning leftovers is **stock/waste tracking, NOT a sale** — it reduces
+quantity only and posts **no** revenue/expense line.
+
+### Data model — migrations 023 + 023b
+
+- **023 (`20260717110000_return_reason.sql`)** — `stock_movement_reason += 'return'`. Split from the
+  RPC that uses it (a new enum value can't be used in the same transaction that adds it — same
+  two-file pattern as finished_good/production, 018a+018b).
+- **023b (`20260717111000_finished_good_return.sql`)** — `return_finished_good(item, qty, note)`, the
+  end-of-day mirror of `produce_batch`: one `return` movement of **-qty** against a finished good; the
+  existing apply trigger (008) folds it into `qty_on_hand` in the same transaction. SECURITY INVOKER
+  (RLS enforced) so any tenant member (owner/manager/kitchen) may run it; rejects non-finished-good
+  items and non-positive qty; returns the updated (fresh) row. Money untouched — quantity only.
+- `types.ts` hand-updated (enum union + array, new RPC signature) — mirrors the generated shape.
+
+### App layer
+
+- `queries/inventory.ts` — `listReturnMovements(period)` sums today's `return` movements per item
+  (magnitude) for the "returned today" column. `selectors/inventory.ts` — `getProductionView` now
+  resolves the tenant's **today** period and attaches per finished good: `leftoverQty`
+  (= max(qtyOnHand, 0)), `leftoverValueCents` (leftover × unit_cost — cost insight, not revenue), and
+  `returnedTodayQty`; plus the three grand totals.
+- `zod/inventory.ts` `returnFinishedGoodSchema` + `returnFinishedGood` server action (RLS RPC,
+  revalidates `/inventory/production`, `/inventory`, inventory tag → qty, low-stock/production badges,
+  bell all refresh).
+- UI: **ProductionPanel** gains an "End-of-day leftovers" card — per-item leftover qty, optional cash
+  value, returned-today, and a **Return** button that pulls the item's full leftover (qty on hand).
+  Rows only list items with leftover **or** a return today (so the day's returns stay visible after
+  the sweep). Leftover **value** is money, so it's gated to the money-visibility role (owner) via
+  `canAccess(role, "reports")` — same gate as the stock-take revenue column (CLAUDE.md §5); qtys are
+  operational and shown to all roles. Skeleton gained a matching leftover block. i18n en + si.
+
+### Deviation / note
+
+- **Return sweeps the full leftover** (qty on hand) per item in one tap — matches "next day starts
+  fresh". No partial-return input (the daily model is all-or-nothing); can add one later if the client
+  wants to return a subset. Negative stock (system stock lies) has nothing to return — the button
+  disables.
+- Migration behaviour was **not** run against the linked DB: an `ALTER TYPE ADD VALUE` can't be
+  exercised inside the established BEGIN…ROLLBACK test harness (the new value isn't usable until the
+  adding txn commits). The RPC is a line-for-line clone of the proven `produce_batch`/`receive_stock`
+  pattern (delta negated, reason `return`), so risk is low.
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on all touched files; en/si JSON parse; `next build` passes
+(18 routes).
+
+### Open questions / follow-up
+
+- **Migrations 023 + 023b are not yet pushed** to the hosted project (same pending-deploy state as
+  020/021/022). Run `supabase db push` to make Return live. Until then the Production screen renders
+  the leftover report from current `qty_on_hand` but the Return button's RPC 404s on the remote.
+
+---
+
 ## 2026-07-17 — feat: daily payroll with bonus and expense posting
 
 ### Context

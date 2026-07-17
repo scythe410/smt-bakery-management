@@ -9,7 +9,12 @@
 
 import "server-only";
 import { cache } from "react";
-import { listInventoryItems, listFinishedGoodItems } from "@/lib/db/queries/inventory";
+import {
+  listInventoryItems,
+  listFinishedGoodItems,
+  listReturnMovements,
+} from "@/lib/db/queries/inventory";
+import { resolveTenantPeriod } from "@/lib/db/selectors/context";
 import { categoryOrder } from "@/lib/inventory-config";
 import type { InventoryCategory, InventoryKind } from "@/lib/inventory-config";
 
@@ -92,6 +97,15 @@ export type FinishedGood = {
   lowStockThreshold: number;
   /** qty_on_hand <= low_stock_threshold — same rule as the production_alert view. */
   needsBatch: boolean;
+  /**
+   * End-of-day leftover = units still on hand (max(qtyOnHand, 0); negative stock
+   * has nothing to return). This is what the Return control pulls from stock.
+   */
+  leftoverQty: number;
+  /** leftoverQty × unit_cost_cents — cash cost of the leftover (insight, not revenue). */
+  leftoverValueCents: number;
+  /** Units already RETURNED today (Σ magnitude of today's `return` movements). */
+  returnedTodayQty: number;
 };
 
 export type ProductionView = {
@@ -99,14 +113,28 @@ export type ProductionView = {
   items: FinishedGood[];
   /** The subset at/below threshold — the "make another batch" alerts. */
   alerts: FinishedGood[];
+  /** Σ leftoverQty over all finished goods — the leftover report total. */
+  totalLeftoverQty: number;
+  /** Σ leftoverValueCents — total cash value of end-of-day leftovers (owner insight). */
+  totalLeftoverValueCents: number;
+  /** Σ returnedTodayQty — total units returned/wasted today. */
+  totalReturnedTodayQty: number;
 };
 
 async function loadProductionView(): Promise<ProductionView> {
-  const rows = await listFinishedGoodItems();
+  // Today (tenant timezone) for the returned-today tally — the leftover report is
+  // an end-of-day view, so "returned today" scopes to the shop's current day.
+  const today = await resolveTenantPeriod({ kind: "today" });
+  const [rows, returnedByItem] = await Promise.all([
+    listFinishedGoodItems(),
+    listReturnMovements(today),
+  ]);
 
   const items: FinishedGood[] = rows.map((r) => {
     const qtyOnHand = toNumberOrNull(r.qty_on_hand) ?? 0;
     const lowStockThreshold = toNumberOrNull(r.low_stock_threshold) ?? 0;
+    const leftoverQty = Math.max(qtyOnHand, 0);
+    const unitCostCents = toNumberOrNull(r.unit_cost_cents) ?? 0;
     return {
       id: r.id,
       name: r.name,
@@ -114,10 +142,19 @@ async function loadProductionView(): Promise<ProductionView> {
       unit: r.unit,
       lowStockThreshold,
       needsBatch: qtyOnHand <= lowStockThreshold,
+      leftoverQty,
+      leftoverValueCents: Math.round(leftoverQty * unitCostCents),
+      returnedTodayQty: returnedByItem.get(r.id) ?? 0,
     };
   });
 
-  return { items, alerts: items.filter((i) => i.needsBatch) };
+  return {
+    items,
+    alerts: items.filter((i) => i.needsBatch),
+    totalLeftoverQty: items.reduce((n, i) => n + i.leftoverQty, 0),
+    totalLeftoverValueCents: items.reduce((n, i) => n + i.leftoverValueCents, 0),
+    totalReturnedTodayQty: items.reduce((n, i) => n + i.returnedTodayQty, 0),
+  };
 }
 
 /** The Production view for this tenant. React-`cache()`d per request. */

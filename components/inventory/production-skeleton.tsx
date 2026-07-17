@@ -26,6 +26,20 @@ export function ProductionSkeleton() {
           </div>
         ))}
       </Card>
+      {/* End-of-day leftover report */}
+      <Card className="flex flex-col gap-3">
+        <Bar className="h-4 w-40" />
+        <Bar className="h-3 w-56" />
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-2">
+              <Bar className="h-4 w-36" />
+              <Bar className="h-3 w-24" />
+            </div>
+            <Bar className="h-9 w-20" />
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }

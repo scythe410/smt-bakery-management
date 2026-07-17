@@ -728,6 +728,18 @@
       "hint": "Produce another batch to restock.",
       "none": "All finished goods are above their reorder level."
     },
+    "leftovers": {
+      "title": "End-of-day leftovers",
+      "hint": "Daily-renewal goods don't carry over. Return what's left so tomorrow starts fresh — this records waste, not a sale.",
+      "left": "{{qty}} {{unit}} left",
+      "returnedToday": "{{qty}} {{unit}} returned today",
+      "totalLeft": "{{qty}} left",
+      "totalReturned": "{{qty}} returned today",
+      "return": "Return",
+      "returning": "Returning…",
+      "empty": "Nothing left over. Every batch sold through today.",
+      "error": "Couldn't return that. Try again."
+    },
     "empty": {
       "title": "No finished goods yet.",
       "body": "Add an inventory item with type \"Finished good\", then produce batches here."

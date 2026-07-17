@@ -1,39 +1,49 @@
 "use client";
 
-// Production panel (CLAUDE.md §4 FT3) — the finished-good lane. Two parts:
+// Production panel (CLAUDE.md §4 FT3) — the finished-good lane. Three parts:
 //   * Production Alerts: finished goods at/below their reorder threshold
 //     ("Hot Dogs: 8 left — make another batch"). The same items feed the header
 //     bell alert count.
 //   * Produce-batch list: every finished good with its current stock and an inline
 //     "Produce" control that adds N units (the morning "make 20" step) via the
 //     produce_batch RPC (server-validated, RLS-scoped).
+//   * End-of-day leftovers: daily-renewal finished goods don't carry over, so the
+//     leftover report shows what's left per item (qty, optional cash value) and a
+//     "Return" control that pulls it from stock via the return_finished_good RPC —
+//     honest waste tracking, NOT a sale (no revenue posted, CLAUDE.md §8). Returned
+//     quantities for today show per item so the next day opens fresh.
 //
 // Rows render as stacked list-rows (DESIGN.md §4 tables→mobile). Item names are
-// business data, shown as entered — not translated (CLAUDE.md §3). No revenue is
-// shown here — this is operational stock, open to owner/manager/staff.
+// business data, shown as entered — not translated (CLAUDE.md §3). Only the leftover
+// cash VALUE is money and is gated to owner (canSeeValue); everything else is
+// operational stock, open to owner/manager/staff.
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, Croissant } from "lucide-react";
+import { AlertTriangle, Croissant, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
-import { produceBatch } from "@/app/(app)/inventory/actions";
-import type { FinishedGood } from "@/lib/db/selectors/inventory";
+import { formatLKR } from "@/lib/format";
+import { produceBatch, returnFinishedGood } from "@/app/(app)/inventory/actions";
+import type { FinishedGood, ProductionView } from "@/lib/db/selectors/inventory";
 
 function formatQty(qty: number): string {
   return qty.toLocaleString("en-US", { maximumFractionDigits: 3 });
 }
 
 export function ProductionPanel({
-  items,
-  alerts,
+  view,
+  canSeeValue,
 }: {
-  items: FinishedGood[];
-  alerts: FinishedGood[];
+  view: ProductionView;
+  canSeeValue: boolean;
 }) {
   const { t } = useTranslation();
+  const { items, alerts, totalLeftoverQty, totalLeftoverValueCents, totalReturnedTodayQty } = view;
   const [qtyById, setQtyById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [returnBusyId, setReturnBusyId] = useState<string | null>(null);
+  const [returnErrorId, setReturnErrorId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function handleProduce(id: string) {
@@ -55,6 +65,22 @@ export function ProductionPanel({
       }
     });
   }
+
+  // Return the item's full leftover (qty on hand) — the daily end-of-day sweep.
+  function handleReturn(item: FinishedGood) {
+    if (item.leftoverQty <= 0) return;
+    setReturnErrorId(null);
+    setReturnBusyId(item.id);
+    startTransition(async () => {
+      const res = await returnFinishedGood({ inventoryItemId: item.id, qty: item.leftoverQty });
+      setReturnBusyId(null);
+      if (res.error) setReturnErrorId(item.id);
+    });
+  }
+
+  // The leftover report lists items with something still on hand OR already
+  // returned today (so the day's returns stay visible after the sweep).
+  const leftoverRows = items.filter((i) => i.leftoverQty > 0 || i.returnedTodayQty > 0);
 
   return (
     <div className="flex flex-col gap-3">
@@ -153,6 +179,95 @@ export function ProductionPanel({
           </ul>
         </Card>
       )}
+
+      {/* End-of-day leftover report + Return controls (daily-renewal finished goods) */}
+      {items.length > 0 ? (
+        <Card className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-h2 text-ink">{t("production.leftovers.title")}</span>
+            <span className="text-caption text-muted tabular-nums">
+              {t("production.leftovers.totalLeft", { qty: formatQty(totalLeftoverQty) })}
+              {canSeeValue && totalLeftoverValueCents > 0
+                ? ` · ${formatLKR(totalLeftoverValueCents)}`
+                : ""}
+            </span>
+          </div>
+          <p className="text-caption text-muted">{t("production.leftovers.hint")}</p>
+
+          {leftoverRows.length === 0 ? (
+            <p className="text-body text-muted py-2">{t("production.leftovers.empty")}</p>
+          ) : (
+            <ul className="flex flex-col">
+              {leftoverRows.map((it) => (
+                <li
+                  key={it.id}
+                  className="border-border flex items-center justify-between gap-3 border-b py-3 last:border-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <span className="text-label text-ink truncate font-semibold">{it.name}</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span className="text-caption text-muted tabular-nums">
+                        {t("production.leftovers.left", {
+                          qty: formatQty(it.leftoverQty),
+                          unit: it.unit,
+                        })}
+                      </span>
+                      {canSeeValue && it.leftoverValueCents > 0 ? (
+                        <>
+                          <span className="text-faint" aria-hidden>
+                            ·
+                          </span>
+                          <span className="text-caption text-muted tabular-nums">
+                            {formatLKR(it.leftoverValueCents)}
+                          </span>
+                        </>
+                      ) : null}
+                      {it.returnedTodayQty > 0 ? (
+                        <>
+                          <span className="text-faint" aria-hidden>
+                            ·
+                          </span>
+                          <span className="text-caption text-warning tabular-nums">
+                            {t("production.leftovers.returnedToday", {
+                              qty: formatQty(it.returnedTodayQty),
+                              unit: it.unit,
+                            })}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    {returnErrorId === it.id ? (
+                      <p role="alert" className="text-caption text-danger mt-1">
+                        {t("production.leftovers.error")}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReturn(it)}
+                    disabled={returnBusyId === it.id || it.leftoverQty <= 0}
+                    className="border-border-strong text-ink text-caption hover:bg-surface-2 focus-visible:ring-brand/40 flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius)] border px-3 font-medium outline-none transition-colors focus-visible:ring-2 disabled:opacity-50"
+                  >
+                    <Undo2 className="size-3.5" aria-hidden />
+                    {returnBusyId === it.id
+                      ? t("production.leftovers.returning")
+                      : t("production.leftovers.return")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {totalReturnedTodayQty > 0 ? (
+            <p className="text-caption text-faint tabular-nums">
+              {t("production.leftovers.totalReturned", {
+                qty: formatQty(totalReturnedTodayQty),
+              })}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
     </div>
   );
 }

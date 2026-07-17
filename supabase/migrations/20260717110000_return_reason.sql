@@ -1,0 +1,13 @@
+-- Migration 023 — stock_movement reason `return` (daily finished-good leftovers)
+--
+-- Daily-renewal finished goods (rolls, buns) do NOT carry over: whatever is left
+-- at end of day is pulled from stock so the next day starts fresh from the new
+-- morning batch. That removal is recorded as a `return` movement (out) through the
+-- ONE append-only stock_movement ledger (migration 008) — waste/leftover tracking,
+-- NOT a sale and NOT a revenue event (CLAUDE.md §4, §8: honest accounting). The
+-- items were never sold, so returning them reduces STOCK only; money is untouched.
+--
+-- Split from the RPC that uses it (next migration) because a new enum value cannot
+-- be used in the same transaction that adds it — same pattern as the
+-- finished_good / production values (migrations 018a + 018b).
+alter type public.stock_movement_reason add value if not exists 'return';

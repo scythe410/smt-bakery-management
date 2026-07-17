@@ -14,6 +14,7 @@ import {
   barcodeLookupSchema,
   produceBatchSchema,
   receiveStockSchema,
+  returnFinishedGoodSchema,
 } from "@/lib/zod/inventory";
 import { lookupProduct, type ProductLookupResult } from "@/lib/inventory/product-lookup";
 import type { Database } from "@/lib/supabase/types";
@@ -105,6 +106,43 @@ export async function produceBatch(input: {
     p_note: parsed.data.note ?? undefined,
   });
   if (error) return { error: "production.error" };
+
+  revalidatePath("/inventory/production");
+  revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
+  return { ok: true };
+}
+
+export type ReturnFinishedGoodState = { ok?: boolean; error?: string };
+
+/**
+ * Return (remove) end-of-day leftover units of a finished good — the daily-renewal
+ * "return the unsold rolls" step (CLAUDE.md §4 FT3 leftover handling). Posts a
+ * `return` stock_movement (out) so the next day starts fresh from the new batch;
+ * it is waste/leftover tracking, NOT a sale (no revenue/expense — CLAUDE.md §8).
+ * Operational: any tenant member (owner/manager/kitchen) may run it. Identity + the
+ * finished-good check are enforced by the SECURITY INVOKER `return_finished_good`
+ * RPC under RLS; the client value is never trusted. Revalidates the inventory tag
+ * so finished-good qty, the low-stock/production badges, and the bell alert refresh.
+ */
+export async function returnFinishedGood(input: {
+  inventoryItemId: string;
+  qty: number;
+  note?: string;
+}): Promise<ReturnFinishedGoodState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "production.leftovers.error" };
+
+  const parsed = returnFinishedGoodSchema.safeParse(input);
+  if (!parsed.success) return { error: "production.leftovers.error" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("return_finished_good", {
+    p_inventory_item_id: parsed.data.inventoryItemId,
+    p_qty: parsed.data.qty,
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error) return { error: "production.leftovers.error" };
 
   revalidatePath("/inventory/production");
   revalidatePath("/inventory");

@@ -1306,6 +1306,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      return_finished_good: {
+        Args: { p_inventory_item_id: string; p_note?: string; p_qty: number }
+        Returns: {
+          barcode: string | null
+          business_id: string
+          category: Database["public"]["Enums"]["inventory_category"]
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["inventory_kind"]
+          low_stock_threshold: number
+          name: string
+          qty_on_hand: number
+          sale_price_cents: number | null
+          sku: string | null
+          unit: string
+          unit_cost_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "inventory_item"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_account_role: {
         Args: {
           new_role: Database["public"]["Enums"]["app_role"]
@@ -1374,6 +1399,7 @@ export type Database = {
         | "count_adjust"
         | "manual"
         | "production"
+        | "return"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1532,6 +1558,7 @@ export const Constants = {
         "count_adjust",
         "manual",
         "production",
+        "return",
       ],
     },
   },

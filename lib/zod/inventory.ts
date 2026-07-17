@@ -72,3 +72,20 @@ export const receiveStockSchema = z
   .strict();
 
 export type ReceiveStockInput = z.infer<typeof receiveStockSchema>;
+
+/**
+ * Return-finished-good input: pull N leftover units of a finished good from stock
+ * at end of day (the daily-renewal "return the unsold rolls" step). qty is a
+ * positive decimal on the item's stocking unit (numeric(12,3) in the ledger). The
+ * DB RPC re-checks the item is a finished good and re-derives business_id from the
+ * session — never trusted from the client. Waste tracking, not a sale.
+ */
+export const returnFinishedGoodSchema = z
+  .object({
+    inventoryItemId: z.string().uuid(),
+    qty: z.coerce.number().positive().finite().max(1_000_000_000),
+    note: z.string().trim().max(200).optional(),
+  })
+  .strict();
+
+export type ReturnFinishedGoodInput = z.infer<typeof returnFinishedGoodSchema>;

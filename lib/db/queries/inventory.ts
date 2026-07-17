@@ -8,6 +8,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import type { Period } from "@/lib/db/period";
 
 export type InventoryItemRow = Database["public"]["Tables"]["inventory_item"]["Row"];
 
@@ -21,6 +22,30 @@ export async function listInventoryItems(): Promise<InventoryItemRow[]> {
 
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * `return` stock movements whose `created_at` falls in the period, summed to a
+ * per-item RETURNED quantity (positive) — the end-of-day leftovers pulled from
+ * stock today. RLS-scoped like every other read. The selector attaches this to
+ * each finished good so the leftover report shows returned qty per item.
+ */
+export async function listReturnMovements(period: Period): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("stock_movement")
+    .select("inventory_item_id, delta")
+    .eq("reason", "return")
+    .gte("created_at", period.startUtc)
+    .lt("created_at", period.endUtc);
+
+  if (error) throw error;
+  const map = new Map<string, number>();
+  for (const row of data ?? []) {
+    // `return` deltas are negative (stock leaves); report the magnitude returned.
+    map.set(row.inventory_item_id, (map.get(row.inventory_item_id) ?? 0) - Number(row.delta ?? 0));
+  }
+  return map;
 }
 
 /**
