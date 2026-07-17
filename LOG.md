@@ -5,6 +5,56 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-18 — fix: menu availability checkbox + image confirmation on Menu screen
+
+### Reported (client)
+
+"Uploaded a fish roll image via the edit icon — doesn't work. Also the item was unavailable, but
+saving without touching the checkbox flipped it to available."
+
+### Root causes — two separate bugs
+
+1. **Availability silently re-enabled.** An unchecked HTML checkbox is **not submitted**, so a
+   cleared "Available" box means `formData.get("isAvailable")` is `null`. Both `createMenuItem` and
+   `updateMenuItem` defaulted that to `"true"` (`?? "true"`), so every save of an unavailable item
+   turned it **back on**. Fixed to `?? "false"` — absent = unchecked = unavailable. (Verified on the
+   remote: "Fish roll" had `is_available = true` after the edit.)
+2. **Image upload "doesn't work" was actually no on-screen confirmation.** The upload path is fine —
+   verified on the remote that `menu_item.image_url` was set (`…/ad964797….png`), the storage object
+   exists, it signs, and fetches **200 image/png**; the order-entry grid (CF3) renders it correctly.
+   The problem: the **Menu screen showed no image at all** — `selectors/menu.ts` returned the raw
+   object PATH (private bucket, unsigned) and `menu-browser` rendered only a code chip. So after
+   uploading, nothing changed on the Menu screen and it read as a failure.
+
+### Changes
+
+- `app/(app)/menu/actions.ts` — `isAvailable` fallback `"true"` → `"false"` (create + update), with a
+  comment on the unchecked-checkbox semantics.
+- `lib/db/selectors/menu.ts` — batch-**sign** each item's photo (reusing `signItemImageUrls`, same as
+  the order grid) into a new `MenuItem.thumbUrl`; `imageUrl` still carries the raw PATH for the
+  presence check. Unresolved paths stay null → row falls back to the code chip (never a broken image).
+- `components/menu/menu-browser.tsx` — render the signed **thumbnail** as the row's leading element
+  (replacing the code chip when a photo exists); pass `initialThumbUrl` into the edit form.
+- `components/menu/menu-item-form.tsx` — show the **current photo preview** above the file picker in
+  edit mode, so an existing image is visibly confirmed before/after replacing it.
+
+### Notes / follow-up
+
+- **"Fish roll" is left `is_available = true`** in the demo data (the bug's residue). The fix stops
+  future flips; flip it back with the row's availability toggle if it should read unavailable — I
+  didn't mutate production data unprompted.
+- **Landscape "choose by picture":** the grid is orientation-aware (portrait 2-up → landscape 3-up),
+  but DESIGN.md §4 caps the app frame at 430px, so a rotated phone doesn't widen the canvas — the win
+  is more columns within the frame, not a tablet-width layout. Lifting the cap for the order screen is
+  a design call; flag if the client wants a genuinely wider landscape ordering view.
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on touched files; `next build` passes (18 routes). Image signing
+confirmed end-to-end against the remote (sign → fetch 200).
+
+---
+
 ## 2026-07-17 — feat: salaries report
 
 ### Context

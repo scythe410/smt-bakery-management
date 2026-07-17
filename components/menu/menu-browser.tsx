@@ -76,6 +76,7 @@ export function MenuBrowser({
       initialIsAvailable: item.isAvailable,
       initialItemCode: item.itemCode,
       initialImageUrl: item.imageUrl,
+      initialThumbUrl: item.thumbUrl,
       initialTrackedInventoryItemId: item.trackedInventoryItemId,
       recipeLines: lines,
       ingredients,
@@ -212,10 +213,22 @@ export function MenuBrowser({
             >
               {/* Main row */}
               <div className="flex items-center gap-3 p-3">
-                {/* Code chip */}
-                <span className="border-border text-caption text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border font-medium tabular-nums">
-                  {item.itemCode}
-                </span>
+                {/* Photo thumbnail (confirms a CF1 upload) or the code chip */}
+                {item.thumbUrl ? (
+                  // Private bucket → short-lived signed URL; a plain img keeps us off
+                  // next/image remote-host config for ephemeral URLs.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.thumbUrl}
+                    alt=""
+                    loading="lazy"
+                    className="border-border size-9 shrink-0 rounded-[var(--radius)] border object-cover"
+                  />
+                ) : (
+                  <span className="border-border text-caption text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border font-medium tabular-nums">
+                    {item.itemCode}
+                  </span>
+                )}
 
                 {/* Name + category */}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">

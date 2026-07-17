@@ -42,7 +42,10 @@ export async function createMenuItem(
     name: formData.get("name"),
     priceMajor: formData.get("priceMajor"),
     category: formData.get("category") || undefined,
-    isAvailable: formData.get("isAvailable") ?? "true",
+    // An unchecked checkbox is NOT submitted, so a missing field means the box was
+    // cleared → unavailable. Defaulting to "true" here silently re-enabled items the
+    // user had turned off; absent must mean false.
+    isAvailable: formData.get("isAvailable") ?? "false",
     itemCode: formData.get("itemCode") || 0,
     trackedInventoryItemId: formData.get("trackedInventoryItemId") || "",
   });
@@ -94,7 +97,10 @@ export async function updateMenuItem(
     name: formData.get("name"),
     priceMajor: formData.get("priceMajor"),
     category: formData.get("category") || undefined,
-    isAvailable: formData.get("isAvailable") ?? "true",
+    // An unchecked checkbox is NOT submitted, so a missing field means the box was
+    // cleared → unavailable. Defaulting to "true" here silently re-enabled items the
+    // user had turned off; absent must mean false.
+    isAvailable: formData.get("isAvailable") ?? "false",
     itemCode: formData.get("itemCode") || 0,
     trackedInventoryItemId: formData.get("trackedInventoryItemId") || "",
   });

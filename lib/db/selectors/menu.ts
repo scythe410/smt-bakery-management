@@ -10,6 +10,7 @@ import {
   listAllRecipeLines,
   listIngredientItems,
   listSoldFromStockItems,
+  signItemImageUrls,
 } from "@/lib/db/queries/menu";
 import type { InventoryItemRow } from "@/lib/db/queries/menu";
 import type { InventoryKind } from "@/lib/inventory-config";
@@ -20,7 +21,10 @@ export type MenuItem = {
   itemCode: number;
   priceCents: number;
   category: string | null;
+  /** Stored object PATH in the private item-images bucket (presence check + form). */
   imageUrl: string | null;
+  /** Short-lived SIGNED URL of the photo for the list thumbnail, or null. */
+  thumbUrl: string | null;
   isAvailable: boolean;
   recipeLineCount: number;
   /** Linked finished_good (sold-from-stock), or null when made-to-order. */
@@ -58,6 +62,14 @@ async function loadMenuList(): Promise<MenuList> {
     lineCounts.set(l.menu_item_id, (lineCounts.get(l.menu_item_id) ?? 0) + 1);
   }
 
+  // Sign photos for the list thumbnails — the item-images bucket is private, so a
+  // stored PATH must be signed to render (CLAUDE.md §7.8). Batched, one round-trip;
+  // unresolved paths are simply absent → the row shows the code chip, never a broken
+  // image. This is the visual confirmation that a CF1 upload landed.
+  const signedByPath = await signItemImageUrls(
+    rows.map((r) => r.image_url).filter((p): p is string => p != null),
+  );
+
   const items: MenuItem[] = rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -65,6 +77,7 @@ async function loadMenuList(): Promise<MenuList> {
     priceCents: r.price_cents,
     category: r.category,
     imageUrl: r.image_url,
+    thumbUrl: r.image_url ? (signedByPath.get(r.image_url) ?? null) : null,
     isAvailable: r.is_available,
     recipeLineCount: lineCounts.get(r.id) ?? 0,
     trackedInventoryItemId: r.tracked_inventory_item_id,

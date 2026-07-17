@@ -32,6 +32,8 @@ export type MenuItemFormMode =
       initialIsAvailable: boolean;
       initialItemCode: number;
       initialImageUrl: string | null;
+      /** Signed URL of the current photo, for the edit preview (or null). */
+      initialThumbUrl: string | null;
       initialTrackedInventoryItemId: string | null;
       recipeLines: RecipeLineRow[];
       ingredients: IngredientOption[];
@@ -201,6 +203,17 @@ export function MenuItemForm({ mode, onDone }: { mode: MenuItemFormMode; onDone:
           {/* Image upload */}
           <label className="flex flex-col gap-1">
             <span className="text-caption text-muted">{t("menu.form.image")}</span>
+            {/* Current photo preview — confirms the item already has an image. */}
+            {isEdit && mode.initialThumbUrl ? (
+              // Private bucket → short-lived signed URL; a plain img avoids next/image
+              // remote-host config for ephemeral URLs.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={mode.initialThumbUrl}
+                alt=""
+                className="border-border mb-1 size-16 rounded-[var(--radius)] border object-cover"
+              />
+            ) : null}
             <label className="border-border hover:bg-surface-2 flex h-10 cursor-pointer items-center gap-2 rounded-[var(--radius)] border px-3 transition-colors">
               <ImageIcon className="text-muted size-4" aria-hidden />
               <span className="text-label text-muted truncate">
