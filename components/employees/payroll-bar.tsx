@@ -1,22 +1,23 @@
 "use client";
 
-// PayrollBar — monthly payroll summary at the top of the Employees screen
-// (SPEC §4.3, owner-only). Shows total payroll, paid-vs-pending count, and a
-// progress bar. Only rendered when at least one employee has a salary set.
+// PayrollBar — the FN2 status bar, now reflecting DAILY-pay status for the
+// selected pay-day (SPEC §4.3, owner-only). Shows the total PAID so far that day,
+// a paid-vs-total progress bar, and the pending count. Only rendered when at
+// least one employee has a daily rate set.
 
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { formatLKR } from "@/lib/format";
-import type { PayrollSummary } from "@/lib/db/selectors/employees";
+import type { PayrollDay } from "@/lib/db/selectors/employees";
 
-export function PayrollBar({ payroll }: { payroll: PayrollSummary }) {
+export function PayrollBar({ payroll }: { payroll: PayrollDay }) {
   const { t } = useTranslation();
 
-  if (payroll.employeesWithSalary === 0) return null;
+  if (payroll.employeesWithRate === 0) return null;
 
   const pct =
-    payroll.employeesWithSalary > 0
-      ? Math.round((payroll.paidCount / payroll.employeesWithSalary) * 100)
+    payroll.employeesWithRate > 0
+      ? Math.round((payroll.paidCount / payroll.employeesWithRate) * 100)
       : 0;
 
   return (
@@ -24,7 +25,7 @@ export function PayrollBar({ payroll }: { payroll: PayrollSummary }) {
       <div className="flex items-center justify-between gap-2">
         <span className="text-h2 text-ink">{t("employees.payroll.label")}</span>
         <span className="text-label font-semibold text-ink tabular-nums">
-          {formatLKR(payroll.totalCents)}
+          {formatLKR(payroll.totalPaidCents)}
         </span>
       </div>
 
@@ -37,10 +38,10 @@ export function PayrollBar({ payroll }: { payroll: PayrollSummary }) {
             role="progressbar"
             aria-valuenow={payroll.paidCount}
             aria-valuemin={0}
-            aria-valuemax={payroll.employeesWithSalary}
+            aria-valuemax={payroll.employeesWithRate}
             aria-label={t("employees.payroll.progress", {
               paid: payroll.paidCount,
-              total: payroll.employeesWithSalary,
+              total: payroll.employeesWithRate,
             })}
           />
         </div>
@@ -53,7 +54,7 @@ export function PayrollBar({ payroll }: { payroll: PayrollSummary }) {
         <span className="text-caption text-success font-medium">
           {t("employees.payroll.paidOf", {
             paid: payroll.paidCount,
-            total: payroll.employeesWithSalary,
+            total: payroll.employeesWithRate,
           })}
         </span>
       </div>

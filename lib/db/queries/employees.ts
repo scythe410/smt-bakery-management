@@ -61,7 +61,7 @@ export async function insertEmployee(
       business_id: businessId,
       name: data.name,
       role: data.role ?? null,
-      salary_cents: data.salaryCents,
+      daily_pay_cents: data.dailyPayCents,
       profile_id: data.profileId,
       permissions: data.permissions,
       shift_schedule: data.shift,
@@ -85,7 +85,7 @@ export async function updateEmployee(
     .update({
       name: data.name,
       role: data.role ?? null,
-      salary_cents: data.salaryCents,
+      daily_pay_cents: data.dailyPayCents,
       profile_id: data.profileId,
       permissions: data.permissions,
       shift_schedule: data.shift,

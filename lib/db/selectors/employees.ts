@@ -1,16 +1,22 @@
-// selectors/employees.ts — the Employees screen's derived, render-ready list
-// (SPEC §4.3). Shapes raw employee rows into typed items: job title, parsed
-// permission set, ordered shift days, login-account flag, and salary/pay status
-// (owner-only money fields). Also computes the payroll summary bar totals.
+// selectors/employees.ts — the Employees screen's derived, render-ready data
+// (SPEC §4.3). Two selectors:
+//   * getEmployeeList  — the staff directory: job title, permissions, ordered
+//     shift days, login-account flag, and the DAILY pay rate (owner-only money).
+//   * getPayrollDay    — the daily-payroll panel for ONE pay-day: each employee
+//     with a rate + their pay record for that day (paid | pending), plus the FN2
+//     status-bar totals. Owner-only; RLS returns no salary_payment rows to a
+//     manager, so nothing money leaks even if this is called for them.
 
 import "server-only";
 import { cache } from "react";
 import { listEmployees, listLinkableAccounts, type LinkableAccount } from "@/lib/db/queries/employees";
+import { listSalaryPaymentsByDate } from "@/lib/db/queries/salary";
 import { parsePermissions, parseShiftSchedule, type ShiftDay } from "@/lib/employees/employee-config";
 
 export type { LinkableAccount };
 
-export type PayStatus = "paid" | "pending" | "not_set";
+/** A pay record's status. Daily payroll is a per-day paid|pending state. */
+export type PayStatus = "paid" | "pending";
 
 export type EmployeeListItem = {
   id: string;
@@ -25,40 +31,13 @@ export type EmployeeListItem = {
   hasLogin: boolean;
   /** The linked login account's profile id, or null when HR-record only. */
   profileId: string | null;
-  /** Monthly salary in LKR minor units, or null when not configured. */
-  salaryCents: number | null;
-  /** Current-period pay status. */
-  payStatus: PayStatus;
-  /** When pay_status was last set to 'paid'; null otherwise. */
-  paidAt: string | null;
+  /** DAILY pay rate in LKR minor units, or null when not configured. */
+  dailyPayCents: number | null;
 };
 
-/** Aggregated payroll summary for the status bar (owner-only). */
-export type PayrollSummary = {
-  /** Sum of salary_cents for employees with a salary set (any status). */
-  totalCents: number;
-  /** Count of employees with pay_status = 'paid'. */
-  paidCount: number;
-  /** Count of employees with pay_status = 'pending'. */
-  pendingCount: number;
-  /** Employees with a salary configured (paid + pending). */
-  employeesWithSalary: number;
-};
-
-export type EmployeeList = {
-  items: EmployeeListItem[];
-  payroll: PayrollSummary;
-};
-
-function toPayStatus(raw: string): PayStatus {
-  if (raw === "paid" || raw === "pending" || raw === "not_set") return raw;
-  return "not_set";
-}
-
-async function loadEmployeeList(): Promise<EmployeeList> {
+async function loadEmployeeList(): Promise<EmployeeListItem[]> {
   const rows = await listEmployees();
-
-  const items: EmployeeListItem[] = rows.map((r) => ({
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     role: r.role,
@@ -66,31 +45,95 @@ async function loadEmployeeList(): Promise<EmployeeList> {
     shift: parseShiftSchedule(r.shift_schedule),
     hasLogin: r.profile_id !== null,
     profileId: r.profile_id,
-    salaryCents: r.salary_cents ?? null,
-    payStatus: toPayStatus(r.pay_status),
-    paidAt: r.paid_at ?? null,
+    dailyPayCents: r.daily_pay_cents ?? null,
   }));
-
-  // Build payroll summary from items.
-  let totalCents = 0;
-  let paidCount = 0;
-  let pendingCount = 0;
-  for (const item of items) {
-    if (item.salaryCents !== null) {
-      totalCents += item.salaryCents;
-      if (item.payStatus === "paid") paidCount++;
-      else if (item.payStatus === "pending") pendingCount++;
-    }
-  }
-
-  return {
-    items,
-    payroll: { totalCents, paidCount, pendingCount, employeesWithSalary: paidCount + pendingCount },
-  };
 }
 
-/** The Employees list + payroll summary for this tenant. React-`cache()`d per request. */
-export const getEmployeeList = cache((): Promise<EmployeeList> => loadEmployeeList());
+/** The Employees staff directory for this tenant. React-`cache()`d per request. */
+export const getEmployeeList = cache((): Promise<EmployeeListItem[]> => loadEmployeeList());
 
 /** Login accounts an owner may link to an employee. React-`cache()`d per request. */
 export const getLinkableAccounts = cache((): Promise<LinkableAccount[]> => listLinkableAccounts());
+
+// ── Daily payroll: one pay-day ───────────────────────────────────────────────
+
+export type PayrollDayEmployee = {
+  employeeId: string;
+  name: string;
+  role: string | null;
+  /** null → no rate set; the employee can't be paid until one is configured. */
+  dailyPayCents: number | null;
+  /** The pay record for THIS day, or null when not yet approved. */
+  payment: {
+    id: string;
+    baseCents: number;
+    bonusCents: number;
+    totalCents: number;
+    status: PayStatus;
+    paidAt: string | null;
+  } | null;
+};
+
+/** The daily-payroll panel model + FN2 status-bar totals for one pay-day. */
+export type PayrollDay = {
+  payDate: string;
+  /** Every employee, whether or not they have a rate (the panel filters). */
+  rows: PayrollDayEmployee[];
+  /** Σ total_cents of PAID records this day (equals the day's Salaries expenses). */
+  totalPaidCents: number;
+  /** Employees paid for this day. */
+  paidCount: number;
+  /** Employees with a rate not yet paid for this day. */
+  pendingCount: number;
+  /** Employees with a daily rate configured (paid + pending). */
+  employeesWithRate: number;
+};
+
+async function loadPayrollDay(payDate: string): Promise<PayrollDay> {
+  const [employees, payments] = await Promise.all([
+    listEmployees(),
+    listSalaryPaymentsByDate(payDate),
+  ]);
+
+  const payByEmp = new Map(payments.map((p) => [p.employee_id, p]));
+
+  const rows: PayrollDayEmployee[] = employees.map((e) => {
+    const p = payByEmp.get(e.id);
+    return {
+      employeeId: e.id,
+      name: e.name,
+      role: e.role,
+      dailyPayCents: e.daily_pay_cents ?? null,
+      payment: p
+        ? {
+            id: p.id,
+            baseCents: p.base_cents,
+            bonusCents: p.bonus_cents,
+            totalCents: p.total_cents,
+            status: p.status === "paid" ? "paid" : "pending",
+            paidAt: p.paid_at,
+          }
+        : null,
+    };
+  });
+
+  let totalPaidCents = 0;
+  let paidCount = 0;
+  let pendingCount = 0;
+  let employeesWithRate = 0;
+  for (const r of rows) {
+    if (r.dailyPayCents === null) continue;
+    employeesWithRate++;
+    if (r.payment && r.payment.status === "paid") {
+      paidCount++;
+      totalPaidCents += r.payment.totalCents;
+    } else {
+      pendingCount++;
+    }
+  }
+
+  return { payDate, rows, totalPaidCents, paidCount, pendingCount, employeesWithRate };
+}
+
+/** The daily-payroll panel + status-bar totals for one pay-day. Per-request cache. */
+export const getPayrollDay = cache((payDate: string): Promise<PayrollDay> => loadPayrollDay(payDate));

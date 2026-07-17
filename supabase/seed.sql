@@ -455,8 +455,6 @@ set order_seq = coalesce((
 insert into public.expense (business_id, date, category, amount_cents, note, created_by) values
 ('11111111-1111-1111-1111-111111111111', current_date - 35, 'Rent',       25000000, 'Monthly shop rent',                  'aaaaaaaa-0000-0000-0000-000000000001'),
 ('11111111-1111-1111-1111-111111111111', current_date - 5,  'Rent',       25000000, 'Monthly shop rent',                  'aaaaaaaa-0000-0000-0000-000000000001'),
-('11111111-1111-1111-1111-111111111111', current_date - 34, 'Salaries',   18000000, 'Staff salaries — prior period',      'aaaaaaaa-0000-0000-0000-000000000001'),
-('11111111-1111-1111-1111-111111111111', current_date - 4,  'Salaries',   18000000, 'Staff salaries — current period',    'aaaaaaaa-0000-0000-0000-000000000001'),
 ('11111111-1111-1111-1111-111111111111', current_date - 30, 'Ingredients',  4500000, 'Flour, sugar, butter restock',      'aaaaaaaa-0000-0000-0000-000000000002'),
 ('11111111-1111-1111-1111-111111111111', current_date - 21, 'Ingredients',  6200000, 'Chocolate + dairy wholesale order',  'aaaaaaaa-0000-0000-0000-000000000002'),
 ('11111111-1111-1111-1111-111111111111', current_date - 12, 'Ingredients',  3800000, 'Coffee beans + tea leaves',          'aaaaaaaa-0000-0000-0000-000000000002'),
@@ -508,38 +506,77 @@ insert into public.booking (
 
 -- ---------------------------------------------------------------------------
 -- 11. Employees (owner/manager/staff link to profiles; two are non-login staff).
---     salary_cents in LKR minor units; 2 of 5 paid → non-trivial payroll bar.
---     Total payroll LKR 253,000 (25,300,000 cents); 2 paid, 3 pending.
+--     daily_pay_cents in LKR minor units = each employee's DAILY rate. Daily
+--     payroll (all five) = LKR 18,000 (1,800,000 cents). Pay records + linked
+--     Salaries expenses for two past days are seeded in §11a below.
 -- ---------------------------------------------------------------------------
 insert into public.employee
   (business_id, name, role, permissions, shift_schedule, profile_id,
-   salary_cents, pay_status, paid_at)
+   daily_pay_cents)
 values
 ('11111111-1111-1111-1111-111111111111', 'Samantha Perera', 'Owner',
  '{"all": true}'::jsonb,
  '{"mon":"08:00-17:00","tue":"08:00-17:00","wed":"08:00-17:00","thu":"08:00-17:00","fri":"08:00-17:00"}'::jsonb,
  'aaaaaaaa-0000-0000-0000-000000000001',
- 7500000, 'paid', now() - interval '3 days'),
+ 500000),
 ('11111111-1111-1111-1111-111111111111', 'Nadeesha Fernando', 'Manager',
  '{"orders": true, "inventory": true, "reports": true, "finance": true, "settings": false}'::jsonb,
  '{"mon":"07:00-16:00","wed":"07:00-16:00","thu":"07:00-16:00","fri":"07:00-16:00","sat":"07:00-16:00"}'::jsonb,
  'aaaaaaaa-0000-0000-0000-000000000002',
- 5800000, 'paid', now() - interval '3 days'),
+ 400000),
 ('11111111-1111-1111-1111-111111111111', 'Kasun Silva', 'Barista',
  '{"orders": true, "inventory": true, "menu": true, "bookings": true}'::jsonb,
  '{"tue":"09:00-18:00","wed":"09:00-18:00","fri":"09:00-18:00","sat":"09:00-18:00","sun":"09:00-16:00"}'::jsonb,
  'aaaaaaaa-0000-0000-0000-000000000003',
- 4000000, 'pending', null),
+ 300000),
 ('11111111-1111-1111-1111-111111111111', 'Amara Jayasinghe', 'Head Baker',
  '{"inventory": true, "menu": true}'::jsonb,
  '{"mon":"05:00-13:00","tue":"05:00-13:00","wed":"05:00-13:00","thu":"05:00-13:00","sat":"05:00-13:00"}'::jsonb,
  null,
- 4800000, 'pending', null),
+ 350000),
 ('11111111-1111-1111-1111-111111111111', 'Ruwan Dias', 'Cashier',
  '{"orders": true}'::jsonb,
  '{"thu":"10:00-19:00","fri":"10:00-19:00","sat":"10:00-19:00","sun":"10:00-19:00"}'::jsonb,
  null,
- 3200000, 'pending', null);
+ 250000);
+
+-- ---------------------------------------------------------------------------
+-- 11a. Daily payroll history — pay every employee for two past days, each via a
+--      LINKED 'Salaries' expense (single source of truth: the expense IS the
+--      payroll cost). Day −2 carries a LKR 500 bonus each. Yesterday (−1) has no
+--      bonus. Today is deliberately left UNPAID so the payroll panel opens with
+--      pending rows to approve. The linked expenses replace the old monthly
+--      lump-sum Salaries lines (removed from §9), so Reports "Salaries" and
+--      Finance "Salaries" reconcile exactly by expense_id.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_biz   uuid := '11111111-1111-1111-1111-111111111111';
+  v_owner uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  r       record;
+  v_exp   uuid;
+begin
+  for r in
+    select e.id as emp_id, e.name, e.daily_pay_cents as base, d.pay_date, d.bonus
+    from public.employee e
+    cross join (values
+      (current_date - 1, 0),
+      (current_date - 2, 50000)
+    ) as d(pay_date, bonus)
+    where e.business_id = v_biz and e.daily_pay_cents is not null
+  loop
+    insert into public.expense (business_id, date, category, amount_cents, note, created_by)
+    values (v_biz, r.pay_date, 'Salaries', r.base + r.bonus,
+            'Daily salary — ' || r.name, v_owner)
+    returning id into v_exp;
+
+    insert into public.salary_payment
+      (business_id, employee_id, pay_date, base_cents, bonus_cents, total_cents,
+       status, approved_by, paid_at, expense_id)
+    values (v_biz, r.emp_id, r.pay_date, r.base, r.bonus, r.base + r.bonus,
+            'paid', v_owner, r.pay_date + time '17:30', v_exp);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 12. Notifications — some unread (drive the bell badge; unread count = 4).

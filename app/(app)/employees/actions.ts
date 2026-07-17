@@ -5,47 +5,98 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { markEmployeePaidSchema, upsertEmployeeSchema, deleteEmployeeSchema } from "@/lib/zod/employees";
+import { revalidateBusinessTags } from "@/lib/db/cache";
+import { upsertEmployeeSchema, deleteEmployeeSchema } from "@/lib/zod/employees";
+import { approveSalarySchema, salaryPaymentIdSchema } from "@/lib/zod/salary";
 import { insertEmployee, updateEmployee, removeEmployee } from "@/lib/db/queries/employees";
 import { WEEKDAYS } from "@/lib/employees/employee-config";
 
 export type EmployeePayActionState = { ok?: boolean; error?: string };
 export type EmpFormState = { ok?: boolean; error?: string };
 
-export async function markEmployeePaid(
+// Approving a day's pay creates a linked 'Salaries' expense, so it touches both
+// the Employees payroll view and the Finance/Expenses surfaces. Revalidate all
+// three plus the `expenses` data-cache tag (Dashboard/Finance/Reports totals).
+function revalidatePayrollSurfaces(businessId: string) {
+  revalidatePath("/employees");
+  revalidatePath("/finance");
+  revalidatePath("/expenses");
+  revalidatePath("/reports");
+  revalidateBusinessTags(businessId, ["expenses"]);
+}
+
+/**
+ * Approve & pay one employee for one pay-day, with an optional bonus. The
+ * SECURITY DEFINER RPC snapshots the daily rate, computes base+bonus, sets the
+ * record 'paid', and posts the LINKED 'Salaries' expense in one transaction —
+ * the payment IS that expense (single source of truth, CLAUDE.md §8). The client
+ * never sends a base or total; only the employee, the day, and the bonus.
+ */
+export async function approveSalary(
   employeeId: string,
-  paid: boolean,
+  payDate: string,
+  bonusCents: number,
 ): Promise<EmployeePayActionState> {
   const profile = await requireRole(["owner"]);
   if (!profile.business_id) return { error: "employees.payroll.error" };
 
-  const parsed = markEmployeePaidSchema.safeParse({ employeeId, paid });
+  const parsed = approveSalarySchema.safeParse({ employeeId, payDate, bonusCents });
   if (!parsed.success) return { error: "employees.payroll.error" };
 
   const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("employee")
-    .update({
-      pay_status: paid ? "paid" : "pending",
-      paid_at: paid ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.employeeId)
-    .eq("business_id", profile.business_id);
-
+  const { error } = await supabase.rpc("approve_salary_payment", {
+    p_employee_id: parsed.data.employeeId,
+    p_pay_date: parsed.data.payDate,
+    p_bonus_cents: parsed.data.bonusCents,
+  });
   if (error) return { error: "employees.payroll.error" };
 
-  revalidatePath("/employees");
+  revalidatePayrollSurfaces(profile.business_id);
+  return { ok: true };
+}
+
+/** Unapprove a paid day: reverse the linked expense, set the record pending. */
+export async function reverseSalary(paymentId: string): Promise<EmployeePayActionState> {
+  const profile = await requireRole(["owner"]);
+  if (!profile.business_id) return { error: "employees.payroll.error" };
+
+  const parsed = salaryPaymentIdSchema.safeParse({ paymentId });
+  if (!parsed.success) return { error: "employees.payroll.error" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reverse_salary_payment", {
+    p_payment_id: parsed.data.paymentId,
+  });
+  if (error) return { error: "employees.payroll.error" };
+
+  revalidatePayrollSurfaces(profile.business_id);
+  return { ok: true };
+}
+
+/** Delete a pay record entirely (also removes its linked expense, if any). */
+export async function deleteSalaryPayment(paymentId: string): Promise<EmployeePayActionState> {
+  const profile = await requireRole(["owner"]);
+  if (!profile.business_id) return { error: "employees.payroll.error" };
+
+  const parsed = salaryPaymentIdSchema.safeParse({ paymentId });
+  if (!parsed.success) return { error: "employees.payroll.error" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_salary_payment", {
+    p_payment_id: parsed.data.paymentId,
+  });
+  if (error) return { error: "employees.payroll.error" };
+
+  revalidatePayrollSurfaces(profile.business_id);
   return { ok: true };
 }
 
 function parseFormData(formData: FormData) {
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const role = (formData.get("role") as string | null)?.trim() || undefined;
-  const salaryRaw = (formData.get("salary_lkr") as string | null)?.trim();
-  const salaryCents =
-    salaryRaw && salaryRaw !== "" ? Math.round(parseInt(salaryRaw, 10) * 100) : null;
+  const dailyPayRaw = (formData.get("daily_pay_lkr") as string | null)?.trim();
+  const dailyPayCents =
+    dailyPayRaw && dailyPayRaw !== "" ? Math.round(parseInt(dailyPayRaw, 10) * 100) : null;
   const profileIdRaw = (formData.get("profile_id") as string | null)?.trim();
   const profileId = profileIdRaw && profileIdRaw !== "" ? profileIdRaw : null;
   const accessRoleRaw = (formData.get("access_role") as string | null)?.trim();
@@ -73,7 +124,7 @@ function parseFormData(formData: FormData) {
     }
   }
 
-  return { name, role, salaryCents, profileId, accessRole, permissions, shift };
+  return { name, role, dailyPayCents, profileId, accessRole, permissions, shift };
 }
 
 /**

@@ -211,42 +211,36 @@ export type Database = {
         Row: {
           business_id: string
           created_at: string
+          daily_pay_cents: number | null
           id: string
           name: string
-          paid_at: string | null
-          pay_status: string
           permissions: Json
           profile_id: string | null
           role: string | null
-          salary_cents: number | null
           shift_schedule: Json
           updated_at: string
         }
         Insert: {
           business_id: string
           created_at?: string
+          daily_pay_cents?: number | null
           id?: string
           name: string
-          paid_at?: string | null
-          pay_status?: string
           permissions?: Json
           profile_id?: string | null
           role?: string | null
-          salary_cents?: number | null
           shift_schedule?: Json
           updated_at?: string
         }
         Update: {
           business_id?: string
           created_at?: string
+          daily_pay_cents?: number | null
           id?: string
           name?: string
-          paid_at?: string | null
-          pay_status?: string
           permissions?: Json
           profile_id?: string | null
           role?: string | null
-          salary_cents?: number | null
           shift_schedule?: Json
           updated_at?: string
         }
@@ -262,6 +256,83 @@ export type Database = {
             foreignKeyName: "employee_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      salary_payment: {
+        Row: {
+          approved_by: string | null
+          base_cents: number
+          bonus_cents: number
+          business_id: string
+          created_at: string
+          employee_id: string
+          expense_id: string | null
+          id: string
+          paid_at: string | null
+          pay_date: string
+          status: string
+          total_cents: number
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          base_cents: number
+          bonus_cents?: number
+          business_id: string
+          created_at?: string
+          employee_id: string
+          expense_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pay_date: string
+          status?: string
+          total_cents: number
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          base_cents?: number
+          bonus_cents?: number
+          business_id?: string
+          created_at?: string
+          employee_id?: string
+          expense_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pay_date?: string
+          status?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_payment_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expense"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
@@ -1088,6 +1159,18 @@ export type Database = {
       }
     }
     Functions: {
+      approve_salary_payment: {
+        Args: { p_bonus_cents?: number; p_employee_id: string; p_pay_date: string }
+        Returns: string
+      }
+      reverse_salary_payment: {
+        Args: { p_payment_id: string }
+        Returns: undefined
+      }
+      delete_salary_payment: {
+        Args: { p_payment_id: string }
+        Returns: undefined
+      }
       close_stock_day: {
         Args: { p_lines: Json; p_stock_day_id: string }
         Returns: {

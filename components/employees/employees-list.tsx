@@ -3,15 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { CalendarClock, Pencil, Plus, ShieldCheck, Trash2, UserCheck } from "lucide-react";
+import { CalendarClock, Coins, Pencil, Plus, ShieldCheck, Trash2, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
-import { PayrollBar } from "@/components/employees/payroll-bar";
+import { PayrollPanel } from "@/components/employees/payroll-panel";
 import { EmployeeForm } from "@/components/employees/employee-form";
-import { markEmployeePaid, deleteEmployee } from "@/app/(app)/employees/actions";
+import { deleteEmployee } from "@/app/(app)/employees/actions";
 import { useAppContext } from "@/components/app/app-provider";
 import { formatLKR } from "@/lib/format";
-import type { EmployeeListItem, PayrollSummary, PayStatus } from "@/lib/db/selectors/employees";
+import type { EmployeeListItem, PayrollDay } from "@/lib/db/selectors/employees";
 import type { LinkableAccount } from "@/lib/db/queries/employees";
 
 const KNOWN_PERMISSIONS = new Set([
@@ -25,70 +25,13 @@ const KNOWN_PERMISSIONS = new Set([
   "settings",
 ]);
 
-const PAY_STATUS_TONE: Record<PayStatus, "success" | "warning" | "neutral"> = {
-  paid: "success",
-  pending: "warning",
-  not_set: "neutral",
-};
-
-function SalaryCell({
-  empId,
-  salaryCents,
-  initialStatus,
-}: {
-  empId: string;
-  salaryCents: number;
-  initialStatus: PayStatus;
-}) {
-  const { t } = useTranslation();
-  const [status, setStatus] = useState<PayStatus>(initialStatus);
-  const [isPending, startTransition] = useTransition();
-
-  function toggle() {
-    const nextPaid = status !== "paid";
-    const next: PayStatus = nextPaid ? "paid" : "pending";
-    setStatus(next);
-    startTransition(async () => {
-      const result = await markEmployeePaid(empId, nextPaid);
-      if (result.error) setStatus(status);
-    });
-  }
-
-  return (
-    <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-caption text-muted">{t("employees.payroll.salary")}</span>
-        <span className="text-label font-semibold text-ink tabular-nums">
-          {formatLKR(salaryCents)}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <StatusPill
-          tone={PAY_STATUS_TONE[status]}
-          label={t(`employees.payroll.status.${status}`)}
-        />
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={isPending}
-          className="text-caption text-brand hover:text-brand-ember font-medium transition-colors disabled:opacity-40"
-        >
-          {status === "paid"
-            ? t("employees.payroll.markPending")
-            : t("employees.payroll.markPaid")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function EmployeesList({
   items,
-  payroll,
+  payrollDay,
   linkableAccounts,
 }: {
   items: EmployeeListItem[];
-  payroll: PayrollSummary;
+  payrollDay: PayrollDay;
   linkableAccounts: LinkableAccount[];
 }) {
   const { t } = useTranslation();
@@ -129,7 +72,7 @@ export function EmployeesList({
 
   return (
     <div className="flex flex-col gap-3">
-      {isOwner ? <PayrollBar payroll={payroll} /> : null}
+      {isOwner ? <PayrollPanel payrollDay={payrollDay} /> : null}
 
       <div className="flex items-center justify-between gap-2">
         <p className="text-label text-muted">
@@ -244,17 +187,19 @@ export function EmployeesList({
             </div>
 
             {isOwner ? (
-              emp.salaryCents !== null ? (
-                <SalaryCell
-                  empId={emp.id}
-                  salaryCents={emp.salaryCents}
-                  initialStatus={emp.payStatus}
-                />
-              ) : (
-                <p className="border-border text-caption text-faint border-t pt-3">
-                  {t("employees.payroll.notSet")}
-                </p>
-              )
+              <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
+                <span className="text-caption text-muted inline-flex items-center gap-1">
+                  <Coins className="size-3.5" aria-hidden />
+                  {t("employees.payroll.dailyRate")}
+                </span>
+                {emp.dailyPayCents !== null ? (
+                  <span className="text-label font-semibold text-ink tabular-nums">
+                    {formatLKR(emp.dailyPayCents)}
+                  </span>
+                ) : (
+                  <span className="text-caption text-faint">{t("employees.payroll.notSet")}</span>
+                )}
+              </div>
             ) : null}
           </Card>
         ))

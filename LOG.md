@@ -5,6 +5,78 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — feat: daily payroll with bonus and expense posting
+
+### Context
+
+Client reworked payroll: pay is **DAILY**, approved **per day** with an optional **bonus**, and
+approving posts a **Finance expense** (category "Salaries"). The salary payment **IS** that expense —
+they're linked by `expense_id`, so Finance / Reports count payroll **exactly once** (single source of
+truth; cash basis, CLAUDE.md §8 / §4 reconciliation). Payroll is never added as a second independent
+total on top of the expense.
+
+### Data model — migration 022 (`20260717100000_daily_payroll.sql`)
+
+- `employee.salary_cents` → **renamed `daily_pay_cents`** (the daily rate). Existing monthly values
+  are converted `/30` (integer cents, no float stored). `employee.pay_status` / `paid_at` **dropped** —
+  per-period status is no longer a single field; it now lives per day in `salary_payment`.
+- **New `public.salary_payment`** — one record per `(business_id, employee_id, pay_date)` (unique):
+  `base_cents` (daily-rate **snapshot**), `bonus_cents` (default 0), `total_cents`, `status`
+  (`pending|paid`), `approved_by`, `paid_at`, `expense_id` (FK → the posted expense,
+  `on delete set null`). CHECK `total_cents = base_cents + bonus_cents`. Generic triggers
+  (business_id stamp + touch/freeze). **Owner-only RLS** (money is stricter than the owner/manager
+  `employee` table it hangs off).
+- **Three SECURITY DEFINER RPCs**, pinned `search_path`, each re-checking owner + tenant from the
+  caller's profile and doing payment + expense in **one transaction** (no phantom expense, no paid
+  record without an expense):
+  - `approve_salary_payment(employee, pay_date, bonus)` — snapshots the rate, computes base+bonus,
+    upserts the record `paid`, and posts/updates the linked `Salaries` expense.
+  - `reverse_salary_payment(id)` — record → `pending`, deletes the linked expense (unapprove).
+  - `delete_salary_payment(id)` — removes the record and its linked expense.
+- **Verified on the linked DB** inside `BEGIN…ROLLBACK` with owner JWT impersonation (per the
+  established test method): approve creates a `paid` record + linked `Salaries` expense with
+  `total = base + bonus` (325000 = 300000 + 25000); reverse removes the expense, sets `pending`,
+  nulls the link; delete removes both. Migration DDL applied cleanly on top of the current remote
+  schema. Types.ts hand-updated (new table, renamed/ dropped employee columns, three RPC signatures).
+
+### App layer
+
+- `lib/zod/salary.ts` — `approveSalarySchema` (employee/day/bonus, bonus ≥ 0 and capped) +
+  `salaryPaymentIdSchema`. Client sends only employee + day + bonus; server snapshots base/total.
+- `queries/salary.ts` — `listSalaryPaymentsByDate` (panel) + `listSalaryPaymentsInPeriod`
+  (report, joins employee name). `selectors/employees.ts` reworked: `EmployeeListItem.dailyPayCents`
+  (dropped payStatus/paidAt); new `getPayrollDay(payDate)` → per-employee pay record + FN2 status-bar
+  totals (paid today, paid/total, pending).
+- Actions: `markEmployeePaid` replaced by `approveSalary` / `reverseSalary` / `deleteSalaryPayment`
+  (owner-only, Zod-validated, call the RPCs). All revalidate `/employees` **and** `/finance` /
+  `/expenses` / `/reports` + the `expenses` data-cache tag (approving moves a Finance figure).
+- UI: new **`PayrollPanel`** (owner-only) — a URL-driven pay-day picker (`?payDate=`, defaults to
+  tenant today, like Reports), the reworked **`PayrollBar`** status bar (now DAILY), and per-employee
+  rows: bonus input + **Approve & Pay**, or (paid) base/bonus/total + **Unapprove** / **Delete**.
+  Employee cards show the daily rate read-only. `employee-form` field → daily pay. i18n en + si.
+
+### Seed
+
+- Employees now carry `daily_pay_cents` (clean daily wages, total LKR 18,000/day). New **§11a** pays
+  every rated employee for the last **two** days via the linked-expense pattern (day −2 carries a
+  LKR 500 bonus); **today is left unpaid** so the panel opens with pending rows. The two old monthly
+  lump-sum `Salaries` expenses were **removed** so Reports "Salaries" and Finance "Salaries" reconcile
+  exactly by `expense_id`.
+
+### Verified
+
+`tsc` + `eslint` clean; `next build` passes (18 routes); en/si JSON parse; migration + RPC behaviour
+proven against the linked DB (rolled back).
+
+### Open questions / follow-up
+
+- **Migration 022 + reworked seed are not yet pushed to the hosted project.** Run `supabase db push`
+  (and reseed the demo) to make daily payroll live — same deploy step flagged for 020/021.
+- Bonus is entered in **whole rupees** (matches the salary field's granularity). If the client needs
+  sub-rupee bonuses, widen the input + parsing.
+
+---
+
 ## 2026-07-17 — feat: image grid menu picker for order entry
 
 ### Context

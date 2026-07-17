@@ -754,8 +754,8 @@
       "namePlaceholder": "e.g. Kasun Silva",
       "jobTitle": "Job title",
       "jobTitlePlaceholder": "e.g. Head Baker",
-      "salary": "Monthly salary (LKR)",
-      "salaryPlaceholder": "e.g. 45000",
+      "dailyPay": "Daily pay rate (LKR)",
+      "dailyPayPlaceholder": "e.g. 3000",
       "loginAccount": "Login account",
       "loginAccountNone": "Unlinked (HR record only)",
       "accessLevel": "Access level",
@@ -810,20 +810,26 @@
       "retry": "Retry"
     },
     "payroll": {
-      "label": "Payroll",
-      "salary": "Monthly salary",
-      "total": "Total payroll",
+      "label": "Paid today",
       "paidOf": "{{paid}} of {{total}} paid",
       "pending": "{{count}} pending",
-      "progress": "{{paid}} of {{total}} employees paid this period",
-      "markPaid": "Mark paid",
-      "markPending": "Revert",
-      "notSet": "Salary not set",
-      "error": "Could not update pay status.",
+      "progress": "{{paid}} of {{total}} employees paid this day",
+      "notSet": "Rate not set",
+      "error": "Could not update this payment.",
+      "approveTitle": "Approve & pay",
+      "payDate": "Day",
+      "dailyRate": "Daily rate",
+      "noneWithRate": "No employees have a daily rate yet. Set one in an employee's details.",
+      "bonusOptional": "Bonus (optional, LKR)",
+      "approvePay": "Approve & Pay",
+      "unapprove": "Unapprove",
+      "delete": "Delete payment",
+      "base": "Base",
+      "bonus": "Bonus",
+      "total": "Total",
       "status": {
         "paid": "Paid",
-        "pending": "Pending",
-        "not_set": "Not set"
+        "pending": "Pending"
       }
     }
   }

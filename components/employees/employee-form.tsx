@@ -133,19 +133,19 @@ export function EmployeeForm({ mode, linkableAccounts, onDone }: Props) {
           />
         </div>
 
-        {/* Salary */}
+        {/* Daily pay rate */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-label text-ink font-medium" htmlFor="emp-salary">
-            {t("employees.form.salary")}
+          <label className="text-label text-ink font-medium" htmlFor="emp-daily-pay">
+            {t("employees.form.dailyPay")}
           </label>
           <input
-            id="emp-salary"
-            name="salary_lkr"
+            id="emp-daily-pay"
+            name="daily_pay_lkr"
             type="number"
             min="0"
             step="1"
-            defaultValue={emp?.salaryCents != null ? emp.salaryCents / 100 : ""}
-            placeholder={t("employees.form.salaryPlaceholder")}
+            defaultValue={emp?.dailyPayCents != null ? emp.dailyPayCents / 100 : ""}
+            placeholder={t("employees.form.dailyPayPlaceholder")}
             className={FIELD}
             onFocus={(e) => e.target.select()}
           />
