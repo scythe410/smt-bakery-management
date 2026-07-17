@@ -5,6 +5,45 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — fix: apply order-discount migration to remote (order detail crash)
+
+### Symptom
+
+Clicking any order showed the orders error boundary — "Couldn't load orders." — while the orders
+**list** loaded fine.
+
+### Root cause — deploy-state drift, not a code bug
+
+Migration `20260717090000_order_discount.sql` was committed and applied **locally** but never pushed
+to the linked/hosted DB (`supabase migration list` showed a blank Remote column for it). So the remote
+`order` table had no `discount_cents` / `discount_pct` columns. `getOrderBillData` (detail + bill
+selector) formats the discount: `formatLKR(order.discount_cents)` → the field came back `undefined`
+→ `assertCents(undefined)` throws `RangeError` → server component throws → error boundary.
+The list never formats the discount field, so only the detail/bill path crashed.
+
+### Fix
+
+`supabase db push --linked` applied the pending migration. This also restored the 6-arg
+`create_order` RPC, so creating an order **with** a discount (which would have failed the same way,
+"function does not exist") works again.
+
+### Verification
+
+- `supabase migration list --linked`: `20260717090000` now present in both Local and Remote, no drift.
+- `create_order` resolves to a single 6-arg signature (old 5-arg dropped, not overloaded).
+- All four discount constraints exist on remote (`order_discount_pct_valid`, `order_discount_nonneg`,
+  `order_discount_le_subtotal`, `order_total_is_net`).
+- Existing rows back-filled to `discount_pct=0` / `discount_cents=0`; net invariant
+  `total = subtotal - discount` holds. Detail page now renders `LKR 0.00`, no throw.
+
+### Open question / follow-up
+
+Deploy flow let a committed migration ship without `supabase db push` to the hosted project — app
+code and schema went out of sync. Worth wiring `db push` into the deploy step (or a CI check comparing
+`migration list` Local vs Remote) so this can't recur.
+
+---
+
 ## 2026-07-17 — feat: order discount buttons (10/15/20 percent)
 
 ### Context
