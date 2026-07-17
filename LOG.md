@@ -5,6 +5,59 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — feat: image grid menu picker for order entry
+
+### Context
+
+Client wants to **pick items by picture** when creating an order (landscape-friendly). Added an
+image-tile grid to the new-order picker, **alongside** the existing add methods — wedge/camera
+barcode scan (MG3) and quick-add-by-code / name search (CF3). A list/grid toggle switches between
+the new grid and the existing dense list; both share one search box and the same add/qty machinery.
+**No change to the server-side order / total / snapshot logic** — this is purely how the cashier
+selects lines.
+
+### Data layer — reuse CF1's photo, signed per request
+
+- `menu_item.image_url` stores an object **PATH** in the **private** `item-images` bucket
+  (CLAUDE.md §7.8), so it must be signed to render. Added `signItemImageUrls(paths)` in
+  `queries/menu.ts` — a **batch** `createSignedUrls(..., 60*60)` returning a path→URL map; paths that
+  don't resolve (missing object / sign error) are omitted so the tile falls back to a placeholder,
+  never a broken image (DESIGN.md §6).
+- `NewOrderMenuItem` gains `imageUrl: string | null`; `getNewOrderMenu` batch-signs all available
+  items' photos in one call (cheap, and the selector is already React-`cache()`d per request).
+
+### UI — grid tiles + toggle (`new-order-form.tsx`)
+
+- Grid: each tile is a tap-to-add button (square photo or placeholder `ImageIcon`, name clamped to
+  2 lines, price). Repeat taps increment; when in cart the tile gets a red-tint border, a qty badge
+  (top-right), and a minus overlay (top-left) to decrement — no nested buttons (valid a11y).
+- **Landscape / wider:** columns are orientation-aware — `grid-cols-2 landscape:grid-cols-3
+  min-[520px]:grid-cols-4` — more columns and roomier tap targets in landscape, still 2-up and usable
+  in portrait (DESIGN.md §4).
+- Toggle: a small segmented Grid/List control on the Items label row (`LayoutGrid` / `List`,
+  `aria-pressed`). **Default = grid** — the client's explicit "pick by picture" ask is front-and-centre;
+  list is one tap away for fast keying/scanning.
+- Photos use a plain `<img>` (lazy) with a localized `no-img-element` disable: the URLs are ephemeral
+  signed URLs, so `next/image` remote-host config buys nothing here.
+- i18n: `orders.new.viewToggle` + `orders.new.view.{grid,list}` added to en + si.
+
+### Deviation / note
+
+- DESIGN.md §4 caps the app frame at **430px**, so "more columns on a tablet" only materializes if
+  that cap is ever lifted; within the demo frame the win is **portrait 2-up → landscape 3-up**. Kept
+  the global frame intact rather than widening it for one screen — flagging in case the client wants a
+  genuinely wider tablet layout later. The `min-[520px]:grid-cols-4` step is ready for that day.
+- **Seed has no `image_url` values**, so grid tiles render placeholders on the demo until photos are
+  uploaded via CF1 (Menu). Functionality (tap name/price to add) is unaffected. Consider seeding a few
+  menu photos if the demo should show the grid populated.
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on all touched files; en/si JSON parse. `createSignedUrls`
+confirmed present in `@supabase/storage-js` (supabase-js 2.110.1).
+
+---
+
 ## 2026-07-17 — fix: apply order-discount migration to remote (order detail crash)
 
 ### Symptom

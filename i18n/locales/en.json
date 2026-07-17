@@ -289,6 +289,11 @@
       "increase": "Add one {{name}}",
       "searchPlaceholder": "Item code or name",
       "clearSearch": "Clear search",
+      "viewToggle": "Item view",
+      "view": {
+        "grid": "Grid view",
+        "list": "List view"
+      },
       "noMatch": "No items match '{{query}}'",
       "qtyFor": "Quantity for {{name}}",
       "discount": "Discount",

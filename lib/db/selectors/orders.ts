@@ -14,7 +14,7 @@ import {
   listOrdersPage,
   type OrderWithItems,
 } from "@/lib/db/queries/orders";
-import { listAvailableMenuItems } from "@/lib/db/queries/menu";
+import { listAvailableMenuItems, signItemImageUrls } from "@/lib/db/queries/menu";
 import { listBarcodesByItemIds } from "@/lib/db/queries/inventory";
 import { zonedDateKey, zonedWallTimeToUtcIso } from "@/lib/db/period";
 import { ACTIVE_STATUSES, ARCHIVED_STATUSES, tabForStatus } from "@/lib/orders/order-config";
@@ -147,6 +147,12 @@ export type NewOrderMenuItem = {
   priceCents: number;
   category: string | null;
   /**
+   * Short-lived signed URL for the item's photo, or null when it has none (the
+   * grid picker shows a placeholder tile). CF1's menu image, reused for order
+   * entry — the `item-images` bucket is private, so this is signed per request.
+   */
+  imageUrl: string | null;
+  /**
    * Barcode of the tracked sold-from-stock item (finished_good / merchandise), or
    * null for made-to-order items. Lets billing quick-add this menu item by scanning
    * the physical product's barcode (CLAUDE.md §4).
@@ -162,12 +168,17 @@ export const getNewOrderMenu = cache(async (): Promise<NewOrderMenuItem[]> => {
     .map((m) => m.tracked_inventory_item_id)
     .filter((id): id is string => id != null);
   const barcodeByItemId = await listBarcodesByItemIds([...new Set(trackedIds)]);
+  // Sign item photos for the grid picker (private bucket → short-lived URLs).
+  const signedByPath = await signItemImageUrls(
+    rows.map((m) => m.image_url).filter((p): p is string => p != null),
+  );
   return rows.map((m) => ({
     id: m.id,
     name: m.name,
     itemCode: m.item_code,
     priceCents: m.price_cents,
     category: m.category,
+    imageUrl: m.image_url ? (signedByPath.get(m.image_url) ?? null) : null,
     barcode: m.tracked_inventory_item_id
       ? (barcodeByItemId.get(m.tracked_inventory_item_id) ?? null)
       : null,

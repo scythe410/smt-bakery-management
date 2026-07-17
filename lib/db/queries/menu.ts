@@ -26,6 +26,27 @@ export async function listAvailableMenuItems(): Promise<MenuItemRow[]> {
   return data ?? [];
 }
 
+/**
+ * Batch-sign private item-image object PATHs into short-lived URLs (the
+ * `item-images` bucket is private, CLAUDE.md §7.8). Returns a path→signedUrl map;
+ * paths that don't resolve (missing object, sign error) are simply omitted, so the
+ * caller falls back to a placeholder tile — never a broken image (DESIGN.md §6).
+ */
+export async function signItemImageUrls(paths: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(paths.filter((p): p is string => !!p))];
+  if (unique.length === 0) return map;
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from("item-images")
+    .createSignedUrls(unique, 60 * 60);
+  if (error || !data) return map;
+  for (const row of data) {
+    if (row.path && row.signedUrl) map.set(row.path, row.signedUrl);
+  }
+  return map;
+}
+
 /** All menu items (available + unavailable) ordered by item_code. */
 export async function listAllMenuItems(): Promise<MenuItemRow[]> {
   const supabase = await createClient();

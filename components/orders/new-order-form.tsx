@@ -20,7 +20,17 @@
 // same item). On order completion the item's stock DECREMENTS via the FT1 ledger.
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Minus, Plus, ScanBarcode, Search, X } from "lucide-react";
+import {
+  Camera,
+  Image as ImageIcon,
+  LayoutGrid,
+  List,
+  Minus,
+  Plus,
+  ScanBarcode,
+  Search,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { createOrder, type CreateOrderState } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
@@ -47,6 +57,10 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
   const [qtyRaw, setQtyRaw] = useState<Record<string, string>>({});
   // Quick-add / search query.
   const [quickAdd, setQuickAdd] = useState("");
+  // Item picker layout: an image grid (pick by picture, CF1 photos) or the dense
+  // list. Both share the same search + add/qty machinery; grid is the default so
+  // the client can pick by picture, list stays a tap away for fast keying.
+  const [view, setView] = useState<"grid" | "list">("grid");
   // Whole-order quick discount (0 = none). The server RECOMPUTES the actual
   // discount + net total from stored prices; this is only the selected rate and
   // the on-screen estimate (CLAUDE.md §7.7).
@@ -279,7 +293,35 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
 
       {/* Quick-add / item picker */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-caption text-muted">{t("orders.new.items")}</span>
+        <div className="flex items-center justify-between">
+          <span className="text-caption text-muted">{t("orders.new.items")}</span>
+          {menu.length > 0 ? (
+            <div
+              role="group"
+              aria-label={t("orders.new.viewToggle")}
+              className="border-border inline-flex rounded-[var(--radius)] border p-0.5"
+            >
+              {(["grid", "list"] as const).map((v) => {
+                const active = view === v;
+                const Icon = v === "grid" ? LayoutGrid : List;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    aria-pressed={active}
+                    aria-label={t(`orders.new.view.${v}`)}
+                    className={`flex size-7 items-center justify-center rounded-[calc(var(--radius)-4px)] transition-colors ${
+                      active ? "bg-[var(--red-tint)] text-brand" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    <Icon className="size-4" aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
 
         {menu.length === 0 ? (
           <p className="text-caption text-muted py-1">{t("orders.new.noMenu")}</p>
@@ -321,12 +363,12 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
               ) : null}
             </div>
 
-            {/* Item list — no max-h, page scroll handles overflow */}
+            {/* Item picker — no max-h, page scroll handles overflow */}
             {filteredMenu.length === 0 ? (
               <p className="text-caption text-muted py-1">
                 {t("orders.new.noMatch", { query: quickAdd.trim() })}
               </p>
-            ) : (
+            ) : view === "list" ? (
               <ul className="border-border divide-border divide-y rounded-[var(--radius)] border">
                 {filteredMenu.map((m) => {
                   const qty = qtyById[m.id] ?? 0;
@@ -397,6 +439,80 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
                           <Plus className="size-3.5" aria-hidden />
                         </button>
                       </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              /* Image grid — pick by picture. Orientation-aware columns so it lays
+                 out well in landscape / on wider frames while staying usable in
+                 portrait (DESIGN.md §4). Tapping a tile adds 1; the minus overlay
+                 decrements. Missing photos fall back to a placeholder tile. */
+              <ul className="grid grid-cols-2 gap-2 landscape:grid-cols-3 min-[520px]:grid-cols-4">
+                {filteredMenu.map((m) => {
+                  const qty = qtyById[m.id] ?? 0;
+                  const inCart = qty > 0;
+                  return (
+                    <li key={m.id} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => addItem(m.id)}
+                        aria-label={t("orders.new.increase", { name: m.name })}
+                        className={`flex min-h-[44px] w-full flex-col overflow-hidden rounded-[var(--radius)] border text-left transition-colors ${
+                          inCart
+                            ? "border-brand bg-[var(--red-tint)]"
+                            : "border-border hover:bg-surface-2"
+                        }`}
+                      >
+                        <div className="bg-surface-2 aspect-square w-full">
+                          {m.imageUrl ? (
+                            // Private bucket → short-lived signed URL; a plain img keeps
+                            // us off next/image remote-host config for ephemeral URLs.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={m.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-faint flex size-full items-center justify-center">
+                              <ImageIcon className="size-7" aria-hidden />
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5 p-2">
+                          <span
+                            className={`text-label line-clamp-2 ${
+                              inCart ? "text-ink font-semibold" : "text-ink"
+                            }`}
+                          >
+                            {m.name}
+                          </span>
+                          <span className="text-caption text-muted tabular-nums">
+                            {formatLKR(m.priceCents)}
+                          </span>
+                        </div>
+                      </button>
+
+                      {inCart ? (
+                        <>
+                          <span
+                            className="bg-brand text-brand-white text-caption absolute top-1.5 right-1.5 flex h-5 min-w-5 items-center justify-center rounded-[var(--radius-pill)] px-1 font-semibold tabular-nums"
+                            aria-hidden
+                          >
+                            {qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => bump(m.id, -1)}
+                            aria-label={t("orders.new.decrease", { name: m.name })}
+                            className="border-border-strong bg-surface text-ink hover:bg-surface-2 absolute top-1.5 left-1.5 flex size-8 items-center justify-center rounded-[var(--radius)] border shadow-[var(--shadow-card)]"
+                          >
+                            <Minus className="size-4" aria-hidden />
+                          </button>
+                        </>
+                      ) : null}
                     </li>
                   );
                 })}
