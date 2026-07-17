@@ -12,8 +12,9 @@ import { resolveTenantPeriod } from "@/lib/db/selectors/context";
 import { ReportControls } from "@/components/reports/report-controls";
 import { DailySalesReport } from "@/components/reports/daily-sales-report";
 import { EndOfDayReport } from "@/components/reports/end-of-day-report";
+import { SalariesReport } from "@/components/reports/salaries-report";
 import { ReportsSkeleton } from "@/components/reports/reports-skeleton";
-import { isDateStr, toReportType } from "@/lib/reports/report-params";
+import { isDateStr, toReportType, toSalaryRange } from "@/lib/reports/report-params";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -38,15 +39,31 @@ export default async function ReportsPage({
     ? dateParam
     : (await resolveTenantPeriod({ kind: "today" })).startDate;
 
-  // Re-suspend (skeleton) whenever the report type or date changes.
-  const suspenseKey = `${reportType}:${date}`;
+  // Salaries is reviewed over a window (Day/Week/Month/Custom); the others report a
+  // single day. Range + explicit custom from/to live in the URL alongside the anchor.
+  const range = toSalaryRange(first(sp.range));
+  const fromParam = first(sp.from);
+  const toParam = first(sp.to);
+  const from = isDateStr(fromParam) ? fromParam : undefined;
+  const to = isDateStr(toParam) ? toParam : undefined;
+
+  // Re-suspend (skeleton) whenever the report type, date, or salary window changes.
+  const suspenseKey = `${reportType}:${date}:${range}:${from ?? ""}:${to ?? ""}`;
 
   return (
     <div className="flex flex-col gap-4">
-      <ReportControls reportType={reportType} date={date} />
+      <ReportControls
+        reportType={reportType}
+        date={date}
+        range={range}
+        from={from}
+        to={to}
+      />
       <Suspense key={suspenseKey} fallback={<ReportsSkeleton />}>
         {reportType === "end_of_day" ? (
           <EndOfDayReport date={date} />
+        ) : reportType === "salaries" ? (
+          <SalariesReport range={range} date={date} from={from} to={to} />
         ) : (
           <DailySalesReport reportType={reportType} date={date} />
         )}

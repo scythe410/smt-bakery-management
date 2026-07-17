@@ -410,10 +410,40 @@
     "type": {
       "label": "Report",
       "daily_sales": "Daily Sales",
-      "end_of_day": "End of Day"
+      "end_of_day": "End of Day",
+      "salaries": "Salaries"
     },
     "date": {
       "label": "Date"
+    },
+    "range": {
+      "label": "Period",
+      "anchor": "Around",
+      "from": "From",
+      "to": "To",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "custom": "Custom"
+    },
+    "salaries": {
+      "totalPaid": "Total Paid",
+      "base": "Base Pay",
+      "bonus": "Bonuses",
+      "pending": "Pending",
+      "employee": "Employee",
+      "daysPaid": "Days paid",
+      "total": "Total",
+      "detailTitle": "By Employee",
+      "empty": "No payroll in this period.",
+      "recon": {
+        "title": "Finance reconciliation",
+        "ok": "Reconciled",
+        "mismatch": "Mismatch — review",
+        "paid": "Payroll paid",
+        "finance": "Posted to Finance (Salaries)",
+        "note": "Approving a pay-day posts one Salaries expense equal to the payment, linked by expense_id — counted once, never doubled."
+      }
     },
     "stats": {
       "revenue": "Revenue",

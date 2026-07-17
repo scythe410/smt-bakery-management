@@ -5,6 +5,60 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-17 — feat: salaries report
+
+### Context
+
+Added a **Salaries** report type to Reports (owner-only, CLAUDE.md §5) reading the MH2 daily-payroll
+ledger (`salary_payment`). Reviewed over a **window** — Day / Week / Month / Custom — unlike the
+single-day Daily Sales / End-of-Day reports. Per employee: **days paid, base total, bonuses, total
+paid, and any pending**; grand totals across the window. **Reconciles with Finance "Salaries"**: the
+paid total is compared to the Σ Salaries expenses the same payments posted (linked by `expense_id`),
+so payroll is provably the same money Finance shows — never double-counted (CLAUDE.md §8).
+
+### Data / selector
+
+- `lib/reports/report-params.ts` (groundwork already staged) — `salaries` in `REPORT_TYPES`;
+  `SALARY_RANGES` (day/week/month/custom, default month) + `salaryPeriodBounds` / `salaryPeriod`
+  (pure calendar math on the anchor date → a `custom` PeriodInput; week = Mon–Sun, ISO).
+- `lib/db/selectors/salaries.ts` — `getSalariesReport(PeriodInput)` (owner-only, RLS server client,
+  React-`cache()`d). Groups `listSalaryPaymentsInPeriod` by employee (paid → daysPaid/base/bonus/
+  totalPaid; pending → pendingDays/pendingCents), sums grand totals, and reconciles: `financeSalaries`
+  = Σ `listExpenses` where category = "Salaries"; `reconciled` = paid total === finance total **and**
+  every paid row is linked to an expense. A manually-added/orphaned Salaries expense flips the flag to
+  "Mismatch — review" (honest surfacing, not a silent fix).
+
+### UI + export
+
+- `SalariesReport` (server) — 4 stat cards (Total Paid / Base / Bonuses / Pending), a **reconciliation
+  card** (paid vs Finance, success/danger pill + note), and the per-employee table. `SalariesDetail`
+  (client) — the wide table (DESIGN.md §4 "export preview" table) with a totals footer, **Export CSV**
+  (built client-side from derived rows, `toMajor` render-time only), and a **PDF** link.
+- `ReportControls` extended: the **Period** picker (day/week/month/custom) + custom **From/To** date
+  inputs render only for Salaries; other reports keep the single Date field (labelled "Around" for
+  Salaries' Day/Week/Month anchor). Period lives in the URL (`range`/`from`/`to`) → server-rendered,
+  shareable, re-suspends on change.
+- `reports/page.tsx` branches to `SalariesReport`; `api/reports/pdf` gains a **salaries** branch +
+  `lib/pdf/salaries-doc.tsx` (branded doc: summary, reconciliation line, by-employee table + totals),
+  all money pre-formatted by the route (no money math in the doc). Same `?type=…` export pattern as the
+  other reports, carrying `range`/`from`/`to`. i18n en + si (`reports.range.*`, `reports.salaries.*`).
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on all touched files; en/si JSON parse; `next build` passes
+(18 routes). Reconciliation is exact by construction (approve posts expense = payment total, linked
+by `expense_id`); the report proves it rather than asserting it.
+
+### Open questions / follow-up
+
+- Reconciliation compares by category string `"Salaries"` (the literal the payroll RPC posts) and by
+  period. It's owner-scoped (RLS), so no leak. If Finance ever renames the payroll category, update the
+  `SALARIES_EXPENSE_CATEGORY` constant in the selector to match.
+- Requires migration 022 (daily payroll) on the hosted DB to have live data — still part of the pending
+  `supabase db push` (020/021/022/023 all unpushed). The report renders empty-safe until then.
+
+---
+
 ## 2026-07-17 — feat: leftover report and return for daily finished goods
 
 ### Context

@@ -19,10 +19,19 @@ import { getProfile, getBusiness } from "@/lib/auth";
 import { rolesFor } from "@/lib/access";
 import { getDailyReport } from "@/lib/db/selectors/reports";
 import { getEndOfDayReport } from "@/lib/db/selectors/stock";
-import { isDateStr, singleDayPeriod, toReportType } from "@/lib/reports/report-params";
+import { getSalariesReport } from "@/lib/db/selectors/salaries";
+import {
+  isDateStr,
+  singleDayPeriod,
+  toReportType,
+  toSalaryRange,
+  salaryPeriod,
+  salaryPeriodBounds,
+} from "@/lib/reports/report-params";
 import { formatLKR, formatAmount } from "@/lib/format";
 import { DailySalesDoc } from "@/lib/pdf/daily-sales-doc";
 import { EndOfDayDoc } from "@/lib/pdf/end-of-day-doc";
+import { SalariesDoc } from "@/lib/pdf/salaries-doc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,7 +87,49 @@ export async function GET(request: NextRequest) {
   let docElement: ReactElement<DocumentProps>;
   let filename: string;
 
-  if (reportType === "end_of_day") {
+  if (reportType === "salaries") {
+    // Salaries is reviewed over a window (Day/Week/Month/Custom) around the anchor
+    // date; range + custom from/to ride in the query, same params as the screen.
+    const range = toSalaryRange(sp.range);
+    const from = isDateStr(sp.from) ? sp.from : undefined;
+    const to = isDateStr(sp.to) ? sp.to : undefined;
+    const bounds = salaryPeriodBounds(range, date, from, to);
+    const report = await getSalariesReport(salaryPeriod(range, date, from, to));
+
+    docElement = createElement(SalariesDoc, {
+      businessName,
+      period: bounds.from === bounds.to ? bounds.from : `${bounds.from} – ${bounds.to}`,
+      generatedAt,
+      summary: {
+        totalPaidFmt: formatLKR(report.totalPaidCents),
+        baseFmt: formatLKR(report.baseCents),
+        bonusFmt: formatLKR(report.bonusCents),
+        pendingFmt: formatLKR(report.pendingCents),
+      },
+      rows: report.rows.map((r) => ({
+        employeeId: r.employeeId,
+        name: r.name,
+        daysPaid: r.daysPaid,
+        baseFmt: formatLKR(r.baseCents),
+        bonusFmt: formatLKR(r.bonusCents),
+        totalPaidFmt: formatLKR(r.totalPaidCents),
+        pendingFmt: r.pendingCents > 0 ? formatLKR(r.pendingCents) : "—",
+      })),
+      totals: {
+        daysPaid: report.daysPaid,
+        baseFmt: formatLKR(report.baseCents),
+        bonusFmt: formatLKR(report.bonusCents),
+        totalPaidFmt: formatLKR(report.totalPaidCents),
+        pendingFmt: report.pendingCents > 0 ? formatLKR(report.pendingCents) : "—",
+      },
+      recon: {
+        paidFmt: formatLKR(report.totalPaidCents),
+        financeFmt: formatLKR(report.financeSalariesCents),
+        reconciled: report.reconciled,
+      },
+    }) as unknown as ReactElement<DocumentProps>;
+    filename = `salaries-${bounds.from === bounds.to ? bounds.from : `${bounds.from}_${bounds.to}`}.pdf`;
+  } else if (reportType === "end_of_day") {
     const report = await getEndOfDayReport(date);
 
     const priceFmtMap = new Map<string, string>(
