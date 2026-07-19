@@ -446,23 +446,26 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
             ) : (
               /* Image grid — pick by picture. Orientation-aware columns so it lays
                  out well in landscape / on wider frames while staying usable in
-                 portrait (DESIGN.md §4). Tapping a tile adds 1; the minus overlay
-                 decrements. Missing photos fall back to a placeholder tile. */
+                 portrait (DESIGN.md §4). Tapping the image/name adds 1; the
+                 minus/qty-input/plus footer (same stepper as the list view,
+                 including a typeable qty field) handles the rest. Missing
+                 photos fall back to a placeholder tile. */
               <ul className="grid grid-cols-2 gap-2 landscape:grid-cols-3 min-[520px]:grid-cols-4">
                 {filteredMenu.map((m) => {
                   const qty = qtyById[m.id] ?? 0;
                   const inCart = qty > 0;
                   return (
-                    <li key={m.id} className="relative">
+                    <li
+                      key={m.id}
+                      className={`flex flex-col overflow-hidden rounded-[var(--radius)] border transition-colors ${
+                        inCart ? "border-brand bg-[var(--red-tint)]" : "border-border hover:bg-surface-2"
+                      }`}
+                    >
                       <button
                         type="button"
                         onClick={() => addItem(m.id)}
                         aria-label={t("orders.new.increase", { name: m.name })}
-                        className={`flex min-h-[44px] w-full flex-col overflow-hidden rounded-[var(--radius)] border text-left transition-colors ${
-                          inCart
-                            ? "border-brand bg-[var(--red-tint)]"
-                            : "border-border hover:bg-surface-2"
-                        }`}
+                        className="flex w-full flex-col text-left"
                       >
                         <div className="bg-surface-2 aspect-square w-full">
                           {m.imageUrl ? (
@@ -496,22 +499,34 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
                       </button>
 
                       {inCart ? (
-                        <>
-                          <span
-                            className="bg-brand text-brand-white text-caption absolute top-1.5 right-1.5 flex h-5 min-w-5 items-center justify-center rounded-[var(--radius-pill)] px-1 font-semibold tabular-nums"
-                            aria-hidden
-                          >
-                            {qty}
-                          </span>
+                        <div className="flex items-center justify-center gap-1 px-2 pb-2">
                           <button
                             type="button"
                             onClick={() => bump(m.id, -1)}
                             aria-label={t("orders.new.decrease", { name: m.name })}
-                            className="border-border-strong bg-surface text-ink hover:bg-surface-2 absolute top-1.5 left-1.5 flex size-8 items-center justify-center rounded-[var(--radius)] border shadow-[var(--shadow-card)]"
+                            className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
                           >
-                            <Minus className="size-4" aria-hidden />
+                            <Minus className="size-3.5" aria-hidden />
                           </button>
-                        </>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={qtyRaw[m.id] ?? String(qty)}
+                            onChange={(e) => handleQtyChange(m.id, e.target.value)}
+                            onBlur={() => commitQty(m.id)}
+                            onFocus={(e) => e.currentTarget.select()}
+                            aria-label={t("orders.new.qtyFor", { name: m.name })}
+                            className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => bump(m.id, 1)}
+                            aria-label={t("orders.new.increase", { name: m.name })}
+                            className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                          >
+                            <Plus className="size-3.5" aria-hidden />
+                          </button>
+                        </div>
                       ) : null}
                     </li>
                   );
