@@ -311,6 +311,8 @@
       "scanCameraOn": "Camera",
       "scanCameraOff": "Stop camera",
       "scanAdded": "Added {{name}}",
+      "scanLooking": "Looking up {{code}}…",
+      "scanNoPrice": "Set a retail price for {{name}} in Stock first",
       "scanUnknown": "No item for barcode {{code}}"
     },
     "detail": {

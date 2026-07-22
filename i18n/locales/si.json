@@ -311,6 +311,8 @@
       "scanCameraOn": "කැමරාව",
       "scanCameraOff": "කැමරාව නවත්වන්න",
       "scanAdded": "{{name}} එක් කරන ලදී",
+      "scanLooking": "{{code}} සොයමින්…",
+      "scanNoPrice": "පළමුව {{name}} සඳහා තොගයේ සිල්ලර මිලක් සකසන්න",
       "scanUnknown": "තීරුකේතය {{code}} සඳහා භාණ්ඩයක් නැත"
     },
     "detail": {

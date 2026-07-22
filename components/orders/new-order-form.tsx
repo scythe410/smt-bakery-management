@@ -32,7 +32,11 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { createOrder, type CreateOrderState } from "@/app/(app)/orders/actions";
+import {
+  createOrder,
+  resolveScannedBarcode,
+  type CreateOrderState,
+} from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
 import {
   DISCOUNT_PCTS,
@@ -47,9 +51,24 @@ import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
 const FIELD_CLASS =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
-export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDone: () => void }) {
+export function NewOrderForm({
+  menu: initialMenu,
+  onDone,
+}: {
+  menu: NewOrderMenuItem[];
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Menu items linked on the fly from a scanned stock barcode (§4). They aren't in
+  // the server-fetched list yet, so we hold them here and merge — the picker, the
+  // barcode map, and the estimate all read the merged list.
+  const [extraItems, setExtraItems] = useState<NewOrderMenuItem[]>([]);
+  const menu = useMemo(
+    () => (extraItems.length === 0 ? initialMenu : [...initialMenu, ...extraItems]),
+    [initialMenu, extraItems],
+  );
 
   // Canonical integer qty per menu item (0 = not in order).
   const [qtyById, setQtyById] = useState<Record<string, number>>({});
@@ -100,13 +119,20 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
     return menu.filter((m) => m.name.toLowerCase().includes(lower));
   }, [menu, quickAdd]);
 
-  function addItem(id: string) {
-    const next = (qtyById[id] ?? 0) + 1;
-    setQtyById((prev) => ({ ...prev, [id]: next }));
-    setQtyRaw((prev) => ({ ...prev, [id]: String(next) }));
+  // Add one of `id` to the cart. Functional update so repeat scans of the same
+  // code increment correctly (a captured closure would otherwise read a stale qty);
+  // the raw override is cleared so the input falls back to the canonical qty.
+  const addItem = useCallback((id: string) => {
+    setQtyById((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+    setQtyRaw((prev) => {
+      if (prev[id] === undefined) return prev;
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
     setQuickAdd("");
     searchRef.current?.focus();
-  }
+  }, []);
 
   // Add a menu item from a scanned barcode (wedge or camera). Dedupe identical
   // reads within a short window so a camera held on one code (many frames) or a
@@ -114,7 +140,7 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
   // increments the qty. An unknown barcode is surfaced, not silently dropped.
   const lastScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const addByBarcode = useCallback(
-    (raw: string) => {
+    async (raw: string) => {
       const code = raw.trim();
       if (!code) return;
       const now = Date.now();
@@ -126,16 +152,29 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
         addItem(id);
         const name = menu.find((m) => m.id === id)?.name ?? "";
         setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name }) });
+        return;
+      }
+
+      // Not on the menu yet — resolve against Stock. The server links the barcode's
+      // stock row to a sold-from-stock menu item (creating one if needed) and hands
+      // it back so we can bill it here and show it in the picker.
+      setScanMsg({ tone: "ok", text: t("orders.new.scanLooking", { code }) });
+      const res = await resolveScannedBarcode(code);
+      if (res.status === "found") {
+        setExtraItems((prev) =>
+          prev.some((m) => m.id === res.item.id) ? prev : [...prev, res.item],
+        );
+        addItem(res.item.id);
+        setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
+      } else if (res.status === "no_price") {
+        setScanMsg({ tone: "warn", text: t("orders.new.scanNoPrice", { name: res.name }) });
       } else {
         // Clear any first-character leak from the focused search box, then warn.
         setQuickAdd("");
         setScanMsg({ tone: "warn", text: t("orders.new.scanUnknown", { code }) });
       }
     },
-    // addItem/menu are stable enough (menuByBarcode derives from menu); reads are
-    // via state updaters, so a captured closure stays correct.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuByBarcode, menu],
+    [menuByBarcode, menu, addItem, t],
   );
 
   // Keyboard-wedge scanner — ALWAYS ON, and captures even while the search box is
@@ -493,7 +532,7 @@ export function NewOrderForm({ menu, onDone }: { menu: NewOrderMenuItem[]; onDon
                             {m.name}
                           </span>
                           <span className="text-caption text-muted tabular-nums">
-                            {formatLKR(m.priceCents)}
+                            #{m.itemCode} · {formatLKR(m.priceCents)}
                           </span>
                         </div>
                       </button>

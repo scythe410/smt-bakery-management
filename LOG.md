@@ -5,6 +5,64 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-22 — feat: scan stock barcodes at billing + number menu items everywhere
+
+### Reported (client, via chat)
+
+"Make it so the bills get the scanned information from the stock section — the codes are not on the
+menu." And "number the menu items also."
+
+Client answers that shaped the build: a scanned product sells at the **Stock retail price**; barcoded
+goods **should appear on the menu**; scan and menu button are the **same sellable record** (stock
+counts down once); **anything with a barcode** is scan-and-sell.
+
+### Changes
+
+- **Scan-to-bill bridge (`resolveScannedBarcode`, `app/(app)/orders/actions.ts`).** New server action.
+  Barcodes live on `inventory_item`, not `menu_item`. On a scan the till couldn't resolve locally, it:
+  finds the tenant's stock row by barcode (RLS-scoped); if a menu item already tracks it, returns that
+  same record; otherwise **links** it by creating a sold-from-stock `menu_item` (name + `sale_price_cents`
+  from stock, `tracked_inventory_item_id` → the row) so the sale decrements that one row 1:1 and it now
+  shows on the Menu. Guarded: only `merchandise`/`finished_good` are linkable (matches the DB kind guard,
+  migration `20260716120000`); a row with no retail price returns `no_price` instead of selling at 0.
+  Client never sends money — the menu item carries the price (§7.7).
+- **`components/orders/new-order-form.tsx`.** Scanner path (wedge + camera) now falls back to
+  `resolveScannedBarcode` when the code isn't in the local menu; the returned item is merged into the
+  picker (`extraItems`) and added to the cart. Refactored `addItem` to a functional state update — the
+  old direct read of `qtyById` inside a `useCallback`-captured closure meant **repeat scans of the same
+  code didn't increment** (stale qty). Grid tiles now show `#itemCode` (list view already did).
+- **`components/menu/menu-browser.tsx`.** Item number stays visible even when a photo replaces the code
+  chip (shown inline before the name), so every menu item is numbered.
+- **`lib/zod/order.ts`.** `scanBarcodeSchema` (trim, 1–64) for the new action.
+- **i18n.** `orders.new.scanLooking`, `orders.new.scanNoPrice` (en + si).
+
+### Decisions / deviations
+
+- **Lazy link, not bulk backfill.** Menu items are created the first time a barcode is scanned, not by
+  pre-generating one per barcoded stock row. Keeps the locked "everything sold is a menu_item" model,
+  avoids flooding the menu, self-heals as real products are scanned. Stays within §4 (sold-from-stock,
+  linked by `tracked_inventory_item_id`, kind-agnostic decrement).
+- New sold-from-stock menu items inherit the stock row's `category` (inventory taxonomy, e.g. `merch`) so
+  they group on the Menu.
+
+### Open questions
+
+- **Duplicate menu rows.** The typed menu already lists some packaged goods (chips/water/etc., `menu.md`)
+  that also exist as barcoded stock with no link between them. Scanning creates a *new* sold-from-stock
+  entry rather than reusing the pre-existing typed one — so both can coexist until someone merges them.
+  A "link this menu item to a stock barcode" control in the menu editor would let the shop reconcile
+  over time; deferred pending a decision.
+- Concurrent first-scans of the same brand-new barcode in two sessions could create two links (no unique
+  constraint on `tracked_inventory_item_id`). Not a concern on a single till; flag if multi-till.
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on touched files; `next build` passes (18 routes). Not exercised
+against a live scan on the hosted DB (would create real menu rows in the demo tenant) — logic verified
+against the schema columns in the migrations.
+
+---
+
 ## 2026-07-18 — fix: menu availability checkbox + image confirmation on Menu screen
 
 ### Reported (client)

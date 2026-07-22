@@ -88,3 +88,8 @@ export const orderStatusChangeSchema = z
   .strict();
 
 export type OrderStatusChangeInput = z.infer<typeof orderStatusChangeSchema>;
+
+// A scanned/typed barcode resolved at billing (the resolveScannedBarcode action).
+// Shape guard only; the server looks the code up against this tenant's stock under
+// RLS and, if needed, links it to a sold-from-stock menu item (CLAUDE.md §4).
+export const scanBarcodeSchema = z.string().trim().min(1).max(64);

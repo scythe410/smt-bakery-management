@@ -230,9 +230,17 @@ export function MenuBrowser({
                   </span>
                 )}
 
-                {/* Name + category */}
+                {/* Name + category. When a photo replaces the code chip, keep the
+                    item number visible inline so every item stays numbered. */}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-label text-ink truncate font-medium">{item.name}</span>
+                  <span className="text-label text-ink truncate font-medium">
+                    {item.thumbUrl ? (
+                      <span className="text-muted font-normal tabular-nums">
+                        #{item.itemCode}{" "}
+                      </span>
+                    ) : null}
+                    {item.name}
+                  </span>
                   {item.category ? (
                     <span className="text-caption text-muted truncate">{item.category}</span>
                   ) : null}
