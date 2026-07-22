@@ -5,6 +5,29 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — chore: UI polish + employee roster entry (client requests)
+
+### UI (committed)
+
+- `70d7e28` — menu code chip now shows `#143` (was bare `143`), matching the inline marker
+  on photo rows; chip grew `min-w` + padding so 4-digit codes fit. Client noticed only
+  photo rows "had a # number".
+- `d28330b` — bottom nav: new `scrollbar-none` utility hides the browser's default
+  horizontal scrollbar on the scrolling nav strip (swipe/wheel untouched); bar slightly
+  bigger per client (icons 20→22px, tap target 52→58px, labels 11→12px).
+
+### Data (live DB, client-supplied)
+
+Inserted 13 employees as Cashier with client-supplied DAILY pay (LKR → cents):
+Sunila 2000, Dayalatha 2250 (normalized from "DayalathA"), Malani/Wasanthi/Indrani/
+Disanayake 1750, Thilaka/Lalitha 1500, Kumari/Thushari 2000, Sudarshi 2500, Kesara 5000,
+Fathima — trainee, role "Cashier (Trainee)", `daily_pay_cents` NULL (no rate given; the
+payroll flow treats null as not configured). Verified: 13 rows, Σ daily = LKR 25,750
+(matches hand sum). `permissions`/`shift_schedule` = `{}` (same as the app form's empty
+defaults); no linked login accounts (HR-only records).
+
+---
+
 ## 2026-07-23 — feat: editable pending orders (client request)
 
 ### Context
