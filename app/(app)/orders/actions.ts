@@ -81,7 +81,14 @@ export async function createOrder(
     p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
   });
 
-  if (error || !data) return { error: "orders.new.error" };
+  if (error || !data) {
+    // 22023 = the RPC's input validation. Everything it checks except item
+    // validity/availability (empty items, qty < 1, off-list discount) is already
+    // impossible past newOrderSchema, so in practice this means a line went
+    // invalid or unavailable between picking and saving (AUDIT 1.3).
+    if (error?.code === "22023") return { error: "orders.new.invalidItem" };
+    return { error: "orders.new.error" };
+  }
 
   revalidatePath("/orders");
   // "inventory" because a realized order deducts stock via the movement ledger,
@@ -145,6 +152,7 @@ export async function changeOrderStatus(input: unknown): Promise<ChangeOrderStat
 export type ScanResolveResult =
   | { status: "found"; item: NewOrderMenuItem }
   | { status: "no_price"; name: string }
+  | { status: "unavailable"; name: string }
   | { status: "unknown" };
 
 export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResolveResult> {
@@ -165,14 +173,18 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
     .maybeSingle();
   if (!inv) return { status: "unknown" };
 
-  // Already linked to a menu item? Bill that same record (no duplicate).
+  // Already linked to a menu item? Bill that same record (no duplicate). An
+  // unavailable link is surfaced, not billed: create_order would reject the
+  // whole order later, and silently flipping an explicit availability setting
+  // isn't this action's call (AUDIT 1.3) — the cashier gets a nameable fix.
   const { data: linked } = await supabase
     .from("menu_item")
-    .select("id, name, item_code, price_cents, category")
+    .select("id, name, item_code, price_cents, category, is_available")
     .eq("tracked_inventory_item_id", inv.id)
     .limit(1);
   const existing = linked?.[0];
   if (existing) {
+    if (!existing.is_available) return { status: "unavailable", name: existing.name };
     return {
       status: "found",
       item: {

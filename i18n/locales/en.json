@@ -323,6 +323,7 @@
       "scanAdded": "Added {{name}}",
       "scanLooking": "Looking up {{code}}…",
       "scanNoPrice": "Set a retail price for {{name}} in Stock first",
+      "scanUnavailable": "{{name}} is marked unavailable on the Menu — mark it available to sell it",
       "scanUnknown": "No item for barcode {{code}}"
     },
     "detail": {

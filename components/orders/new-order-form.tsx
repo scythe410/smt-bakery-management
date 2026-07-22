@@ -63,12 +63,16 @@ export function NewOrderForm({
 
   // Menu items linked on the fly from a scanned stock barcode (§4). They aren't in
   // the server-fetched list yet, so we hold them here and merge — the picker, the
-  // barcode map, and the estimate all read the merged list.
+  // barcode map, and the estimate all read the merged list. Deduped by id: the
+  // action's revalidation refreshes the server list mid-session, so a just-linked
+  // item can arrive in initialMenu while still sitting in extraItems (AUDIT 1.4).
   const [extraItems, setExtraItems] = useState<NewOrderMenuItem[]>([]);
-  const menu = useMemo(
-    () => (extraItems.length === 0 ? initialMenu : [...initialMenu, ...extraItems]),
-    [initialMenu, extraItems],
-  );
+  const menu = useMemo(() => {
+    if (extraItems.length === 0) return initialMenu;
+    const known = new Set(initialMenu.map((m) => m.id));
+    const novel = extraItems.filter((m) => !known.has(m.id));
+    return novel.length === 0 ? initialMenu : [...initialMenu, ...novel];
+  }, [initialMenu, extraItems]);
 
   // Canonical integer qty per menu item (0 = not in order).
   const [qtyById, setQtyById] = useState<Record<string, number>>({});
@@ -168,6 +172,8 @@ export function NewOrderForm({
         setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
       } else if (res.status === "no_price") {
         setScanMsg({ tone: "warn", text: t("orders.new.scanNoPrice", { name: res.name }) });
+      } else if (res.status === "unavailable") {
+        setScanMsg({ tone: "warn", text: t("orders.new.scanUnavailable", { name: res.name }) });
       } else {
         // Clear any first-character leak from the focused search box, then warn.
         setQuickAdd("");

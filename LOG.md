@@ -5,6 +5,34 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — fix: scan-to-bill availability + picker dedupe (AUDIT 1.3, 1.4)
+
+### Changes
+
+- **1.3** `app/(app)/orders/actions.ts` — `resolveScannedBarcode` now selects `is_available`
+  on the linked lookup and returns a distinct `unavailable` status (with the item name)
+  instead of handing the till an item `create_order` would reject. Decision: **no auto-flip**
+  — availability is an explicit user setting; silently overriding it from a scan isn't this
+  action's call. The cashier gets a nameable fix ("mark it available on the Menu") instead.
+  Separately, `createOrder` maps the RPC's `22023` to `orders.new.invalidItem` (previously a
+  defined-but-unused key; every RPC failure showed the generic error). Safe mapping: all
+  other 22023 raises in the RPC (empty items, qty < 1, off-list discount) are impossible
+  past `newOrderSchema`.
+- **1.4** `components/orders/new-order-form.tsx` — the `initialMenu`/`extraItems` merge now
+  dedupes by id: the scan action's revalidation can refresh the server list mid-session, so
+  a just-linked item could arrive in `initialMenu` while still in `extraItems` (duplicate
+  React keys / double tile). Also handles the new `unavailable` scan status with a warn
+  message.
+- i18n — `orders.new.scanUnavailable` (en + si).
+
+### Verified
+
+`tsc --noEmit`, `eslint` (touched files), locale JSON parse, `next build` — all clean.
+Browser not exercised this prompt (same caveat as the audit: the refresh-timing half of 1.4
+is defensive either way).
+
+---
+
 ## 2026-07-23 — feat: retail price on inventory (AUDIT 1.1)
 
 ### Context
