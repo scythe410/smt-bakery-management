@@ -142,3 +142,13 @@
     border-radius: 0 !important;
   }
 }
+
+/* Scrollable strips that must not show the browser's default scrollbar (the
+ * bottom nav): scrolling still works by swipe/wheel; the bar itself is hidden. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -55,16 +55,16 @@ function NavItemContent({
         {/* While pending, the icon yields to a spinner (motion) or stays put
             under reduced motion, where the spinner is hidden. */}
         <item.Icon
-          className={`size-5 ${pending ? "opacity-0 motion-reduce:opacity-100" : ""}`}
+          className={`size-[22px] ${pending ? "opacity-0 motion-reduce:opacity-100" : ""}`}
           strokeWidth={active ? 2.25 : 2}
           aria-hidden
         />
         {pending ? (
-          <Loader2 className="absolute inset-0 size-5 animate-spin motion-reduce:hidden" aria-hidden />
+          <Loader2 className="absolute inset-0 size-[22px] animate-spin motion-reduce:hidden" aria-hidden />
         ) : null}
         <CountBadge count={count} className="absolute -top-1.5 -right-2.5" />
       </span>
-      <span className="text-[11px] leading-none font-medium whitespace-nowrap">{label}</span>
+      <span className="text-[12px] leading-none font-medium whitespace-nowrap">{label}</span>
     </span>
   );
 }
@@ -81,7 +81,7 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
       aria-label={t("nav.label")}
       className="border-border bg-surface fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[430px] border-t pb-[env(safe-area-inset-bottom)] print:hidden"
     >
-      <ul className="flex items-stretch overflow-x-auto">
+      <ul className="scrollbar-none flex items-stretch overflow-x-auto">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
           const count = item.badge ? badges[item.badge] : 0;
@@ -90,7 +90,7 @@ export function BottomNav({ badges }: { badges: ShellBadges }) {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className="group focus-visible:ring-brand/40 relative flex min-h-[52px] items-stretch justify-center px-2 py-1.5 outline-none focus-visible:ring-2"
+                className="group focus-visible:ring-brand/40 relative flex min-h-[58px] items-stretch justify-center px-2 py-1.5 outline-none focus-visible:ring-2"
               >
                 <NavItemContent
                   item={item}
