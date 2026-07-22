@@ -225,8 +225,10 @@ export function MenuBrowser({
                     className="border-border size-9 shrink-0 rounded-[var(--radius)] border object-cover"
                   />
                 ) : (
-                  <span className="border-border text-caption text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border font-medium tabular-nums">
-                    {item.itemCode}
+                  // "#" marks it as the item number (same marker as photo rows'
+                  // inline code); min-w + padding so 4-digit codes don't clip.
+                  <span className="border-border text-caption text-muted flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[var(--radius)] border px-1.5 font-medium tabular-nums">
+                    #{item.itemCode}
                   </span>
                 )}
 
