@@ -31,6 +31,7 @@ import {
   type OrderFilterInput,
   type OrdersPageResult,
 } from "@/lib/db/selectors/orders";
+import { MENU_CATEGORY_FOR_INVENTORY } from "@/lib/inventory-config";
 import type { Database } from "@/lib/supabase/types";
 
 type Enums = Database["public"]["Enums"];
@@ -225,8 +226,10 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
     .insert({
       business_id: profile.business_id,
       name: inv.name,
-      price_cents: inv.sale_price_cents,
-      category: inv.category ?? null,
+      // Menu categories are the shop's free-text vocabulary, not the inventory
+      // enum — map the unambiguous tokens, leave the rest for the shop to
+      // categorize (AUDIT 1.2; a raw "merch" leaked into the Menu filter).
+      category: MENU_CATEGORY_FOR_INVENTORY[inv.category] ?? null,
       is_available: true,
       tracked_inventory_item_id: inv.id,
     })

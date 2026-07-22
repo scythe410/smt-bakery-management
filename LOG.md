@@ -5,6 +5,40 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — fix: menu category mapping for scan-linked items (AUDIT 1.2) + 1.5 pushed
+
+### 1.5 pushed & verified live
+
+`supabase db push` applied `20260723090000` to the hosted project. Post-push checks (all
+read-only or BEGIN/ROLLBACK): index present in `pg_indexes`; 277 menu items / 130 tracked
+links / 130 distinct (nothing lost, no duplicates); duplicate-link insert rejected by the
+index and self-relink non-conflicting, inside a rolled-back transaction.
+
+### 1.2 — live data surprise, smaller fix than audited
+
+Queried live category distribution first: **no raw tokens exist** — all 277 items carry
+human vocabulary (Ice Cream 46, Sweets 34, Snacks 32, Beverages 88, Bakery 29, Cakes,
+Pastries, Custom, null). The 130 linked items were evidently created/curated via the menu
+form with proper names, so the audited leak hasn't materialized in data and **no data-fix
+migration is needed** — only the code path that would leak on future scan-links.
+
+### Changes
+
+- `lib/inventory-config.ts` — `MENU_CATEGORY_FOR_INVENTORY`: maps only the two unambiguous
+  tokens (`beverages` → "Beverages", `baking` → "Bakery"). `merch` spans Ice Cream / Sweets /
+  Snacks in the shop's own vocabulary — unrecoverable from the token, so it (and
+  `syrups_toppings` / `other`) stays **null** for the shop to categorize; a wrong shelf is
+  worse than an empty one. Deliberately not i18n: menu categories are dynamic business data
+  (CLAUDE.md §3).
+- `app/(app)/orders/actions.ts` — `resolveScannedBarcode` stamps the mapped category (or
+  null) instead of copying `inv.category` raw.
+
+### Verified
+
+Live category query (above); `tsc --noEmit`, `eslint` (touched files), `next build` clean.
+
+---
+
 ## 2026-07-23 — feat: one menu item per tracked stock row (AUDIT 1.5)
 
 ### Changes

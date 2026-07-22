@@ -30,3 +30,15 @@ export function categoryOrder(category: InventoryCategory): number {
   const i = INVENTORY_CATEGORIES.indexOf(category);
   return i === -1 ? INVENTORY_CATEGORIES.length : i;
 }
+
+// Menu category to stamp on a menu item auto-linked from stock (scan-to-bill).
+// menu_item.category is the shop's free-text vocabulary ("Cakes", "Ice Cream"),
+// NOT this enum — copying a raw token like "merch" leaked taxonomy into the
+// Menu screen (AUDIT 1.2). Only the two tokens with an unambiguous menu
+// equivalent are mapped; the rest (merch spans Ice Cream / Sweets / Snacks)
+// stay null for the shop to categorize — a wrong shelf is worse than an empty
+// one. Business data, deliberately not i18n (dynamic content, CLAUDE.md §3).
+export const MENU_CATEGORY_FOR_INVENTORY: Partial<Record<InventoryCategory, string>> = {
+  beverages: "Beverages",
+  baking: "Bakery",
+};
