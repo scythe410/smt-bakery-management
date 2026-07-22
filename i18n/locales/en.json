@@ -734,7 +734,8 @@
       "cancel": "Cancel",
       "error": "Couldn't save that item. Check the fields and try again.",
       "errorCodeDuplicate": "That item code is already in use. Choose a different code.",
-      "errorTrackedConflict": "A menu item is either made to order or sold from stock, not both. Clear its recipe first."
+      "errorTrackedConflict": "A menu item is either made to order or sold from stock, not both. Clear its recipe first.",
+      "errorTrackedDuplicate": "Another menu item already sells from that stock item. Link a different one, or edit that item instead."
     },
     "recipe": {
       "empty": "No ingredients linked yet.",

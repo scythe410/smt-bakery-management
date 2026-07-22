@@ -155,6 +155,34 @@ export type ScanResolveResult =
   | { status: "unavailable"; name: string }
   | { status: "unknown" };
 
+type LinkedMenuRow = {
+  id: string;
+  name: string;
+  item_code: number;
+  price_cents: number;
+  category: string | null;
+  is_available: boolean;
+};
+
+// Shape a tracking menu row into the scan result (shared by the direct-hit
+// lookup and the lost-a-concurrent-race retry). An unavailable link is
+// surfaced, not billed — see resolveScannedBarcode.
+function scanResultFromLinked(row: LinkedMenuRow, code: string): ScanResolveResult {
+  if (!row.is_available) return { status: "unavailable", name: row.name };
+  return {
+    status: "found",
+    item: {
+      id: row.id,
+      name: row.name,
+      itemCode: row.item_code,
+      priceCents: row.price_cents,
+      category: row.category,
+      imageUrl: null,
+      barcode: code,
+    },
+  };
+}
+
 export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResolveResult> {
   const profile = await requireProfile();
   if (!profile.business_id) return { status: "unknown" };
@@ -173,31 +201,17 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
     .maybeSingle();
   if (!inv) return { status: "unknown" };
 
-  // Already linked to a menu item? Bill that same record (no duplicate). An
-  // unavailable link is surfaced, not billed: create_order would reject the
-  // whole order later, and silently flipping an explicit availability setting
-  // isn't this action's call (AUDIT 1.3) — the cashier gets a nameable fix.
-  const { data: linked } = await supabase
+  // Already linked to a menu item? Bill that same record (at most one exists —
+  // unique index, migration 024). An unavailable link is surfaced, not billed:
+  // create_order would reject the whole order later, and silently flipping an
+  // explicit availability setting isn't this action's call (AUDIT 1.3) — the
+  // cashier gets a nameable fix.
+  const { data: existing } = await supabase
     .from("menu_item")
     .select("id, name, item_code, price_cents, category, is_available")
     .eq("tracked_inventory_item_id", inv.id)
-    .limit(1);
-  const existing = linked?.[0];
-  if (existing) {
-    if (!existing.is_available) return { status: "unavailable", name: existing.name };
-    return {
-      status: "found",
-      item: {
-        id: existing.id,
-        name: existing.name,
-        itemCode: existing.item_code,
-        priceCents: existing.price_cents,
-        category: existing.category,
-        imageUrl: null,
-        barcode: code,
-      },
-    };
-  }
+    .maybeSingle();
+  if (existing) return scanResultFromLinked(existing, code);
 
   // Only sold-from-stock lanes can be tracked by a menu item (DB guard, §4).
   if (inv.kind !== "merchandise" && inv.kind !== "finished_good") return { status: "unknown" };
@@ -218,7 +232,21 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
     })
     .select("id, name, item_code, price_cents, category")
     .single();
-  if (error || !created) return { status: "unknown" };
+  if (error || !created) {
+    // 23505 here is (almost always) the tracked-item unique index: a concurrent
+    // first-scan of the same barcode won the check-then-insert race (AUDIT 1.5).
+    // Bill the winner's record — same stock row, same price, no duplicate. If no
+    // winner turns up (e.g. a rare item_code collision instead), fall through.
+    if (error?.code === "23505") {
+      const { data: winner } = await supabase
+        .from("menu_item")
+        .select("id, name, item_code, price_cents, category, is_available")
+        .eq("tracked_inventory_item_id", inv.id)
+        .maybeSingle();
+      if (winner) return scanResultFromLinked(winner, code);
+    }
+    return { status: "unknown" };
+  }
 
   revalidatePath("/menu");
   revalidateBusinessTags(profile.business_id, ["menu", "pricing"]);

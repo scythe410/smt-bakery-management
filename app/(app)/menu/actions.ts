@@ -68,7 +68,16 @@ export async function createMenuItem(
     .single();
 
   if (error) {
-    if (error.code === UNIQUE_VIOLATION) return { error: "menu.form.errorCodeDuplicate" };
+    // Two unique indexes can trip here: the per-business item_code and the
+    // one-menu-item-per-tracked-stock-row index (migration 024) — tell them
+    // apart by constraint name so the user is pointed at the right field.
+    if (error.code === UNIQUE_VIOLATION) {
+      return {
+        error: error.message.includes("menu_item_tracked_inventory_item_key")
+          ? "menu.form.errorTrackedDuplicate"
+          : "menu.form.errorCodeDuplicate",
+      };
+    }
     if (error.code === CHECK_VIOLATION) return { error: "menu.form.errorTrackedConflict" };
     return { error: "menu.form.error" };
   }
@@ -120,7 +129,16 @@ export async function updateMenuItem(
     .eq("id", id);
 
   if (error) {
-    if (error.code === UNIQUE_VIOLATION) return { error: "menu.form.errorCodeDuplicate" };
+    // Two unique indexes can trip here: the per-business item_code and the
+    // one-menu-item-per-tracked-stock-row index (migration 024) — tell them
+    // apart by constraint name so the user is pointed at the right field.
+    if (error.code === UNIQUE_VIOLATION) {
+      return {
+        error: error.message.includes("menu_item_tracked_inventory_item_key")
+          ? "menu.form.errorTrackedDuplicate"
+          : "menu.form.errorCodeDuplicate",
+      };
+    }
     if (error.code === CHECK_VIOLATION) return { error: "menu.form.errorTrackedConflict" };
     return { error: "menu.form.error" };
   }

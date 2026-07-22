@@ -5,6 +5,42 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — feat: one menu item per tracked stock row (AUDIT 1.5)
+
+### Changes
+
+- **Migration `20260723090000`** — partial unique index
+  `menu_item_tracked_inventory_item_key on menu_item (tracked_inventory_item_id) where not
+  null`. Closes both duplicate-link doors (concurrent first-scans; menu form picking an
+  already-tracked item). No `business_id` in the key: inventory ids are globally unique and
+  the composite FK already pins the tenant. No dedupe step: verified duplicate-free on the
+  linked project first (read-only query, 0 rows).
+- `app/(app)/orders/actions.ts` — `resolveScannedBarcode` treats a 23505 on insert as "lost
+  a concurrent first-scan race": re-selects the winning link and bills that same record.
+  Linked lookup upgraded `.limit(1)` → `.maybeSingle()` (at most one exists now). Result
+  shaping extracted to `scanResultFromLinked` (shared by direct hit + race retry, keeps the
+  1.3 availability check in both paths).
+- `app/(app)/menu/actions.ts` — create/update distinguish the two 23505 sources by
+  constraint name: item-code duplicate → existing message; tracked-link duplicate → new
+  `menu.form.errorTrackedDuplicate` (en + si), pointing at the right field.
+
+### Decisions / notes
+
+- A row re-saving its own tracked link doesn't self-conflict (update, same row) — no special
+  casing needed.
+- The menu form's sold-from-stock select still *offers* already-tracked items; the DB now
+  rejects with a clear message. Filtering the options (while keeping the item's own link
+  visible in edit mode) is a UI nicety, deferred.
+- **Migration not yet pushed to the hosted project** — needs `supabase db push`.
+
+### Verified
+
+Index creation tested against the linked DB inside BEGIN/ROLLBACK (created, verified via
+pg_indexes, rolled back). Duplicate check on live data: 0 rows. `tsc --noEmit`, `eslint`
+(touched files), locale JSON, `next build` — all clean.
+
+---
+
 ## 2026-07-23 — fix: scan-to-bill availability + picker dedupe (AUDIT 1.3, 1.4)
 
 ### Changes
