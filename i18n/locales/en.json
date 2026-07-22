@@ -199,6 +199,8 @@
       "qty": "Quantity",
       "unit": "Unit",
       "unitCost": "Unit cost",
+      "salePrice": "Retail price",
+      "salePricePlaceholder": "What it sells for",
       "lowStockThreshold": "Low-stock threshold",
       "save": "Save item",
       "saving": "Saving…",
@@ -209,6 +211,14 @@
       "title": "Couldn't load inventory.",
       "body": "Check your connection and try again.",
       "retry": "Retry"
+    },
+    "price": {
+      "at": "Price: {{price}}",
+      "notSet": "Set price",
+      "inputLabel": "Retail price for {{name}}",
+      "save": "Save",
+      "saving": "Saving…",
+      "error": "Couldn't save that price. Try again."
     },
     "receive": {
       "action": "Receive Stock",

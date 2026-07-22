@@ -35,6 +35,12 @@ export type InventoryListItem = {
   /** qty_on_hand <= low_stock_threshold (only meaningful when qty is set). */
   isLowStock: boolean;
   unitCostCents: number;
+  /**
+   * Retail selling price (sold-from-stock kinds), or null when unset — the
+   * scan-to-bill flow can't sell the item until this is set, so the list
+   * surfaces it with an inline editor. Always null for ingredients.
+   */
+  salePriceCents: number | null;
   /** Stored barcode (GTIN/QR), or null — lets the scanner spot a re-scan. */
   barcode: string | null;
 };
@@ -70,6 +76,7 @@ async function loadInventoryList(): Promise<InventoryList> {
       lowStockThreshold,
       isLowStock: qtyOnHand !== null && qtyOnHand <= lowStockThreshold,
       unitCostCents: r.unit_cost_cents,
+      salePriceCents: r.sale_price_cents,
       barcode: r.barcode,
     };
   });

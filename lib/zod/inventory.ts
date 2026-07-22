@@ -18,6 +18,10 @@ export const addInventoryItemSchema = z
     unit: z.string().trim().min(1).max(20),
     // Major-unit unit cost (rupees) → cents in the action.
     unitCostMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+    // Retail selling price (rupees) → sale_price_cents in the action. Only
+    // meaningful for sold-from-stock kinds (merchandise / finished_good); the
+    // action nulls it for ingredients. Optional: absent/empty → NULL (unset).
+    salePriceMajor: z.coerce.number().min(0).finite().max(1_000_000_000).optional(),
     lowStockThreshold: z.coerce.number().min(0).finite().max(1_000_000_000),
     // Optional scanned/typed barcode. Stored verbatim (an empty value is coerced to
     // undefined by the action → NULL, so the partial unique index isn't hit for
@@ -89,3 +93,18 @@ export const returnFinishedGoodSchema = z
   .strict();
 
 export type ReturnFinishedGoodInput = z.infer<typeof returnFinishedGoodSchema>;
+
+/**
+ * Set-retail-price input: the inline price editor on sellable inventory rows
+ * (merchandise / finished_good). Price arrives in major units (rupees) → cents in
+ * the action. The action re-checks the item's kind server-side; z.guid() (not
+ * z.uuid()) to accept the seed/vanity ids, as in lib/zod/order.ts.
+ */
+export const setSalePriceSchema = z
+  .object({
+    inventoryItemId: z.guid(),
+    salePriceMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+  })
+  .strict();
+
+export type SetSalePriceInput = z.infer<typeof setSalePriceSchema>;

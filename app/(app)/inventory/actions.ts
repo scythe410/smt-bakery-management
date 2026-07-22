@@ -15,6 +15,7 @@ import {
   produceBatchSchema,
   receiveStockSchema,
   returnFinishedGoodSchema,
+  setSalePriceSchema,
 } from "@/lib/zod/inventory";
 import { lookupProduct, type ProductLookupResult } from "@/lib/inventory/product-lookup";
 import type { Database } from "@/lib/supabase/types";
@@ -33,6 +34,7 @@ export async function addInventoryItem(
   if (!profile.business_id) return { error: "inventory.add.error" };
 
   const rawBarcode = formData.get("barcode");
+  const rawSalePrice = formData.get("salePrice");
   const parsed = addInventoryItemSchema.safeParse({
     name: formData.get("name"),
     kind: formData.get("kind"),
@@ -40,12 +42,19 @@ export async function addInventoryItem(
     qtyOnHand: formData.get("qtyOnHand"),
     unit: formData.get("unit"),
     unitCostMajor: formData.get("unitCost"),
+    // Absent (field hidden for ingredients) or empty → undefined → NULL (unset).
+    salePriceMajor:
+      typeof rawSalePrice === "string" && rawSalePrice.trim() !== "" ? rawSalePrice : undefined,
     lowStockThreshold: formData.get("lowStockThreshold"),
     // Empty string (barcode-less add) → undefined → NULL, so the partial unique
     // index isn't tripped by multiple barcode-less items.
     barcode: typeof rawBarcode === "string" && rawBarcode.trim() !== "" ? rawBarcode : undefined,
   });
   if (!parsed.success) return { error: "inventory.add.error" };
+
+  // Retail price applies to sold-from-stock kinds only; never store one for an
+  // ingredient (its money story is unit_cost_cents via the recipe/COGS lane).
+  const sellable = parsed.data.kind === "merchandise" || parsed.data.kind === "finished_good";
 
   const supabase = await createClient();
   const { error } = await supabase.from("inventory_item").insert({
@@ -56,6 +65,10 @@ export async function addInventoryItem(
     qty_on_hand: parsed.data.qtyOnHand,
     unit: parsed.data.unit,
     unit_cost_cents: toCents(parsed.data.unitCostMajor),
+    sale_price_cents:
+      sellable && parsed.data.salePriceMajor !== undefined
+        ? toCents(parsed.data.salePriceMajor)
+        : null,
     low_stock_threshold: parsed.data.lowStockThreshold,
     barcode: parsed.data.barcode ?? null,
   });
@@ -66,6 +79,42 @@ export async function addInventoryItem(
   }
 
   // Refresh the list + low-stock counts (list row, pill, nav badge → shell cache).
+  revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
+  return { ok: true };
+}
+
+export type SetSalePriceState = { ok?: boolean; error?: string };
+
+/**
+ * Set the retail selling price on a sellable inventory row (the inline editor on
+ * the Inventory list). This is the master price the scan-to-bill flow uses when it
+ * links a barcode to a menu item (AUDIT 1.1: the column previously had no write
+ * path in the UI). Operational, all roles: a per-item price is a cost/price fact,
+ * not an aggregate revenue figure (CLAUDE.md §5). The kind filter keeps ingredients
+ * priceless — their money story is unit_cost_cents via the recipe/COGS lane.
+ */
+export async function setSalePrice(input: {
+  inventoryItemId: string;
+  salePriceMajor: number;
+}): Promise<SetSalePriceState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "inventory.price.error" };
+
+  const parsed = setSalePriceSchema.safeParse(input);
+  if (!parsed.success) return { error: "inventory.price.error" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .update({ sale_price_cents: toCents(parsed.data.salePriceMajor) })
+    .eq("id", parsed.data.inventoryItemId)
+    .in("kind", ["merchandise", "finished_good"])
+    .select("id");
+  // RLS hides cross-tenant rows and the kind filter skips ingredients — either
+  // way zero rows came back, so surface it instead of reporting a phantom save.
+  if (error || !data || data.length === 0) return { error: "inventory.price.error" };
+
   revalidatePath("/inventory");
   revalidateBusinessTags(profile.business_id, ["inventory"]);
   return { ok: true };

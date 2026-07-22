@@ -8,7 +8,7 @@
 // revalidates /inventory (the new row, low-stock counts, and nav badge update)
 // and we close the form.
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { addInventoryItem, type AddInventoryItemState } from "@/app/(app)/inventory/actions";
 import { INVENTORY_CATEGORIES, INVENTORY_KINDS } from "@/lib/inventory-config";
@@ -28,6 +28,11 @@ export type AddItemPrefill = {
 export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?: AddItemPrefill }) {
   const { t } = useTranslation();
   const formRef = useRef<HTMLFormElement>(null);
+  // Controlled so the retail-price field can follow the kind: sold-from-stock
+  // kinds (merchandise / finished_good) sell at this price when scanned at
+  // billing; ingredients never carry one.
+  const [kind, setKind] = useState<InventoryKind>(prefill?.kind ?? INVENTORY_KINDS[0]);
+  const sellable = kind === "merchandise" || kind === "finished_good";
   const [state, formAction, pending] = useActionState<AddInventoryItemState, FormData>(
     addInventoryItem,
     {},
@@ -69,7 +74,8 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
           <span className="text-caption text-muted">{t("inventory.add.kind")}</span>
           <select
             name="kind"
-            defaultValue={prefill?.kind ?? INVENTORY_KINDS[0]}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as InventoryKind)}
             className={FIELD_CLASS}
           >
             {INVENTORY_KINDS.map((k) => (
@@ -147,6 +153,24 @@ export function AddItemForm({ onDone, prefill }: { onDone: () => void; prefill?:
           />
         </label>
       </div>
+
+      {/* Retail price — sold-from-stock kinds only. This is what the item sells
+          for when a scan at billing links it to the menu; blank = not sellable
+          yet (the scan flow surfaces it). Unmounted (not just hidden) for
+          ingredients so no salePrice field is ever submitted for them. */}
+      {sellable ? (
+        <label className="flex flex-col gap-1">
+          <span className="text-caption text-muted">{t("inventory.add.salePrice")} (LKR)</span>
+          <input
+            type="text"
+            name="salePrice"
+            inputMode="decimal"
+            onFocus={(e) => e.currentTarget.select()}
+            placeholder={t("inventory.add.salePricePlaceholder")}
+            className={`${FIELD_CLASS} tabular-nums`}
+          />
+        </label>
+      ) : null}
 
       {state.error ? (
         <p role="alert" className="text-caption text-danger">

@@ -10,7 +10,7 @@
 // badge. Item names are business data, shown as entered — not translated
 // (CLAUDE.md §3).
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -25,11 +25,100 @@ import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AddItemForm } from "@/components/inventory/add-item-form";
 import { ScanReceive, type ReceiveTarget } from "@/components/inventory/scan-receive";
+import { setSalePrice } from "@/app/(app)/inventory/actions";
+import { formatLKR } from "@/lib/format";
 import type { InventoryListItem } from "@/lib/db/selectors/inventory";
 import type { InventoryCategory } from "@/lib/inventory-config";
 
 function formatQty(qty: number): string {
   return qty.toLocaleString("en-US", { maximumFractionDigits: 3 });
+}
+
+// Inline retail-price editor for sold-from-stock rows (AUDIT 1.1: the master
+// price the scan-to-bill flow sells at previously had no write path in the UI).
+// Unset price renders as a warn-toned "Set price" prompt — an unpriced sellable
+// item can't be sold by scan, so the gap is surfaced where it's fixed.
+function RowPriceEditor({ item }: { item: InventoryListItem }) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function open() {
+    setRaw(item.salePriceCents !== null ? (item.salePriceCents / 100).toFixed(2) : "");
+    setFailed(false);
+    setEditing(true);
+  }
+
+  function commit() {
+    const major = Number(raw);
+    if (!isFinite(major) || major < 0) {
+      setEditing(false);
+      return;
+    }
+    startTransition(async () => {
+      const res = await setSalePrice({ inventoryItemId: item.id, salePriceMajor: major });
+      setFailed(!res.ok);
+      if (res.ok) setEditing(false);
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="mt-1 flex flex-col items-end gap-1">
+        <div className="flex items-center justify-end gap-1">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={raw}
+          autoFocus
+          onChange={(e) => setRaw(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") setEditing(false);
+          }}
+          aria-label={t("inventory.price.inputLabel", { name: item.name })}
+          className={`border-border focus-visible:ring-brand/40 text-caption text-ink h-7 w-20 rounded border bg-surface px-1.5 text-right tabular-nums outline-none focus-visible:ring-2 ${
+            failed ? "border-danger" : ""
+          }`}
+        />
+        <button
+          type="button"
+          onClick={commit}
+          disabled={pending}
+          className="text-caption text-brand h-7 rounded px-1.5 font-medium disabled:opacity-40"
+        >
+          {pending ? t("inventory.price.saving") : t("inventory.price.save")}
+        </button>
+        </div>
+        {failed ? (
+          <p role="alert" className="text-caption text-danger">
+            {t("inventory.price.error")}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      className={`text-caption mt-1 block w-full text-right tabular-nums transition-colors ${
+        item.salePriceCents === null
+          ? "text-danger font-medium"
+          : "text-muted hover:text-ink"
+      }`}
+    >
+      {item.salePriceCents === null
+        ? t("inventory.price.notSet")
+        : t("inventory.price.at", { price: formatLKR(item.salePriceCents) })}
+    </button>
+  );
 }
 
 export function InventoryBrowser({
@@ -235,6 +324,9 @@ export function InventoryBrowser({
                         <span className="text-caption text-muted">{it.unit}</span>
                       </>
                     )}
+                    {it.kind === "merchandise" || it.kind === "finished_good" ? (
+                      <RowPriceEditor item={it} />
+                    ) : null}
                   </div>
                 </li>
               ))}

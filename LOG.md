@@ -5,6 +5,68 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — feat: retail price on inventory (AUDIT 1.1)
+
+### Context
+
+AUDIT-scan-billing.md 1.1: `inventory_item.sale_price_cents` had **no write path in the app**
+(only two seed rows set it), so scan-to-bill dead-ended with "set a retail price in Stock" for
+every real item — pointing at a field that didn't exist on any form. There was also no edit
+surface for inventory at all, so the fix needed two entry points: the add form (new items) and
+an inline editor on the list (the client's existing, all-NULL rows).
+
+### Changes
+
+- `lib/zod/inventory.ts` — `salePriceMajor` (optional) on `addInventoryItemSchema`; new
+  `setSalePriceSchema` (guid + non-negative major-unit price).
+- `app/(app)/inventory/actions.ts` — `addInventoryItem` writes `sale_price_cents` (nulled for
+  ingredients — their money story is unit_cost/COGS); new `setSalePrice` action:
+  Zod-validated, updates under RLS with a `kind in (merchandise, finished_good)` filter, and
+  treats zero-rows-updated as an error rather than a phantom save.
+- `components/inventory/add-item-form.tsx` — kind select is now controlled; a "Retail price
+  (LKR)" field mounts for sellable kinds only (unmounted for ingredients, so the field is
+  never submitted for them).
+- `components/inventory/inventory-browser.tsx` — `RowPriceEditor` on sellable rows: shows
+  "Price: LKR x" (tap to edit) or a danger-toned "Set price" prompt when unset — surfacing
+  exactly the rows scan-to-bill can't sell yet. Enter/blur-free explicit Save button,
+  Escape cancels, inline error per DESIGN (no toasts).
+- `lib/db/selectors/inventory.ts` — `salePriceCents` threaded onto `InventoryListItem`
+  (query already `select("*")`).
+- i18n — `inventory.add.salePrice(+Placeholder)`, `inventory.price.*` (en + si).
+
+### Decisions
+
+- Role gate: all roles may set a per-item retail price. It's a price/cost fact, not an
+  aggregate revenue figure, consistent with staff seeing menu prices and per-order totals
+  (CLAUDE.md §5 hides analytics, not prices).
+- Stock-take open-day price write-back (audit's "optional" half) **deferred** — separate
+  surface, separate prompt. The daily snapshot still doesn't update the master price.
+- Existing scan-created menu items do NOT re-price when `sale_price_cents` changes (the
+  two-price tension in AUDIT §2) — unchanged, pending a client decision on the single source.
+
+### Verified
+
+`tsc --noEmit` clean; `eslint` clean on touched files; `next build` passes (18 routes);
+locale JSON parses. Not exercised in the browser against the hosted DB this prompt.
+
+---
+
+## 2026-07-22 — audit: scan-to-bill + stock/menu linking DB & logic review
+
+Client suspected issues; full audit written to `AUDIT-scan-billing.md` (working file, not
+committed). Headline: **`inventory_item.sale_price_cents` has no write path anywhere in the
+app UI** (only two seed rows set it), so the new scan-to-bill flow dead-ends with "set a
+retail price in Stock" for every real item the client entered — the message points at a
+field that doesn't exist on any form. Also confirmed: inventory category enum tokens leak
+into free-text menu categories on link; scan returns already-linked items without checking
+`is_available` (order then fails with the generic error — `orders.new.invalidItem` key is
+defined but unused); the picker merge doesn't dedupe after revalidation refresh; no unique
+index on `menu_item.tracked_inventory_item_id`. Verified sound: barcode uniqueness, money
+recomputation, ledger idempotency, no Finance double-count of stock-take revenue, snapshot
+integrity on menu-item delete. No code changed this prompt — report only.
+
+---
+
 ## 2026-07-22 — feat: scan stock barcodes at billing + number menu items everywhere
 
 ### Reported (client, via chat)
