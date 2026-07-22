@@ -1400,6 +1400,41 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_order: {
+        Args: {
+          p_customer_name: string
+          p_discount_pct?: number
+          p_items: Json
+          p_order_id: string
+          p_payment_method: Database["public"]["Enums"]["payment_method"]
+          p_payment_status: Database["public"]["Enums"]["payment_status"]
+          p_source: Database["public"]["Enums"]["order_source"]
+        }
+        Returns: {
+          business_id: string
+          commission_cents: number
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          discount_cents: number
+          discount_pct: number
+          id: string
+          order_no: string
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          source: Database["public"]["Enums"]["order_source"]
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal_cents: number
+          total_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_language: "en" | "si"

@@ -16,6 +16,11 @@ import type { OrderStatus } from "@/lib/orders/order-config";
 // ── Shared data shape ─────────────────────────────────────────────────────────
 
 export type OrderBillLine = {
+  /**
+   * The line's menu item id, or null when that item was deleted. Seeds the
+   * edit-order form; the bill itself renders only the snapshot.
+   */
+  menuItemId: string | null;
   nameSnapshot: string;
   qty: number;
   unitPriceCents: number;
@@ -100,6 +105,7 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
     .map((item) => {
       const lineTotalCents = item.unit_price_cents * item.qty;
       return {
+        menuItemId: item.menu_item_id,
         nameSnapshot: item.name_snapshot,
         qty: item.qty,
         unitPriceCents: item.unit_price_cents,

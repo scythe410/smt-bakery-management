@@ -326,6 +326,14 @@
       "scanUnavailable": "{{name}} is marked unavailable on the Menu — mark it available to sell it",
       "scanUnknown": "No item for barcode {{code}}"
     },
+    "edit": {
+      "action": "Edit Order",
+      "title": "Edit {{orderNo}}",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "errorNotPending": "Only pending orders can be edited. Void this order and create a new one instead.",
+      "droppedLines": "Not carried over (item removed or unavailable): {{names}}. Re-add a current item if needed."
+    },
     "detail": {
       "back": "Orders",
       "reprintBill": "Reprint Bill",

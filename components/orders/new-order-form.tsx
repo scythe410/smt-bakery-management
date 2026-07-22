@@ -35,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import {
   createOrder,
   resolveScannedBarcode,
+  updateOrder,
   type CreateOrderState,
 } from "@/app/(app)/orders/actions";
 import { formatLKR } from "@/lib/format";
@@ -51,15 +52,37 @@ import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
 const FIELD_CLASS =
   "border-border text-label text-ink focus-visible:ring-brand/40 h-10 rounded-[var(--radius)] border bg-surface px-2 outline-none focus-visible:ring-2";
 
+/** Seed values for edit mode — read straight off OrderBillData on the detail page. */
+export type OrderFormInitial = {
+  source: string;
+  customerName: string | null;
+  paymentMethod: string | null;
+  paymentStatus: string;
+  discountPct: number;
+  lines: { menuItemId: string | null; nameSnapshot: string; qty: number }[];
+};
+
+/**
+ * create → the new-order flow (default). edit → same form seeded from a PENDING
+ * order; submits to updateOrder, which replaces the lines atomically (the RPC
+ * re-guards pending-only — migration 026).
+ */
+export type OrderFormMode =
+  | { kind: "create" }
+  | { kind: "edit"; orderId: string; initial: OrderFormInitial };
+
 export function NewOrderForm({
   menu: initialMenu,
   onDone,
+  mode = { kind: "create" },
 }: {
   menu: NewOrderMenuItem[];
   onDone: () => void;
+  mode?: OrderFormMode;
 }) {
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
+  const editInitial = mode.kind === "edit" ? mode.initial : null;
 
   // Menu items linked on the fly from a scanned stock barcode (§4). They aren't in
   // the server-fetched list yet, so we hold them here and merge — the picker, the
@@ -74,10 +97,34 @@ export function NewOrderForm({
     return novel.length === 0 ? initialMenu : [...initialMenu, ...novel];
   }, [initialMenu, extraItems]);
 
-  // Canonical integer qty per menu item (0 = not in order).
-  const [qtyById, setQtyById] = useState<Record<string, number>>({});
+  // Canonical integer qty per menu item (0 = not in order). Edit mode seeds it
+  // from the order's lines — only lines whose menu item still exists in the
+  // picker (deleted/unavailable ones are surfaced below, not silently kept:
+  // the RPC would reject them on save).
+  const [qtyById, setQtyById] = useState<Record<string, number>>(() => {
+    if (!editInitial) return {};
+    const known = new Set(initialMenu.map((m) => m.id));
+    const init: Record<string, number> = {};
+    for (const l of editInitial.lines) {
+      if (l.menuItemId && known.has(l.menuItemId)) {
+        init[l.menuItemId] = (init[l.menuItemId] ?? 0) + l.qty;
+      }
+    }
+    return init;
+  });
   // Raw string values for the editable qty text inputs (CF2: never sanitize mid-type).
   const [qtyRaw, setQtyRaw] = useState<Record<string, string>>({});
+  // Edit mode: order lines that can't be carried into the cart (menu item
+  // deleted or no longer available) — named so the cashier can re-add manually.
+  const droppedNames = useMemo(() => {
+    if (!editInitial) return [];
+    const known = new Set(initialMenu.map((m) => m.id));
+    return editInitial.lines
+      .filter((l) => !l.menuItemId || !known.has(l.menuItemId))
+      .map((l) => l.nameSnapshot);
+    // Snapshot of the mount-time menu is intentional — matches the qty seeding.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Quick-add / search query.
   const [quickAdd, setQuickAdd] = useState("");
   // Item picker layout: an image grid (pick by picture, CF1 photos) or the dense
@@ -87,7 +134,7 @@ export function NewOrderForm({
   // Whole-order quick discount (0 = none). The server RECOMPUTES the actual
   // discount + net total from stored prices; this is only the selected rate and
   // the on-screen estimate (CLAUDE.md §7.7).
-  const [discountPct, setDiscountPct] = useState<number>(0);
+  const [discountPct, setDiscountPct] = useState<number>(editInitial?.discountPct ?? 0);
 
   // Barcode checkout state. The wedge scanner is always on; the camera is optional.
   const [scanMsg, setScanMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
@@ -103,7 +150,17 @@ export function NewOrderForm({
     return map;
   }, [menu]);
 
-  const [state, formAction, pending] = useActionState<CreateOrderState, FormData>(createOrder, {});
+  // One form, two mutations: create posts to createOrder; edit binds the order
+  // id onto updateOrder (mode never changes over the component's life).
+  const submitAction = useMemo(
+    () => (mode.kind === "edit" ? updateOrder.bind(null, mode.orderId) : createOrder),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [state, formAction, pending] = useActionState<CreateOrderState, FormData>(
+    submitAction,
+    {},
+  );
 
   useEffect(() => {
     if (state.ok) onDone();
@@ -258,7 +315,11 @@ export function NewOrderForm({
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("orders.new.source")}</span>
-          <select name="source" defaultValue={ORDER_SOURCES[0]} className={FIELD_CLASS}>
+          <select
+            name="source"
+            defaultValue={editInitial?.source ?? ORDER_SOURCES[0]}
+            className={FIELD_CLASS}
+          >
             {ORDER_SOURCES.map((s) => (
               <option key={s} value={s}>
                 {t(`source.${s}`)}
@@ -272,11 +333,20 @@ export function NewOrderForm({
             type="text"
             name="customerName"
             maxLength={120}
+            defaultValue={editInitial?.customerName ?? ""}
             placeholder={t("orders.new.customerPlaceholder")}
             className={FIELD_CLASS}
           />
         </label>
       </div>
+
+      {/* Edit mode: order lines that couldn't be carried over (item deleted or
+          unavailable) — the RPC would reject them, so they're named instead. */}
+      {droppedNames.length > 0 ? (
+        <p role="alert" className="text-caption text-danger">
+          {t("orders.edit.droppedLines", { names: droppedNames.join(", ") })}
+        </p>
+      ) : null}
 
       {/* Barcode checkout — wedge scanner always on; camera optional */}
       <div className="border-border bg-surface-2 flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
@@ -639,7 +709,11 @@ export function NewOrderForm({
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("orders.new.paymentMethod")}</span>
-          <select name="paymentMethod" defaultValue={PAYMENT_METHODS[0]} className={FIELD_CLASS}>
+          <select
+            name="paymentMethod"
+            defaultValue={editInitial?.paymentMethod ?? PAYMENT_METHODS[0]}
+            className={FIELD_CLASS}
+          >
             {PAYMENT_METHODS.map((m) => (
               <option key={m} value={m}>
                 {t(`orders.payment.${m}`)}
@@ -649,7 +723,11 @@ export function NewOrderForm({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted">{t("orders.new.paymentStatus")}</span>
-          <select name="paymentStatus" defaultValue={PAYMENT_STATUSES[0]} className={FIELD_CLASS}>
+          <select
+            name="paymentStatus"
+            defaultValue={editInitial?.paymentStatus ?? PAYMENT_STATUSES[0]}
+            className={FIELD_CLASS}
+          >
             {PAYMENT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {t(`orders.paymentStatus.${s}`)}
@@ -674,7 +752,13 @@ export function NewOrderForm({
           disabled={pending || lines.length === 0}
           className="bg-brand text-brand-white text-label hover:bg-brand-ember h-10 flex-1 rounded-[var(--radius)] font-semibold transition-colors disabled:opacity-50"
         >
-          {pending ? t("orders.new.saving") : t("orders.new.save")}
+          {mode.kind === "edit"
+            ? pending
+              ? t("orders.edit.saving")
+              : t("orders.edit.save")
+            : pending
+              ? t("orders.new.saving")
+              : t("orders.new.save")}
         </button>
         <button
           type="button"

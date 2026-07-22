@@ -52,6 +52,16 @@ export const newOrderSchema = z
 
 export type NewOrderInput = z.infer<typeof newOrderSchema>;
 
+// Edit-order mutation: the same client contract as newOrderSchema (which menu
+// items, how many, no money) plus which order. Pending-only is enforced by the
+// update_order RPC (errcode OR002), not here. orderId is z.guid() for the
+// seed/vanity ids, as elsewhere.
+export const updateOrderSchema = newOrderSchema.extend({
+  orderId: z.guid(),
+});
+
+export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
+
 // Zod schema for the Orders list READ query (the fetchOrders action). It's a
 // read, but the input still crosses the client→server boundary, so it's validated
 // and unknown fields are rejected — the tab/filters/page become DB predicates

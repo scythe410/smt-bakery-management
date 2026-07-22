@@ -6,12 +6,16 @@
 // component is pure layout with no money math. All labels go through i18n
 // (CLAUDE.md §3); dynamic content (item names, customer name) is not translated.
 
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Tone } from "@/components/ui/status-pill";
+import { NewOrderForm, type OrderFormMode } from "@/components/orders/new-order-form";
 import type { OrderBillData } from "@/lib/db/selectors/order-bill";
+import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/order-config";
 
 const STATUS_TONE: Record<OrderStatus, Tone> = {
@@ -26,10 +30,47 @@ const PAYMENT_STATUS_TONE: Record<PaymentStatus, Tone> = {
   refunded: "danger",
 };
 
-export function OrderDetail({ data, orderId }: { data: OrderBillData; orderId: string }) {
+export function OrderDetail({
+  data,
+  orderId,
+  menu = [],
+}: {
+  data: OrderBillData;
+  orderId: string;
+  /** Available menu for the edit form — passed only while the order is pending. */
+  menu?: NewOrderMenuItem[];
+}) {
   const { t } = useTranslation();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
   const showCommission = data.commissionCents > 0;
   const showDiscount = data.discountCents > 0;
+  // Editable = pending only (completed/cancelled are immutable history; the
+  // update_order RPC re-guards this server-side — migration 026).
+  const canEdit = data.status === "pending" && menu.length > 0;
+
+  const editMode: OrderFormMode = {
+    kind: "edit",
+    orderId,
+    initial: {
+      source: data.source,
+      customerName: data.customerName,
+      paymentMethod: data.paymentMethod,
+      paymentStatus: data.paymentStatus,
+      discountPct: data.discountPct,
+      lines: data.lines.map((l) => ({
+        menuItemId: l.menuItemId,
+        nameSnapshot: l.nameSnapshot,
+        qty: l.qty,
+      })),
+    },
+  };
+
+  const closeEdit = useCallback(() => {
+    setEditing(false);
+    // Pull the recomputed order (lines, totals) back into this server-rendered view.
+    router.refresh();
+  }, [router]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -43,6 +84,17 @@ export function OrderDetail({ data, orderId }: { data: OrderBillData; orderId: s
           {t("orders.detail.back")}
         </Link>
         <div className="flex-1" />
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-expanded={editing}
+            className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-1.5 rounded-[var(--radius)] border px-3 font-medium transition-colors"
+          >
+            <Pencil className="size-4" aria-hidden />
+            {t("orders.edit.action")}
+          </button>
+        ) : null}
         <Link
           href={`/orders/${orderId}/bill`}
           className="border-border-strong text-ink text-label hover:bg-surface-2 flex h-10 items-center gap-1.5 rounded-[var(--radius)] border px-3 font-medium transition-colors"
@@ -51,6 +103,14 @@ export function OrderDetail({ data, orderId }: { data: OrderBillData; orderId: s
           {t("orders.detail.reprintBill")}
         </Link>
       </div>
+
+      {/* Inline edit form (pending orders only) */}
+      {editing && canEdit ? (
+        <Card className="flex flex-col gap-3">
+          <p className="text-h2 text-ink">{t("orders.edit.title", { orderNo: data.orderNo })}</p>
+          <NewOrderForm menu={menu} mode={editMode} onDone={closeEdit} />
+        </Card>
+      ) : null}
 
       {/* Order header */}
       <Card className="flex flex-col gap-2.5">

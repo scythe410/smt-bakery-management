@@ -5,6 +5,50 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — feat: editable pending orders (client request)
+
+### Context
+
+Client (via chat): "make the orders editable."
+
+### Scope decision
+
+**Pending orders only.** Stock deducts on completion (order_sync_stock), so a pending edit
+touches no stock; a reopened (completed→cancelled→pending) order carries a netted-out
+sale+reversal pair and OR001 already forbids re-completing it, so no edit path can
+double-deduct. Completed/cancelled orders stay immutable history — void-and-recreate is the
+path there (the RPC rejects them with a new `OR002`, surfaced as
+`orders.edit.errorNotPending`).
+
+### Changes
+
+- **Migration `20260723120000`** — `update_order` RPC: same §7.7 contract as
+  `create_order` (client sends item ids + qty only; every figure recomputed from stored
+  prices + commission_rule), FOR UPDATE lock, pending-only guard, lines replaced wholesale
+  with fresh snapshots, order_no/created_at/status untouched. SECURITY INVOKER, pinned
+  search_path, authenticated-only. Pushed to the hosted project; types regenerated.
+- **`supabase/tests/update_order.sql`** — recompute + replacement + OR002 + 22023, run
+  against the linked project under JWT impersonation, all rolled back: **PASS**.
+- `lib/zod/order.ts` — `updateOrderSchema = newOrderSchema.extend({ orderId })`.
+- `orders/actions.ts` — `updateOrder` (bound-id pattern like `updateMenuItem`); maps
+  OR002 → errorNotPending, 22023 → invalidItem.
+- `new-order-form.tsx` — generalized with a `mode` prop (`create` default / `edit`): seeds
+  cart, discount, source/customer/payment from the order; binds `updateOrder`; edit-mode
+  submit labels. Lines whose menu item was deleted or is unavailable are NOT silently kept
+  (the RPC would reject the save) — they're named in a warning so the cashier re-adds a
+  current item.
+- `order-detail.tsx` + `orders/[id]/page.tsx` — "Edit Order" button (pending only), inline
+  edit form, `router.refresh()` on save; the page fetches the menu only for pending orders.
+- `order-bill` selector — lines now carry `menuItemId` (null when deleted) to seed the form.
+- i18n — `orders.edit.*` (en + si).
+
+### Verified
+
+RPC test PASS on the linked DB (rolled back); `tsc`, `eslint` (touched files), `next build`
+clean. Browser flow not exercised this prompt.
+
+---
+
 ## 2026-07-23 — feat: business phone on the bill (client request)
 
 ### Context

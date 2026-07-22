@@ -24,6 +24,7 @@ import {
   orderListQuerySchema,
   orderStatusChangeSchema,
   scanBarcodeSchema,
+  updateOrderSchema,
 } from "@/lib/zod/order";
 import {
   getOrdersPage,
@@ -95,6 +96,68 @@ export async function createOrder(
   // "inventory" because a realized order deducts stock via the movement ledger,
   // updating qty_on_hand and the low-stock nav badge.
   revalidateBusinessTags(profile.business_id, ["orders", "inventory"]);
+  return { ok: true, orderNo: data.order_no };
+}
+
+/**
+ * Edit a PENDING order (client request: "make the orders editable"). Same §7.7
+ * contract as createOrder: the client sends only which menu items, how many, and
+ * the non-money fields — the update_order RPC recomputes every figure from
+ * stored prices inside one transaction and rejects non-pending orders (OR002).
+ * Ledger safety lives in the RPC (see migration 026), not here. Role: whoever
+ * can create an order can edit a pending one (no aggregate money exposed).
+ */
+export async function updateOrder(
+  orderId: string,
+  _prevState: CreateOrderState,
+  formData: FormData,
+): Promise<CreateOrderState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "orders.new.error" };
+
+  let itemsRaw: unknown = [];
+  try {
+    itemsRaw = JSON.parse(String(formData.get("items") ?? "[]"));
+  } catch {
+    return { error: "orders.new.error" };
+  }
+
+  const parsed = updateOrderSchema.safeParse({
+    orderId,
+    source: formData.get("source"),
+    customerName: formData.get("customerName") || undefined,
+    paymentMethod: formData.get("paymentMethod"),
+    paymentStatus: formData.get("paymentStatus"),
+    discountPct: formData.get("discountPct") ?? 0,
+    items: itemsRaw,
+  });
+  if (!parsed.success) return { error: "orders.new.error" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("update_order", {
+    p_order_id: parsed.data.orderId,
+    p_source: parsed.data.source as Enums["order_source"],
+    p_customer_name: parsed.data.customerName ?? "",
+    p_payment_method: parsed.data.paymentMethod as Enums["payment_method"],
+    p_payment_status: parsed.data.paymentStatus as Enums["payment_status"],
+    p_discount_pct: parsed.data.discountPct,
+    p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
+  });
+
+  if (error || !data) {
+    // OR002 = the RPC refused a non-pending order (completed/cancelled orders
+    // are immutable history — void and recreate instead).
+    if (error?.code === "OR002") return { error: "orders.edit.errorNotPending" };
+    // 22023 past Zod = a line went invalid/unavailable (same as createOrder).
+    if (error?.code === "22023") return { error: "orders.new.invalidItem" };
+    return { error: "orders.new.error" };
+  }
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${parsed.data.orderId}`);
+  // Totals feed Dashboard/Finance/Reports; pending edits touch no stock, but the
+  // "orders" tag also covers the list rows and detail figures.
+  revalidateBusinessTags(profile.business_id, ["orders"]);
   return { ok: true, orderNo: data.order_no };
 }
 

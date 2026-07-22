@@ -9,6 +9,7 @@
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { getOrderBillData } from "@/lib/db/selectors/order-bill";
+import { getNewOrderMenu } from "@/lib/db/selectors/orders";
 import { OrderDetail } from "@/components/orders/order-detail";
 
 export const dynamic = "force-dynamic";
@@ -25,5 +26,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const data = await getOrderBillData(id);
   if (!data) notFound();
 
-  return <OrderDetail data={data} orderId={id} />;
+  // The edit form needs the available menu — only pending orders are editable,
+  // so skip the fetch entirely for archived ones.
+  const menu = data.status === "pending" ? await getNewOrderMenu() : [];
+
+  return <OrderDetail data={data} orderId={id} menu={menu} />;
 }
