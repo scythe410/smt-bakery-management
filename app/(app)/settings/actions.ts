@@ -41,6 +41,7 @@ export async function updateBusinessProfile(
   const parsed = businessProfileSchema.safeParse({
     name: formData.get("name"),
     address: formData.get("address") ?? undefined,
+    phone: formData.get("phone") ?? undefined,
     timezone: formData.get("timezone"),
     localeDefault: formData.get("localeDefault"),
   });
@@ -51,8 +52,9 @@ export async function updateBusinessProfile(
     .from("business")
     .update({
       name: parsed.data.name,
-      // Empty → null so a cleared field removes the address line from the bill.
+      // Empty → null so a cleared field removes the address/phone bill lines.
       address: parsed.data.address ? parsed.data.address : null,
+      phone: parsed.data.phone ? parsed.data.phone : null,
       timezone: parsed.data.timezone,
       locale_default: parsed.data
         .localeDefault as Database["public"]["Enums"]["app_language"],

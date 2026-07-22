@@ -28,6 +28,8 @@ export type SettingsView = {
     name: string;
     /** Optional postal address line (bill footer); null when unset. */
     address: string | null;
+    /** Optional phone line(s) (bill footer); null when unset. */
+    phone: string | null;
     currency: string;
     timezone: string;
     localeDefault: Language;
@@ -57,6 +59,7 @@ async function loadSettings(): Promise<SettingsView> {
     business: {
       name: business.name,
       address: business.address,
+      phone: business.phone,
       currency: business.currency,
       timezone: business.timezone,
       localeDefault: business.locale_default as Language,

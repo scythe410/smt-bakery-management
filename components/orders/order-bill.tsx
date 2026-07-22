@@ -132,6 +132,11 @@ export function OrderBill({ data }: { data: OrderBillData }) {
         {data.businessAddress ? (
           <p className="text-xs font-semibold text-muted">{data.businessAddress}</p>
         ) : null}
+        {data.businessPhone ? (
+          <p className="text-xs font-semibold text-muted tabular-nums">
+            {t("orders.bill.tel", { phone: data.businessPhone })}
+          </p>
+        ) : null}
       </div>
     </div>
   );

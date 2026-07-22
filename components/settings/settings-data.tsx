@@ -19,6 +19,7 @@ export async function SettingsData() {
       <BusinessProfileForm
         name={settings.business.name}
         address={settings.business.address}
+        phone={settings.business.phone}
         timezone={settings.business.timezone}
         localeDefault={settings.business.localeDefault}
         logoUrl={settings.business.logoUrl}

@@ -43,11 +43,12 @@ delete from auth.users where email in (
 -- ---------------------------------------------------------------------------
 -- 1. Business (tenant root)
 -- ---------------------------------------------------------------------------
-insert into public.business (id, name, address, logo_url, currency, timezone, locale_default, tax_config)
+insert into public.business (id, name, address, phone, logo_url, currency, timezone, locale_default, tax_config)
 values (
   '11111111-1111-1111-1111-111111111111',
   'Samanthas Bake House',
   'Walahanduwa, Galle',
+  '077 425 0255 / 074 231 0255',
   null,
   'LKR',
   'Asia/Colombo',

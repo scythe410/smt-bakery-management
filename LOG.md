@@ -5,6 +5,31 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — feat: business phone on the bill (client request)
+
+### Context
+
+Client (via chat): "Add the phone number to the bill" — both numbers, SL national format.
+
+### Changes
+
+- Migration `20260723110000` — `business.phone text` (free text, same contract as
+  `address`: may hold several numbers, NULL omits the bill line). Pushed to the hosted
+  project; `lib/supabase/types.ts` regenerated.
+- Settings → business profile: new Phone field (Zod `max(60)` optional; empty clears →
+  null), threaded through `settings` selector → `settings-data` → form → action.
+- Bill footer (`order-bill.tsx` + `order-bill` selector): renders `Tel: {{phone}}`
+  (i18n en/si) under the address when set.
+- `seed.sql`: demo business now seeds the phone. Live row set directly (client-requested
+  content): `077 425 0255 / 074 231 0255`.
+
+### Verified
+
+Live update returned the stored value; `tsc`, `eslint` (touched files), `next build` clean.
+The bill page itself not browser-verified this prompt.
+
+---
+
 ## 2026-07-23 — fix: menu category mapping for scan-linked items (AUDIT 1.2) + 1.5 pushed
 
 ### 1.5 pushed & verified live

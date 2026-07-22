@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       booking: {
@@ -100,6 +125,7 @@ export type Database = {
           name: string
           notification_preferences: Json
           order_seq: number
+          phone: string | null
           tax_config: Json
           timezone: string
           updated_at: string
@@ -114,6 +140,7 @@ export type Database = {
           name: string
           notification_preferences?: Json
           order_seq?: number
+          phone?: string | null
           tax_config?: Json
           timezone?: string
           updated_at?: string
@@ -128,6 +155,7 @@ export type Database = {
           name?: string
           notification_preferences?: Json
           order_seq?: number
+          phone?: string | null
           tax_config?: Json
           timezone?: string
           updated_at?: string
@@ -256,83 +284,6 @@ export type Database = {
             foreignKeyName: "employee_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
-            referencedRelation: "profile"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      salary_payment: {
-        Row: {
-          approved_by: string | null
-          base_cents: number
-          bonus_cents: number
-          business_id: string
-          created_at: string
-          employee_id: string
-          expense_id: string | null
-          id: string
-          paid_at: string | null
-          pay_date: string
-          status: string
-          total_cents: number
-          updated_at: string
-        }
-        Insert: {
-          approved_by?: string | null
-          base_cents: number
-          bonus_cents?: number
-          business_id: string
-          created_at?: string
-          employee_id: string
-          expense_id?: string | null
-          id?: string
-          paid_at?: string | null
-          pay_date: string
-          status?: string
-          total_cents: number
-          updated_at?: string
-        }
-        Update: {
-          approved_by?: string | null
-          base_cents?: number
-          bonus_cents?: number
-          business_id?: string
-          created_at?: string
-          employee_id?: string
-          expense_id?: string | null
-          id?: string
-          paid_at?: string | null
-          pay_date?: string
-          status?: string
-          total_cents?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salary_payment_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "business"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salary_payment_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salary_payment_expense_id_fkey"
-            columns: ["expense_id"]
-            isOneToOne: false
-            referencedRelation: "expense"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salary_payment_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
@@ -808,6 +759,83 @@ export type Database = {
           },
         ]
       }
+      salary_payment: {
+        Row: {
+          approved_by: string | null
+          base_cents: number
+          bonus_cents: number
+          business_id: string
+          created_at: string
+          employee_id: string
+          expense_id: string | null
+          id: string
+          paid_at: string | null
+          pay_date: string
+          status: string
+          total_cents: number
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          base_cents: number
+          bonus_cents?: number
+          business_id: string
+          created_at?: string
+          employee_id: string
+          expense_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pay_date: string
+          status?: string
+          total_cents: number
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          base_cents?: number
+          bonus_cents?: number
+          business_id?: string
+          created_at?: string
+          employee_id?: string
+          expense_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pay_date?: string
+          status?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_payment_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expense"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_count_line: {
         Row: {
           business_id: string
@@ -1160,16 +1188,12 @@ export type Database = {
     }
     Functions: {
       approve_salary_payment: {
-        Args: { p_bonus_cents?: number; p_employee_id: string; p_pay_date: string }
+        Args: {
+          p_bonus_cents?: number
+          p_employee_id: string
+          p_pay_date: string
+        }
         Returns: string
-      }
-      reverse_salary_payment: {
-        Args: { p_payment_id: string }
-        Returns: undefined
-      }
-      delete_salary_payment: {
-        Args: { p_payment_id: string }
-        Returns: undefined
       }
       close_stock_day: {
         Args: { p_lines: Json; p_stock_day_id: string }
@@ -1226,6 +1250,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_salary_payment: {
+        Args: { p_payment_id: string }
+        Returns: undefined
+      }
       list_linkable_accounts: {
         Args: never
         Returns: {
@@ -1256,7 +1284,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      receive_stock: {
+      produce_batch: {
         Args: { p_inventory_item_id: string; p_note?: string; p_qty: number }
         Returns: {
           barcode: string | null
@@ -1281,7 +1309,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      produce_batch: {
+      receive_stock: {
         Args: { p_inventory_item_id: string; p_note?: string; p_qty: number }
         Returns: {
           barcode: string | null
@@ -1330,6 +1358,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reverse_salary_payment: {
+        Args: { p_payment_id: string }
+        Returns: undefined
       }
       set_account_role: {
         Args: {
@@ -1525,6 +1557,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_language: ["en", "si"],

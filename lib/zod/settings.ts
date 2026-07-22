@@ -16,6 +16,9 @@ export const businessProfileSchema = z
     // Optional postal line shown on the printed bill. Blank clears it (→ null in
     // the action); no format is imposed — it's free text (e.g. "Walahanduwa, Galle").
     address: z.string().trim().max(200).optional(),
+    // Optional phone line(s) for the bill footer, same free-text contract as
+    // address (may hold several numbers, e.g. "077 425 0255 / 074 231 0255").
+    phone: z.string().trim().max(60).optional(),
     timezone: z.enum(TIMEZONES as unknown as [string, ...string[]]),
     localeDefault: z.enum(languages as unknown as [string, ...string[]]),
   })

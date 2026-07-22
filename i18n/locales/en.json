@@ -346,7 +346,8 @@
       "commission": "Platform fee",
       "total": "Total",
       "payment": "Payment",
-      "thankYou": "Thank you for your order!"
+      "thankYou": "Thank you for your order!",
+      "tel": "Tel: {{phone}}"
     },
     "error": {
       "title": "Couldn't load orders.",
@@ -611,6 +612,9 @@
       "name": "Business name",
       "address": "Address",
       "addressPlaceholder": "e.g. Walahanduwa, Galle",
+      "phone": "Phone",
+      "phonePlaceholder": "077 425 0255 / 074 231 0255",
+      "phoneHint": "Shown at the foot of printed bills. Leave blank to omit.",
       "addressHint": "Shown at the foot of printed bills. Leave blank to omit.",
       "timezone": "Timezone",
       "defaultLanguage": "Default language",

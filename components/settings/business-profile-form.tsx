@@ -27,12 +27,14 @@ const FIELD_CLASS =
 export function BusinessProfileForm({
   name,
   address,
+  phone,
   timezone,
   localeDefault,
   logoUrl,
 }: {
   name: string;
   address: string | null;
+  phone: string | null;
   timezone: string;
   localeDefault: Language;
   logoUrl: string | null;
@@ -118,6 +120,20 @@ export function BusinessProfileForm({
             className={FIELD_CLASS}
           />
           <span className="text-caption text-faint">{t("settings.business.addressHint")}</span>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-caption text-muted">{t("settings.business.phone")}</span>
+          <input
+            type="text"
+            name="phone"
+            inputMode="tel"
+            maxLength={60}
+            defaultValue={phone ?? ""}
+            placeholder={t("settings.business.phonePlaceholder")}
+            className={FIELD_CLASS}
+          />
+          <span className="text-caption text-faint">{t("settings.business.phoneHint")}</span>
         </label>
 
         <div className="grid grid-cols-2 gap-2">
