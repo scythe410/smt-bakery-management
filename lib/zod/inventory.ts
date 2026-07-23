@@ -33,6 +33,28 @@ export const addInventoryItemSchema = z
 
 export type AddInventoryItemInput = z.infer<typeof addInventoryItemSchema>;
 
+// Edit an existing inventory item's descriptive/pricing fields. Deliberately NO
+// qtyOnHand: stock quantity is a running total of the append-only movement ledger
+// (received / produced / count-adjusted), never a free-form edit — changing it
+// here would desync from the ledger. Everything else (name, kind, category, unit,
+// cost, retail price, threshold, BARCODE) is editable. The action re-checks kind
+// changes against recipe/tracked-good references and barcode uniqueness.
+export const editInventoryItemSchema = z
+  .object({
+    id: z.guid(),
+    name: z.string().trim().min(1).max(120),
+    kind: z.enum(INVENTORY_KINDS as unknown as [string, ...string[]]),
+    category: z.enum(INVENTORY_CATEGORIES as unknown as [string, ...string[]]),
+    unit: z.string().trim().min(1).max(20),
+    unitCostMajor: z.coerce.number().min(0).finite().max(1_000_000_000),
+    salePriceMajor: z.coerce.number().min(0).finite().max(1_000_000_000).optional(),
+    lowStockThreshold: z.coerce.number().min(0).finite().max(1_000_000_000),
+    barcode: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict();
+
+export type EditInventoryItemInput = z.infer<typeof editInventoryItemSchema>;
+
 /**
  * A barcode we will look up against the product API: a GTIN — EAN-13/8, UPC-A/E —
  * so 8–14 digits only. Manual entry and 1D scans both flow through this before we

@@ -12,6 +12,7 @@ import { toCents } from "@/lib/money";
 import {
   addInventoryItemSchema,
   barcodeLookupSchema,
+  editInventoryItemSchema,
   produceBatchSchema,
   receiveStockSchema,
   returnFinishedGoodSchema,
@@ -81,6 +82,102 @@ export async function addInventoryItem(
   // Refresh the list + low-stock counts (list row, pill, nav badge → shell cache).
   revalidatePath("/inventory");
   revalidateBusinessTags(profile.business_id, ["inventory"]);
+  return { ok: true };
+}
+
+export type EditInventoryItemState = { ok?: boolean; error?: string };
+
+/**
+ * Edit an existing inventory item — name, kind, category, unit, cost, retail
+ * price, low-stock threshold, and BARCODE (the field that lets a manually-added
+ * item be recognised when its physical barcode is scanned). Quantity is NOT here
+ * (it's a ledger running total; adjust via receive/produce/count-adjust).
+ *
+ * A KIND change is guarded server-side against the model's invariants that a
+ * plain UPDATE would otherwise slip past (the DB triggers fire on recipe_line /
+ * menu_item writes, not on an inventory_item kind flip):
+ *   - an item used as a recipe INGREDIENT can't become a non-ingredient;
+ *   - an item TRACKED by a menu item (sold from stock) can't become an ingredient.
+ * Retail price is nulled for ingredients. Barcode uniqueness (23505) is surfaced.
+ */
+export async function editInventoryItem(
+  id: string,
+  _prevState: EditInventoryItemState,
+  formData: FormData,
+): Promise<EditInventoryItemState> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { error: "inventory.edit.error" };
+
+  const rawBarcode = formData.get("barcode");
+  const rawSalePrice = formData.get("salePrice");
+  const parsed = editInventoryItemSchema.safeParse({
+    id,
+    name: formData.get("name"),
+    kind: formData.get("kind"),
+    category: formData.get("category"),
+    unit: formData.get("unit"),
+    unitCostMajor: formData.get("unitCost"),
+    salePriceMajor:
+      typeof rawSalePrice === "string" && rawSalePrice.trim() !== "" ? rawSalePrice : undefined,
+    lowStockThreshold: formData.get("lowStockThreshold"),
+    barcode: typeof rawBarcode === "string" && rawBarcode.trim() !== "" ? rawBarcode : undefined,
+  });
+  if (!parsed.success) return { error: "inventory.edit.error" };
+
+  const supabase = await createClient();
+
+  // Current kind (RLS-scoped — a cross-tenant id is invisible ⇒ not found).
+  const { data: current, error: readErr } = await supabase
+    .from("inventory_item")
+    .select("kind")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+  if (readErr || !current) return { error: "inventory.edit.error" };
+
+  // Guard a kind change against the model invariants (DB triggers don't cover an
+  // inventory_item kind flip — they fire on recipe_line / menu_item writes).
+  if (parsed.data.kind !== current.kind) {
+    if (current.kind === "ingredient" && parsed.data.kind !== "ingredient") {
+      const { count } = await supabase
+        .from("recipe_line")
+        .select("id", { count: "exact", head: true })
+        .eq("inventory_item_id", parsed.data.id);
+      if ((count ?? 0) > 0) return { error: "inventory.edit.errorKindRecipe" };
+    }
+    if (parsed.data.kind === "ingredient") {
+      const { count } = await supabase
+        .from("menu_item")
+        .select("id", { count: "exact", head: true })
+        .eq("tracked_inventory_item_id", parsed.data.id);
+      if ((count ?? 0) > 0) return { error: "inventory.edit.errorKindTracked" };
+    }
+  }
+
+  const sellable = parsed.data.kind === "merchandise" || parsed.data.kind === "finished_good";
+
+  const { error } = await supabase
+    .from("inventory_item")
+    .update({
+      name: parsed.data.name,
+      kind: parsed.data.kind as Database["public"]["Enums"]["inventory_kind"],
+      category: parsed.data.category as Database["public"]["Enums"]["inventory_category"],
+      unit: parsed.data.unit,
+      unit_cost_cents: toCents(parsed.data.unitCostMajor),
+      sale_price_cents:
+        sellable && parsed.data.salePriceMajor !== undefined
+          ? toCents(parsed.data.salePriceMajor)
+          : null,
+      low_stock_threshold: parsed.data.lowStockThreshold,
+      barcode: parsed.data.barcode ?? null,
+    })
+    .eq("id", parsed.data.id);
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return { error: "inventory.scan.duplicate" };
+    return { error: "inventory.edit.error" };
+  }
+
+  revalidatePath("/inventory");
+  revalidateBusinessTags(profile.business_id, ["inventory", "pricing"]);
   return { ok: true };
 }
 

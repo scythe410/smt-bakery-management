@@ -5,6 +5,36 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — feat: order cart + inventory Edit Item (client UX)
+
+Client: order scan flow "just says added, can't adjust amounts", and the page
+"scrolls up automatically weirdly"; also needs to edit existing items (set a
+barcode so a manually-added item is scannable, fix name/kind/cost/etc.).
+
+Order form (new-order-form.tsx):
+- New "Current order" cart between scanner and picker: every added/scanned line
+  with a -/qty/+ stepper, line total, and remove, plus Clear all. Adjust
+  quantities in one place instead of hunting the tile in the 277-item grid.
+- Scroll-jump fixed: addItem/confirmPrice/clear-search now focus the search box
+  with { preventScroll: true }, so refocusing the top input no longer yanks the
+  viewport up on every add/scan. Verified in-browser: scrollY 1200->1204 (was
+  jumping to top). i18n cart/clearCart/removeLine (en+si).
+
+Inventory Edit Item:
+- editInventoryItem action + editInventoryItemSchema + EditItemForm (pencil per
+  row). Edits name, kind, category, unit, cost, retail price, and BARCODE. NO
+  qty (ledger running total). Kind change guarded server-side: an ingredient in
+  a recipe can't leave 'ingredient'; a menu-tracked item can't become one
+  (DB triggers don't cover an inventory kind flip). Barcode uniqueness (23505)
+  surfaced. "No barcode" hint on rows lacking one. i18n inventory.edit.* +
+  noBarcode (en+si).
+
+Verified: tsc, eslint, next build clean; browser drive of both (cart steppers,
+edit form on the "\" item showing editable barcode), zero console errors, no
+live mutation.
+
+---
+
 ## 2026-07-23 — fix: scanned item "doesn't show up" on Orders (client report)
 
 ### Diagnosis (live data)

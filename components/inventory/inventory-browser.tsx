@@ -19,11 +19,13 @@ import {
   ClipboardList,
   ClipboardCheck,
   Croissant,
+  Pencil,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { AddItemForm } from "@/components/inventory/add-item-form";
+import { EditItemForm } from "@/components/inventory/edit-item-form";
 import { ScanReceive, type ReceiveTarget } from "@/components/inventory/scan-receive";
 import { setSalePrice } from "@/app/(app)/inventory/actions";
 import { formatLKR } from "@/lib/format";
@@ -133,6 +135,7 @@ export function InventoryBrowser({
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryListItem | null>(null);
   const [category, setCategory] = useState<InventoryCategory | "">("");
   const [query, setQuery] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
@@ -253,6 +256,16 @@ export function InventoryBrowser({
         </Card>
       ) : null}
 
+      {editingItem ? (
+        <Card>
+          <EditItemForm
+            key={editingItem.id}
+            item={editingItem}
+            onDone={() => setEditingItem(null)}
+          />
+        </Card>
+      ) : null}
+
       {/* Category filter + search */}
       <div className="flex gap-2">
         <select
@@ -309,24 +322,50 @@ export function InventoryBrowser({
                         tone={it.kind === "merchandise" ? "info" : "neutral"}
                         label={t(`inventory.kind.${it.kind}`)}
                       />
+                      {/* Barcode presence — "no barcode" is why a scan won't find
+                          it; surfaced so the fix (edit → set barcode) is obvious. */}
+                      {it.barcode ? null : (
+                        <>
+                          <span className="text-faint" aria-hidden>
+                            ·
+                          </span>
+                          <span className="text-caption text-faint">
+                            {t("inventory.noBarcode")}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    {it.qtyOnHand === null ? (
-                      <span className="text-caption text-faint italic">
-                        {t("inventory.notSet")}
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-label text-ink font-semibold tabular-nums">
-                          {formatQty(it.qtyOnHand)}
-                        </span>{" "}
-                        <span className="text-caption text-muted">{it.unit}</span>
-                      </>
-                    )}
-                    {it.kind === "merchandise" || it.kind === "finished_good" ? (
-                      <RowPriceEditor item={it} />
-                    ) : null}
+                  <div className="flex shrink-0 items-start gap-2">
+                    <div className="text-right">
+                      {it.qtyOnHand === null ? (
+                        <span className="text-caption text-faint italic">
+                          {t("inventory.notSet")}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-label text-ink font-semibold tabular-nums">
+                            {formatQty(it.qtyOnHand)}
+                          </span>{" "}
+                          <span className="text-caption text-muted">{it.unit}</span>
+                        </>
+                      )}
+                      {it.kind === "merchandise" || it.kind === "finished_good" ? (
+                        <RowPriceEditor item={it} />
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdding(false);
+                        setScanning(false);
+                        setEditingItem(it);
+                      }}
+                      aria-label={t("inventory.edit.editItem", { name: it.name })}
+                      className="text-muted hover:text-ink mt-0.5 shrink-0 transition-colors"
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </button>
                   </div>
                 </li>
               ))}
