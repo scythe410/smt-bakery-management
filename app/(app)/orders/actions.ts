@@ -24,6 +24,7 @@ import {
   orderListQuerySchema,
   orderStatusChangeSchema,
   scanBarcodeSchema,
+  scanPriceSchema,
   updateOrderSchema,
 } from "@/lib/zod/order";
 import {
@@ -32,7 +33,8 @@ import {
   type OrderFilterInput,
   type OrdersPageResult,
 } from "@/lib/db/selectors/orders";
-import { MENU_CATEGORY_FOR_INVENTORY } from "@/lib/inventory-config";
+import { MENU_CATEGORY_FOR_INVENTORY, type InventoryCategory } from "@/lib/inventory-config";
+import { toCents } from "@/lib/money";
 import type { Database } from "@/lib/supabase/types";
 
 type Enums = Database["public"]["Enums"];
@@ -279,20 +281,37 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
 
   // Only sold-from-stock lanes can be tracked by a menu item (DB guard, §4).
   if (inv.kind !== "merchandise" && inv.kind !== "finished_good") return { status: "unknown" };
-  // Can't sell without a retail price — the user sets it on the stock row.
+  // Can't sell without a retail price — surfaced so the till can set one inline
+  // (priceScannedItemAndResolve) rather than sending the cashier to Inventory.
   if (!inv.sale_price_cents || inv.sale_price_cents <= 0) {
     return { status: "no_price", name: inv.name };
   }
 
+  return createAndLinkFromStock(supabase, profile.business_id, inv, inv.sale_price_cents, code);
+}
+
+// Create a sold-from-stock menu_item for a priced inventory row and return it as
+// a billable line. Shared by the plain scan (price already on stock) and the
+// price-at-till flow. priceCents is passed explicitly — it MUST be written onto
+// menu_item.price_cents (the column defaults to 0, so omitting it would ship a
+// free-selling item), and it equals the stock row's sale_price_cents.
+async function createAndLinkFromStock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  inv: { id: string; name: string; category: InventoryCategory | null },
+  priceCents: number,
+  code: string,
+): Promise<ScanResolveResult> {
   const { data: created, error } = await supabase
     .from("menu_item")
     .insert({
-      business_id: profile.business_id,
+      business_id: businessId,
       name: inv.name,
+      price_cents: priceCents,
       // Menu categories are the shop's free-text vocabulary, not the inventory
       // enum — map the unambiguous tokens, leave the rest for the shop to
       // categorize (AUDIT 1.2; a raw "merch" leaked into the Menu filter).
-      category: MENU_CATEGORY_FOR_INVENTORY[inv.category] ?? null,
+      category: inv.category ? (MENU_CATEGORY_FOR_INVENTORY[inv.category] ?? null) : null,
       is_available: true,
       tracked_inventory_item_id: inv.id,
     })
@@ -315,7 +334,7 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
   }
 
   revalidatePath("/menu");
-  revalidateBusinessTags(profile.business_id, ["menu", "pricing"]);
+  revalidateBusinessTags(businessId, ["menu", "pricing"]);
 
   return {
     status: "found",
@@ -329,4 +348,50 @@ export async function resolveScannedBarcode(barcode: unknown): Promise<ScanResol
       barcode: code,
     },
   };
+}
+
+// Set a retail price on a just-scanned, unpriced stock item AND bill it — the
+// till's answer to a `no_price` scan (a real POS prices an unknown item inline,
+// it doesn't send the cashier away). Writes sale_price_cents onto the stock row
+// (so it's set for next time too), then creates + links the menu item at that
+// price. Sellable kinds only; RLS-scoped. Money is set here, server-side, from a
+// validated positive price — the client sends the number, never a total (§7.7).
+export async function priceScannedItemAndResolve(
+  barcode: unknown,
+  priceMajor: unknown,
+): Promise<ScanResolveResult> {
+  const profile = await requireProfile();
+  if (!profile.business_id) return { status: "unknown" };
+
+  const parsedCode = scanBarcodeSchema.safeParse(barcode);
+  const parsedPrice = scanPriceSchema.safeParse(priceMajor);
+  if (!parsedCode.success || !parsedPrice.success) return { status: "unknown" };
+  const code = parsedCode.data;
+  const priceCents = toCents(parsedPrice.data);
+
+  const supabase = await createClient();
+
+  // Set the price on the stock row (sellable kinds only; RLS hides other tenants
+  // and the kind filter skips ingredients → zero rows = nothing to price).
+  const { data: inv, error: updErr } = await supabase
+    .from("inventory_item")
+    .update({ sale_price_cents: priceCents })
+    .eq("barcode", code)
+    .in("kind", ["merchandise", "finished_good"])
+    .select("id, name, category")
+    .maybeSingle();
+  if (updErr || !inv) return { status: "unknown" };
+
+  revalidateBusinessTags(profile.business_id, ["inventory"]);
+
+  // An existing link (e.g. priced elsewhere in the meantime) wins; otherwise
+  // create + link at the price we just set.
+  const { data: existing } = await supabase
+    .from("menu_item")
+    .select("id, name, item_code, price_cents, category, is_available")
+    .eq("tracked_inventory_item_id", inv.id)
+    .maybeSingle();
+  if (existing) return scanResultFromLinked(existing, code);
+
+  return createAndLinkFromStock(supabase, profile.business_id, inv, priceCents, code);
 }

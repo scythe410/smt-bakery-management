@@ -35,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import {
   createOrder,
   resolveScannedBarcode,
+  priceScannedItemAndResolve,
   updateOrder,
   type CreateOrderState,
 } from "@/app/(app)/orders/actions";
@@ -138,6 +139,13 @@ export function NewOrderForm({
 
   // Barcode checkout state. The wedge scanner is always on; the camera is optional.
   const [scanMsg, setScanMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  // A scanned stock item with no retail price yet — prompt for one inline at the
+  // till (set price + bill in one step) instead of sending the cashier to
+  // Inventory. Holds the barcode + name of the item awaiting a price.
+  const [pricePrompt, setPricePrompt] = useState<{ code: string; name: string } | null>(null);
+  const [priceInput, setPriceInput] = useState("");
+  const [pricePending, setPricePending] = useState(false);
+  const priceInputRef = useRef<HTMLInputElement>(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [camError, setCamError] = useState<CameraScannerError | null>(null);
   const [camAttempt, setCamAttempt] = useState(0);
@@ -195,6 +203,16 @@ export function NewOrderForm({
     searchRef.current?.focus();
   }, []);
 
+  // Merge a server-resolved menu item into the picker (deduped) and add it to the
+  // cart. Shared by the plain scan and the price-at-till confirm.
+  const addResolvedItem = useCallback(
+    (item: NewOrderMenuItem) => {
+      setExtraItems((prev) => (prev.some((m) => m.id === item.id) ? prev : [...prev, item]));
+      addItem(item.id);
+    },
+    [addItem],
+  );
+
   // Add a menu item from a scanned barcode (wedge or camera). Dedupe identical
   // reads within a short window so a camera held on one code (many frames) or a
   // double-trigger doesn't spam the cart; a deliberate re-scan after the window
@@ -222,13 +240,15 @@ export function NewOrderForm({
       setScanMsg({ tone: "ok", text: t("orders.new.scanLooking", { code }) });
       const res = await resolveScannedBarcode(code);
       if (res.status === "found") {
-        setExtraItems((prev) =>
-          prev.some((m) => m.id === res.item.id) ? prev : [...prev, res.item],
-        );
-        addItem(res.item.id);
+        addResolvedItem(res.item);
         setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
       } else if (res.status === "no_price") {
-        setScanMsg({ tone: "warn", text: t("orders.new.scanNoPrice", { name: res.name }) });
+        // No retail price yet — open the inline price prompt so the cashier can
+        // set it and sell in one step, instead of a dead-end warning.
+        setQuickAdd("");
+        setScanMsg(null);
+        setPriceInput("");
+        setPricePrompt({ code, name: res.name });
       } else if (res.status === "unavailable") {
         setScanMsg({ tone: "warn", text: t("orders.new.scanUnavailable", { name: res.name }) });
       } else {
@@ -237,8 +257,30 @@ export function NewOrderForm({
         setScanMsg({ tone: "warn", text: t("orders.new.scanUnknown", { code }) });
       }
     },
-    [menuByBarcode, menu, addItem, t],
+    [menuByBarcode, menu, addItem, addResolvedItem, t],
   );
+
+  // Confirm the inline price prompt: set the price on stock + bill the item.
+  const confirmPrice = useCallback(async () => {
+    if (!pricePrompt) return;
+    const major = Number(priceInput);
+    if (!isFinite(major) || major <= 0) {
+      setScanMsg({ tone: "warn", text: t("orders.new.scanPriceInvalid") });
+      return;
+    }
+    setPricePending(true);
+    const res = await priceScannedItemAndResolve(pricePrompt.code, major);
+    setPricePending(false);
+    if (res.status === "found") {
+      addResolvedItem(res.item);
+      setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
+      setPricePrompt(null);
+      setPriceInput("");
+      searchRef.current?.focus();
+    } else {
+      setScanMsg({ tone: "warn", text: t("orders.new.scanPriceFailed") });
+    }
+  }, [pricePrompt, priceInput, addResolvedItem, t]);
 
   // Keyboard-wedge scanner — ALWAYS ON, and captures even while the search box is
   // focused (billing counter). The camera path is optional (toggle below).
@@ -403,6 +445,59 @@ export function NewOrderForm({
           >
             {scanMsg.text}
           </p>
+        ) : null}
+
+        {/* Inline price prompt — a scanned item with no retail price yet. Set it
+            here and it's saved to stock + billed in one step (no trip to
+            Inventory). */}
+        {pricePrompt ? (
+          <div className="border-border bg-surface flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
+            <span className="text-caption text-ink">
+              {t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                ref={priceInputRef}
+                type="text"
+                inputMode="decimal"
+                autoFocus
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    confirmPrice();
+                  }
+                  if (e.key === "Escape") {
+                    setPricePrompt(null);
+                    setPriceInput("");
+                  }
+                }}
+                placeholder={t("orders.new.scanPricePlaceholder")}
+                aria-label={t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
+                className="border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 flex-1 rounded-[var(--radius)] border px-2 tabular-nums outline-none focus-visible:ring-2"
+              />
+              <button
+                type="button"
+                onClick={confirmPrice}
+                disabled={pricePending}
+                className="bg-brand text-brand-white hover:bg-brand-ember text-caption h-9 shrink-0 rounded-[var(--radius)] px-3 font-semibold transition-colors disabled:opacity-50"
+              >
+                {pricePending ? t("orders.new.scanPriceSaving") : t("orders.new.scanPriceAdd")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPricePrompt(null);
+                  setPriceInput("");
+                }}
+                aria-label={t("orders.new.scanPriceCancel")}
+                className="text-muted hover:text-ink h-9 shrink-0 transition-colors"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+          </div>
         ) : null}
       </div>
 

@@ -5,6 +5,62 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — fix: scanned item "doesn't show up" on Orders (client report)
+
+### Diagnosis (live data)
+
+Manuja: scanning an item on Orders doesn't add it. Queried the live tenant: **41 barcoded
+merchandise items (Coca Cola, Fanta, Appifizz… — real drinks he's scanned into stock), ALL
+with `sale_price_cents = null` and none linked to a menu item.** So every scan hits
+`resolveScannedBarcode`'s `no_price` guard → the UI showed only a "Set a retail price in
+Stock first" warning and added nothing. From the till it reads as "nothing happens."
+
+Found a **second, latent bug** while in there: the create-and-link `insert` in
+`resolveScannedBarcode` **omitted `price_cents`** — the column defaults to 0 — so even a
+*priced* stock item would have produced a menu item selling for **LKR 0**. That path had
+never run in prod (everything was unpriced, so all scans short-circuited at `no_price`), so
+it was never observed, but it would have been the next bug the moment a price was set.
+
+### Changes
+
+- **`app/(app)/orders/actions.ts`**
+  - Extracted `createAndLinkFromStock(...)` and made it **write `price_cents` explicitly**
+    from the stock row's sale price (fixes the LKR-0 latent bug).
+  - New action **`priceScannedItemAndResolve(barcode, priceMajor)`**: sets `sale_price_cents`
+    on the stock row (sellable kinds only, RLS-scoped, so it's saved for next time too), then
+    creates + links the menu item at that price and returns it as a billable line. Money is
+    set server-side from a validated positive price; the client still never sends a total (§7.7).
+- **`components/orders/new-order-form.tsx`** — a `no_price` scan now opens an **inline price
+  prompt** at the till ("{name} has no price yet. Enter its selling price to add it:" +
+  input + Set & Add + cancel) instead of a dead-end warning. On confirm it prices the stock
+  row and bills the item in one step — the POS way. Extracted `addResolvedItem` (dedupe +
+  add) shared by the plain scan and the price confirm.
+- **`lib/zod/order.ts`** — `scanPriceSchema` (coerced positive number).
+- i18n — `orders.new.scanPrice{Prompt,Placeholder,Add,Saving,Cancel,Invalid,Failed}` (en + si).
+
+### Verified
+
+- **Live browser** (Playwright, owner login, real wedge-scan keystroke burst of an actual
+  unpriced barcode `4792229105807`): the inline price prompt appears, the input is
+  controlled, zero console errors. Screenshot `10-prompt-filled.png`. Deliberately did NOT
+  click "Set & Add" — that mutates live data (prices stock + creates a menu item); confirmed
+  post-drive that all 41 items are still unpriced, so the drive wrote nothing.
+- **Price-flow correctness**: rolled-back SQL against the live DB (JWT-impersonated) proved a
+  created menu item carries the set price, not 0.
+- `tsc`, `eslint` (touched files), `next build` — all clean.
+
+### Open / follow-up
+
+- The 41 stock items stay unpriced until sold or bulk-priced; the till flow prices them one at
+  a time on first scan (intended), or Manuja can price them in Inventory (the inline
+  RowPriceEditor). **Some names are junk** from the scan-to-add lookup (e.g. an item literally
+  named `\`, "charged", mixed-case "coca cola" duplicates) — worth a cleanup pass, flagged to
+  the client, not touched here.
+- The two-price tension (stock `sale_price_cents` vs the linked menu `price_cents` once they
+  diverge) is unchanged — still the documented AUDIT §2 open decision.
+
+---
+
 ## 2026-07-23 — fix: Employees screen UX (client: "the employees section UX is bad")
 
 ### Diagnosis

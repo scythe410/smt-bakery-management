@@ -323,6 +323,13 @@
       "scanAdded": "{{name}} එක් කරන ලදී",
       "scanLooking": "{{code}} සොයමින්…",
       "scanNoPrice": "පළමුව {{name}} සඳහා තොගයේ සිල්ලර මිලක් සකසන්න",
+      "scanPricePrompt": "{{name}} සඳහා තවම මිලක් නැත. එය එක් කිරීමට විකුණුම් මිල ඇතුළත් කරන්න:",
+      "scanPricePlaceholder": "මිල (රු.)",
+      "scanPriceAdd": "සකසා එක් කරන්න",
+      "scanPriceSaving": "එක් කරමින්…",
+      "scanPriceCancel": "අවලංගු කරන්න",
+      "scanPriceInvalid": "0 ට වැඩි මිලක් ඇතුළත් කරන්න.",
+      "scanPriceFailed": "එම භාණ්ඩයට මිල නියම කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "scanUnavailable": "{{name}} මෙනුවේ නොමැති ලෙස සලකුණු කර ඇත — විකිණීමට එය ලබා ගත හැකි ලෙස සලකුණු කරන්න",
       "scanUnknown": "තීරුකේතය {{code}} සඳහා භාණ්ඩයක් නැත"
     },

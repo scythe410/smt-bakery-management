@@ -323,6 +323,13 @@
       "scanAdded": "Added {{name}}",
       "scanLooking": "Looking up {{code}}…",
       "scanNoPrice": "Set a retail price for {{name}} in Stock first",
+      "scanPricePrompt": "{{name}} has no price yet. Enter its selling price to add it:",
+      "scanPricePlaceholder": "Price (LKR)",
+      "scanPriceAdd": "Set & Add",
+      "scanPriceSaving": "Adding…",
+      "scanPriceCancel": "Cancel",
+      "scanPriceInvalid": "Enter a price greater than 0.",
+      "scanPriceFailed": "Couldn't price that item. Try again.",
       "scanUnavailable": "{{name}} is marked unavailable on the Menu — mark it available to sell it",
       "scanUnknown": "No item for barcode {{code}}"
     },

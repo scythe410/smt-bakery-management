@@ -103,3 +103,9 @@ export type OrderStatusChangeInput = z.infer<typeof orderStatusChangeSchema>;
 // Shape guard only; the server looks the code up against this tenant's stock under
 // RLS and, if needed, links it to a sold-from-stock menu item (CLAUDE.md §4).
 export const scanBarcodeSchema = z.string().trim().min(1).max(64);
+
+// A retail price (major units / rupees) set at the till when a scanned item has
+// none yet — the cashier prices an unpriced stock item inline instead of leaving
+// for Inventory. Converted to cents server-side; must be positive (a 0 price
+// would sell the item free).
+export const scanPriceSchema = z.coerce.number().positive().finite().max(1_000_000_000);
