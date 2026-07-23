@@ -143,9 +143,23 @@
     "lowBadge": "Low",
     "searchPlaceholder": "Search ingredients…",
     "notSet": "Not set",
+    "noBarcode": "No barcode",
     "showing": "Showing {{shown}} of {{total}}",
     "empty": "No inventory items yet. Add your first item.",
     "noMatch": "No items match your filters.",
+    "edit": {
+      "editItem": "Edit {{name}}",
+      "title": "Edit item",
+      "close": "Close",
+      "barcodePlaceholder": "Scan or type a barcode",
+      "qtyNote": "Quantity isn't edited here — use Receive Stock, Produce, or a stock count.",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Couldn't save those changes. Check the fields and try again.",
+      "errorKindRecipe": "This item is used in a recipe, so it must stay an Ingredient.",
+      "errorKindTracked": "A menu item sells this from stock, so it can't become an Ingredient."
+    },
     "filter": {
       "category": "Category",
       "allCategories": "All categories"
@@ -299,6 +313,9 @@
       "increase": "Add one {{name}}",
       "searchPlaceholder": "Item code or name",
       "clearSearch": "Clear search",
+      "cart": "Current order",
+      "clearCart": "Clear all",
+      "removeLine": "Remove {{name}}",
       "viewToggle": "Item view",
       "view": {
         "grid": "Grid view",

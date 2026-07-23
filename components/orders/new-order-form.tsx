@@ -29,6 +29,7 @@ import {
   Plus,
   ScanBarcode,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -200,8 +201,29 @@ export function NewOrderForm({
       return copy;
     });
     setQuickAdd("");
-    searchRef.current?.focus();
+    // preventScroll: refocusing the (top) search box must NOT yank the viewport
+    // up — the cashier may be scrolled down in the grid or scanning at the counter.
+    searchRef.current?.focus({ preventScroll: true });
   }, []);
+
+  // Remove a line from the order entirely (cart trash button).
+  function removeLine(id: string) {
+    setQtyById((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    setQtyRaw((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  }
+
+  function clearCart() {
+    setQtyById({});
+    setQtyRaw({});
+  }
 
   // Merge a server-resolved menu item into the picker (deduped) and add it to the
   // cart. Shared by the plain scan and the price-at-till confirm.
@@ -276,7 +298,7 @@ export function NewOrderForm({
       setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
       setPricePrompt(null);
       setPriceInput("");
-      searchRef.current?.focus();
+      searchRef.current?.focus({ preventScroll: true });
     } else {
       setScanMsg({ tone: "warn", text: t("orders.new.scanPriceFailed") });
     }
@@ -336,6 +358,23 @@ export function NewOrderForm({
     () => Object.entries(qtyById).map(([menuItemId, qty]) => ({ menuItemId, qty })),
     [qtyById],
   );
+
+  // The order's current lines, resolved to name + price for the cart summary —
+  // so scanned/added items are visible and adjustable in ONE place, without
+  // hunting for their tile in the full item grid.
+  const cartLines = useMemo(() => {
+    const byId = new Map(menu.map((m) => [m.id, m]));
+    return lines.map((l) => {
+      const m = byId.get(l.menuItemId);
+      return {
+        id: l.menuItemId,
+        name: m?.name ?? "",
+        itemCode: m?.itemCode,
+        priceCents: m?.priceCents ?? 0,
+        qty: l.qty,
+      };
+    });
+  }, [lines, menu]);
 
   // On-screen estimate only — the server recomputes the authoritative total.
   const estimatedCents = useMemo(() => {
@@ -501,6 +540,74 @@ export function NewOrderForm({
         ) : null}
       </div>
 
+      {/* Current order (cart) — every added/scanned item lands here with its own
+          stepper, so quantities are adjustable in one place without finding the
+          tile in the grid. Empty until the first item is added. */}
+      {cartLines.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-label text-ink font-semibold">
+              {t("orders.new.cart")} · {t("orders.new.itemsCount", { count: totalQty })}
+            </span>
+            <button
+              type="button"
+              onClick={clearCart}
+              className="text-caption text-muted hover:text-danger transition-colors"
+            >
+              {t("orders.new.clearCart")}
+            </button>
+          </div>
+          <ul className="border-border divide-border bg-surface divide-y rounded-[var(--radius)] border">
+            {cartLines.map((c) => (
+              <li key={c.id} className="flex items-center gap-2 px-2.5 py-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-label text-ink block truncate">{c.name}</span>
+                  <span className="text-caption text-muted tabular-nums">
+                    {formatLKR(c.priceCents)} × {c.qty} = {formatLKR(c.priceCents * c.qty)}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => bump(c.id, -1)}
+                    aria-label={t("orders.new.decrease", { name: c.name })}
+                    className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
+                  >
+                    <Minus className="size-4" aria-hidden />
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={qtyRaw[c.id] ?? String(c.qty)}
+                    onChange={(e) => handleQtyChange(c.id, e.target.value)}
+                    onBlur={() => commitQty(c.id)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    aria-label={t("orders.new.qtyFor", { name: c.name })}
+                    className="border-border focus-visible:ring-brand/40 text-label text-ink h-8 w-10 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => bump(c.id, 1)}
+                    aria-label={t("orders.new.increase", { name: c.name })}
+                    className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
+                  >
+                    <Plus className="size-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeLine(c.id)}
+                    aria-label={t("orders.new.removeLine", { name: c.name })}
+                    className="text-muted hover:text-danger ml-0.5 flex size-8 items-center justify-center transition-colors"
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {/* Quick-add / item picker */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
@@ -563,7 +670,7 @@ export function NewOrderForm({
                   type="button"
                   onClick={() => {
                     setQuickAdd("");
-                    searchRef.current?.focus();
+                    searchRef.current?.focus({ preventScroll: true });
                   }}
                   aria-label={t("orders.new.clearSearch")}
                   className="text-muted hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
