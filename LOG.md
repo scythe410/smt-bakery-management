@@ -5,6 +5,58 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-23 — fix: Employees screen UX (client: "the employees section UX is bad")
+
+### Diagnosis
+
+With the real 13-person roster now live, two problems were visible in a browser drive
+(Playwright, owner login, `/employees`):
+
+1. **Roster + payroll on one page, no separation.** Both sections stacked vertically; the
+   roster rendered as 13 TALL CARDS (`Card` per employee, ~4-5 lines each incl. "No
+   permissions set" / "No shift set" placeholders that fire for nearly every row — this
+   roster is all Cashiers with no permissions/shift configured), pushing payroll far down
+   the page and making the roster itself a long scroll.
+2. **Payroll list — the owner's daily task — was the worse offender.** Each of the 12
+   rated employees rendered an ALWAYS-EXPANDED "Bonus (optional)" text input + a full-width
+   "Approve & Pay" button, whether or not a bonus was ever going to be entered. For a
+   "approve everyone, no bonus" day (the common case), that's 12 always-visible inputs the
+   owner has to visually skip past — see LOG screenshot description below.
+
+### Changes
+
+- **`components/employees/employees-list.tsx`** — split into two URL-driven tabs
+  (`?tab=payroll|team`, same pattern as Finance's `FinanceTabs`): Payroll (owner default)
+  and Team. Non-owners never see the tab bar (payroll is owner-only regardless).
+  Roster rows are now compact **list-rows** in one `Card` (name + role left, daily rate +
+  login pill + edit/delete right — one line each) instead of a `Card` per employee.
+  Permissions/shift chips render **only when actually set** — no more "No permissions set"
+  / "No shift set" filler on every row.
+- **`components/employees/payroll-panel.tsx`** — each unpaid row collapses to ONE LINE by
+  default (name + rate, a small "+ Bonus" toggle, "Approve & Pay"). The bonus input only
+  appears for a row after "+ Bonus" is tapped, with an explicit Cancel (✕) to collapse back
+  — 12 rows now read as 12 lines, not 12 four-line blocks. Fixed a regression caught before
+  it shipped: the collapsed view initially dropped the "delete a leftover pending payment"
+  action (reachable after an Unapprove, where `salary_payment` reverts to `status='pending'`
+  but the row isn't removed) — restored as a small trash icon in the collapsed row whenever
+  `row.payment` exists and isn't paid.
+- i18n — `employees.tabs.{payroll,team}`, `employees.payroll.{addBonus,cancelBonus}` (en + si).
+
+### Verified
+
+Driven end-to-end in a real browser against the LIVE hosted project (owner login via
+Playwright, `chromium` from the `npx playwright` cache — no local `playwright` devDependency
+was added): Payroll tab renders all 12 rated employees as one-line rows; Team tab renders the
+13-person roster as compact list-rows; bonus open/cancel verified with **zero mutation** —
+confirmed via `select * from salary_payment where pay_date = today` returning 0 rows both
+before and after the drive. The actual "Approve & Pay" submit path was deliberately NOT
+clicked in this session (it would post a real Finance expense against the live tenant) — that
+still needs a real click-through once the client is ready, or a rolled-back RPC-level test
+like `supabase/tests/update_order.sql` for a non-destructive check. Zero browser console
+errors during the drive. `tsc --noEmit`, `eslint` (touched files), `next build` — all clean.
+
+---
+
 ## 2026-07-23 — chore: UI polish + employee roster entry (client requests)
 
 ### UI (committed)
