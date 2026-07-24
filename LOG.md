@@ -5,6 +5,28 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-24 — fix: daily stock-take "can't save the count" (negative seeded qty)
+
+Client (WhatsApp): "I can't save the daily count — it's showing an error." Root
+cause: the stock-take open-day form seeds each opening count from
+`inventory_item.qty_on_hand`, which is legitimately NEGATIVE for 4 merchandise items
+(Kalkiri Highland -4, Plain Tea -3, Milk Coffee -1, magic cone vanilla -1) — stock
+may go negative by design (CLAUDE.md §4, "never block a sale on stock"). But
+`lib/zod/stock.ts` validated quantities with `.min(0)`, so the seeded negative failed
+Zod → the action returned `stock.error.generic` and the day couldn't be opened.
+
+Confirmed against the linked DB: `open_stock_day` / `close_stock_day` themselves
+succeed for all roles (the RPC was never the problem); the `.min(0)` app guard was.
+Fix: relaxed the shared stock-take `qty` to a signed range (`-1e9..1e9`, still
+finite) — the DB constrains no quantity column (migration 013 excludes
+`qty_on_hand`) and these counts are a signed reconciliation. `priceMajor` stays
+non-negative (money). Latent in the ingredient audit too (same schema) — also fixed.
+
+**Changed:** `lib/zod/stock.ts`. **Verified:** `tsc` + eslint clean; reproduced the
+reject and the fix with the real qty values via node. App-only — no DB change.
+
+---
+
 ## 2026-07-24 — fix: order composer — search-reset on tap + phantom submit on "Review & pay"
 
 Client: "search for something and click on it — before I set the amount to 2 or 3

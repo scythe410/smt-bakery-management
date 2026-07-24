@@ -2,13 +2,18 @@
 // server-side (CLAUDE.md §7.6); business_id is NEVER taken from the client — the
 // RPCs/actions resolve it from the session. Money (unit price) arrives in major
 // units (rupees) and is converted to integer cents server-side (lib/money.toCents)
-// — no float money is stored (CLAUDE.md §3). Quantities are non-negative decimals
-// (numeric(12,3) in the DB). Ids use z.guid() (accepts the seed's vanity UUIDs,
-// like the order schema — see LOG 2026-07-12); the RPCs re-check tenancy + kind.
+// — no float money is stored (CLAUDE.md §3). Ids use z.guid() (accepts the seed's
+// vanity UUIDs, like the order schema — see LOG 2026-07-12); the RPCs re-check
+// tenancy + kind.
 
 import { z } from "zod";
 
-const qty = z.coerce.number().min(0).finite().max(1_000_000_000);
+// Stock-take counts are a SIGNED reconciliation against qty_on_hand, which may be
+// negative by design (CLAUDE.md §4: "system stock lies"; a sale is never blocked on
+// stock). The open-day form seeds opening from qty_on_hand, so a floor of 0 would
+// reject a legitimately-negative opening and break "Open day". The DB constrains no
+// quantity column (migration 013 excludes qty_on_hand), so neither does this.
+const qty = z.coerce.number().finite().min(-1_000_000_000).max(1_000_000_000);
 const priceMajor = z.coerce.number().min(0).finite().max(1_000_000_000);
 
 /** Open today's merchandise count: opening qty + snapshot selling price per line. */
