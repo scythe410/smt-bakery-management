@@ -5,6 +5,53 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-24 — fix: order composer — search-reset on tap + phantom submit on "Review & pay"
+
+Client: "search for something and click on it — before I set the amount to 2 or 3
+it takes it as one and goes back to showing all the menu. Also when I click the
+red button and go to the next screen it loads a bit and comes back to the orders
+page. Orders can't be placed."
+
+Two distinct bugs in `new-order-form.tsx`, both confirmed by driving the real app
+(Playwright, owner demo user) and both fixed:
+
+1. **Tapping a result cleared the search.** `addItem` called `setQuickAdd("")`, so
+   after tapping a filtered tile the query emptied and the picker snapped back to
+   the full menu (repro: `Milk` → 3 rows → tap → 276 rows). The cashier lost the
+   tile before they could bump its qty. Removed the clear from `addItem`; the
+   search now persists so the same tile's stepper stays in front of them. Scan
+   paths that legitimately need to wipe a wedge-leaked first char now clear
+   `quickAdd` explicitly (`addResolvedItem`, the menu-barcode branch of
+   `addByBarcode`) — the unknown/no_price branches already did.
+
+2. **"Review & pay" submitted the order instead of advancing a step.** The sticky
+   footer rendered a `type="button"` (Review & pay) OR a `type="submit"` (Charge)
+   from a ternary at the SAME position. React reconciled them into ONE reused
+   `<button>` node and, when the step flipped inside the click handler, mutated its
+   `type` to `submit` mid-click — so the browser's default action fired the form.
+   `createOrder` ran with qty-1, the composer closed, and the user landed back on
+   the list (the order WAS created — ORD-172…176 were these misfires — but it read
+   as "nothing happened / can't place orders"). Gave the two CTAs distinct `key`s
+   (`to-review` / `submit-order`) so React never reuses+mutates one node; the
+   forward button now only calls `setStep`.
+
+**Decisions:** kept the diff minimal — the repo is not Prettier-enforced (64 files
+fail `format:check`, including this one pre-change), so I did NOT run a formatting
+pass that would have reordered unrelated Tailwind classes.
+
+**Verified:** Playwright end-to-end as owner (si locale) — (a) `Milk` search
+survives a tap and the list stays at 3 rows; qty editable to 2/3; (b) clicking
+"Review & pay" fires ZERO server-action POSTs, composer stays open, Charge button
+reads "අය කරන්න LKR …" (ready, not "Saving…"); back-arrow round-trips to Items.
+Placed one real order (ORD-180, LKR 360 = 120×3) then deleted it + all test
+artifacts (ORD-177…180) via service role; DB verified back to ORD-176, no orphan
+`stock_movement` rows. `tsc --noEmit` clean, `eslint` clean on the file,
+`next build` succeeds.
+
+**Open:** the pre-existing repo-wide Prettier drift (64 files) is untouched.
+
+---
+
 ## 2026-07-24 — refactor: full-screen two-step order composer (UX revamp)
 
 Client: the new-order flow "is long, keyboard pops up when you add something,

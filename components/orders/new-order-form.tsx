@@ -220,6 +220,9 @@ export function NewOrderForm({
   // code increment correctly (a captured closure would otherwise read a stale qty);
   // the raw override is cleared so the input falls back to the canonical qty.
   // Deliberately does NOT refocus search — a tile tap must not pop the keyboard.
+  // It also does NOT clear the search box: after tapping a result the cashier wants
+  // the same filtered tile in front of them to bump the qty, not the whole menu
+  // snapping back. Scan paths clear the query themselves (leaked first char).
   const addItem = useCallback((id: string) => {
     setQtyById((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
     setQtyRaw((prev) => {
@@ -228,7 +231,6 @@ export function NewOrderForm({
       delete copy[id];
       return copy;
     });
-    setQuickAdd("");
   }, []);
 
   // Remove a line from the order entirely (cart trash button).
@@ -256,6 +258,8 @@ export function NewOrderForm({
     (item: NewOrderMenuItem) => {
       setExtraItems((prev) => (prev.some((m) => m.id === item.id) ? prev : [...prev, item]));
       addItem(item.id);
+      // A scan may have leaked its first character into a focused search box.
+      setQuickAdd("");
     },
     [addItem],
   );
@@ -276,6 +280,8 @@ export function NewOrderForm({
       const id = menuByBarcode.get(code);
       if (id) {
         addItem(id);
+        // A scan may have leaked its first character into a focused search box.
+        setQuickAdd("");
         const name = menu.find((m) => m.id === id)?.name ?? "";
         setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name }) });
         return;
@@ -1028,10 +1034,16 @@ export function NewOrderForm({
         <input type="hidden" name="items" value={itemsJson} readOnly />
         <input type="hidden" name="discountPct" value={discountPct} readOnly />
 
-        {/* Sticky action bar — running total + the step's forward CTA (DESIGN.md §4) */}
+        {/* Sticky action bar — running total + the step's forward CTA (DESIGN.md §4).
+            The two CTAs carry distinct keys so React never reconciles them into one
+            reused <button> node: mutating type="button"->"submit" on the SAME node
+            mid-click lets the browser's default action submit the form as the step
+            flips, firing createOrder before the cashier ever reviews (phantom
+            submit). Distinct keys force a fresh node per step. */}
         <div className="border-border bg-surface shrink-0 border-t px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           {step === "items" ? (
             <button
+              key="to-review"
               type="button"
               disabled={!hasItems}
               onClick={() => setStep("review")}
@@ -1045,6 +1057,7 @@ export function NewOrderForm({
             </button>
           ) : (
             <button
+              key="submit-order"
               type="submit"
               disabled={pending || !hasItems}
               className="bg-brand text-brand-white text-label hover:bg-brand-ember h-12 w-full rounded-[var(--radius)] font-semibold transition-colors disabled:opacity-50"
