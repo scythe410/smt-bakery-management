@@ -46,6 +46,12 @@ export const newOrderSchema = z
       )
       .min(1)
       .max(100),
+    // Cash the customer hands over (major units / rupees), optional — only a cash
+    // sale records it. Coerced from a FormData string; converted to cents
+    // server-side. It's a recorded input (change = tendered − total is derived on
+    // the bill), so unlike the money totals it IS accepted from the client, but
+    // still bounded non-negative here and re-guarded in the RPC.
+    tenderedMajor: z.coerce.number().min(0).finite().max(1_000_000_000).optional(),
   })
   // Reject unknown fields — the client sends only these (CLAUDE.md §7.6).
   .strict();

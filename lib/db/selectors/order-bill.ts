@@ -69,6 +69,13 @@ export type OrderBillData = {
   // Payment
   paymentMethod: string | null;
   paymentStatus: string;
+  /** Cash the customer handed over, in cents; null when not recorded (non-cash). */
+  tenderedCents: number | null;
+  /** Change to return = max(0, tendered − total); null when tendered isn't recorded. */
+  changeCents: number | null;
+  /** Pre-formatted; empty string when the corresponding value is null. */
+  tenderedFmt: string;
+  changeFmt: string;
   // Order status — used by the detail view; the bill doesn't render it
   status: OrderStatus;
 };
@@ -98,6 +105,11 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
   if (!order) return null;
 
   const timezone = business?.timezone ?? "Asia/Colombo";
+
+  // Cash tendered is a recorded input; change is derived (never stored). Clamp the
+  // display to >= 0 — a bill shows change owed to the customer, not a shortfall.
+  const tenderedCents = order.tendered_cents ?? null;
+  const changeCents = tenderedCents === null ? null : Math.max(0, tenderedCents - order.total_cents);
 
   const lines: OrderBillLine[] = order.order_item
     .slice()
@@ -137,6 +149,10 @@ export async function getOrderBillData(orderId: string): Promise<OrderBillData |
     totalFmt: formatLKR(order.total_cents),
     paymentMethod: order.payment_method,
     paymentStatus: order.payment_status,
+    tenderedCents,
+    changeCents,
+    tenderedFmt: tenderedCents === null ? "" : formatLKR(tenderedCents),
+    changeFmt: changeCents === null ? "" : formatLKR(changeCents),
     status: order.status as OrderStatus,
   };
 }

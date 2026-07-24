@@ -333,6 +333,9 @@
       "discount": "වට්ටම",
       "discountNone": "නැත",
       "discountPct": "{{pct}}%",
+      "cashGiven": "ගෙවූ මුදල",
+      "cashGivenPlaceholder": "මුදල (LKR)",
+      "change": "ඉතිරිය",
       "estTotal": "ඇස්තමේන්තුගත එකතුව",
       "itemsCount_one": "අයිතම {{count}}",
       "itemsCount_other": "අයිතම {{count}}",
@@ -385,6 +388,8 @@
       "commission": "වේදිකා ගාස්තු",
       "total": "එකතුව",
       "payment": "ගෙවීම",
+      "tendered": "ගෙවූ මුදල",
+      "change": "ඉතිරිය",
       "thankYou": "ඔබේ ඇණවුම සඳහා ස්තූතියි!",
       "tel": "දුරකථන: {{phone}}"
     },

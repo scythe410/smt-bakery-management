@@ -531,6 +531,7 @@ export type Database = {
           source: Database["public"]["Enums"]["order_source"]
           status: Database["public"]["Enums"]["order_status"]
           subtotal_cents: number
+          tendered_cents: number | null
           total_cents: number
           updated_at: string
         }
@@ -549,6 +550,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["order_source"]
           status?: Database["public"]["Enums"]["order_status"]
           subtotal_cents?: number
+          tendered_cents?: number | null
           total_cents?: number
           updated_at?: string
         }
@@ -567,6 +569,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["order_source"]
           status?: Database["public"]["Enums"]["order_status"]
           subtotal_cents?: number
+          tendered_cents?: number | null
           total_cents?: number
           updated_at?: string
         }
@@ -1224,6 +1227,7 @@ export type Database = {
           p_payment_method: Database["public"]["Enums"]["payment_method"]
           p_payment_status: Database["public"]["Enums"]["payment_status"]
           p_source: Database["public"]["Enums"]["order_source"]
+          p_tendered_cents?: number
         }
         Returns: {
           business_id: string
@@ -1240,6 +1244,7 @@ export type Database = {
           source: Database["public"]["Enums"]["order_source"]
           status: Database["public"]["Enums"]["order_status"]
           subtotal_cents: number
+          tendered_cents: number | null
           total_cents: number
           updated_at: string
         }
@@ -1390,6 +1395,7 @@ export type Database = {
           source: Database["public"]["Enums"]["order_source"]
           status: Database["public"]["Enums"]["order_status"]
           subtotal_cents: number
+          tendered_cents: number | null
           total_cents: number
           updated_at: string
         }
@@ -1409,6 +1415,7 @@ export type Database = {
           p_payment_method: Database["public"]["Enums"]["payment_method"]
           p_payment_status: Database["public"]["Enums"]["payment_status"]
           p_source: Database["public"]["Enums"]["order_source"]
+          p_tendered_cents?: number
         }
         Returns: {
           business_id: string
@@ -1425,6 +1432,7 @@ export type Database = {
           source: Database["public"]["Enums"]["order_source"]
           status: Database["public"]["Enums"]["order_status"]
           subtotal_cents: number
+          tendered_cents: number | null
           total_cents: number
           updated_at: string
         }

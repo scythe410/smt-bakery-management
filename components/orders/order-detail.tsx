@@ -58,6 +58,7 @@ export function OrderDetail({
       paymentMethod: data.paymentMethod,
       paymentStatus: data.paymentStatus,
       discountPct: data.discountPct,
+      tenderedMajor: data.tenderedCents === null ? null : data.tenderedCents / 100,
       lines: data.lines.map((l) => ({
         menuItemId: l.menuItemId,
         nameSnapshot: l.nameSnapshot,

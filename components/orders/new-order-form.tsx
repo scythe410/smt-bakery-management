@@ -64,6 +64,8 @@ export type OrderFormInitial = {
   paymentMethod: string | null;
   paymentStatus: string;
   discountPct: number;
+  /** Cash tendered in major units (rupees), or null when none was recorded. */
+  tenderedMajor: number | null;
   lines: { menuItemId: string | null; nameSnapshot: string; qty: number }[];
 };
 
@@ -156,6 +158,12 @@ export function NewOrderForm({
   );
   const [paymentStatus, setPaymentStatus] = useState<string>(
     editInitial?.paymentStatus ?? PAYMENT_STATUSES[0],
+  );
+  // Cash the customer hands over (major units, raw string). Recorded only for a
+  // cash sale; the bill derives the change (tendered − total). Never a computed
+  // total — the server stores it as an input and re-guards its sign (§7.7).
+  const [tendered, setTendered] = useState<string>(
+    editInitial?.tenderedMajor != null ? String(editInitial.tenderedMajor) : "",
   );
 
   // Barcode checkout state. The wedge scanner is always on; the camera is optional.
@@ -991,6 +999,36 @@ export function NewOrderForm({
                   </select>
                 </label>
               </div>
+
+              {/* Cash given + change — cash sales only. The bill records the amount
+                  the customer hands over and prints the balance returned. */}
+              {paymentMethod === "cash" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-caption text-muted">{t("orders.new.cashGiven")}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      name="tendered"
+                      value={tendered}
+                      onChange={(e) => setTendered(e.target.value)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      placeholder={t("orders.new.cashGivenPlaceholder")}
+                      className={`${FIELD_CLASS} text-right tabular-nums`}
+                    />
+                  </label>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-caption text-muted">{t("orders.new.change")}</span>
+                    <div className="flex h-10 items-center justify-end px-2">
+                      <span className="text-label text-ink font-semibold tabular-nums">
+                        {tendered.trim() === ""
+                          ? "—"
+                          : formatLKR(Math.max(0, Math.round(Number(tendered) * 100) - netCents))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Estimated total — server recomputes the authoritative figure */}
               <div className="bg-surface-2 flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2">

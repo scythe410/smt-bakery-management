@@ -71,6 +71,7 @@ export async function createOrder(
     paymentMethod: formData.get("paymentMethod"),
     paymentStatus: formData.get("paymentStatus"),
     discountPct: formData.get("discountPct") ?? 0,
+    tenderedMajor: formData.get("tendered") || undefined,
     items: itemsRaw,
   });
   if (!parsed.success) return { error: "orders.new.error" };
@@ -82,6 +83,8 @@ export async function createOrder(
     p_payment_method: parsed.data.paymentMethod as Enums["payment_method"],
     p_payment_status: parsed.data.paymentStatus as Enums["payment_status"],
     p_discount_pct: parsed.data.discountPct,
+    p_tendered_cents:
+      parsed.data.tenderedMajor === undefined ? undefined : toCents(parsed.data.tenderedMajor),
     p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
   });
 
@@ -131,6 +134,7 @@ export async function updateOrder(
     paymentMethod: formData.get("paymentMethod"),
     paymentStatus: formData.get("paymentStatus"),
     discountPct: formData.get("discountPct") ?? 0,
+    tenderedMajor: formData.get("tendered") || undefined,
     items: itemsRaw,
   });
   if (!parsed.success) return { error: "orders.new.error" };
@@ -143,6 +147,8 @@ export async function updateOrder(
     p_payment_method: parsed.data.paymentMethod as Enums["payment_method"],
     p_payment_status: parsed.data.paymentStatus as Enums["payment_status"],
     p_discount_pct: parsed.data.discountPct,
+    p_tendered_cents:
+      parsed.data.tenderedMajor === undefined ? undefined : toCents(parsed.data.tenderedMajor),
     p_items: parsed.data.items.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
   });
 

@@ -333,6 +333,9 @@
       "discount": "Discount",
       "discountNone": "None",
       "discountPct": "{{pct}}%",
+      "cashGiven": "Cash given",
+      "cashGivenPlaceholder": "Amount (LKR)",
+      "change": "Balance",
       "estTotal": "Estimated total",
       "itemsCount_one": "{{count}} item",
       "itemsCount_other": "{{count}} items",
@@ -385,6 +388,8 @@
       "commission": "Platform fee",
       "total": "Total",
       "payment": "Payment",
+      "tendered": "Amount given",
+      "change": "Balance",
       "thankYou": "Thank you for your order!",
       "tel": "Tel: {{phone}}"
     },

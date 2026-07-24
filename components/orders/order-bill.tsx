@@ -113,7 +113,7 @@ export function OrderBill({ data }: { data: OrderBillData }) {
       <Divider className="mt-3" />
 
       {/* ── Payment info ───────────────────────────────────────────────────── */}
-      <div className="mb-4 text-sm">
+      <div className="mb-4 flex flex-col gap-1 text-sm">
         <Row
           label={t("orders.bill.payment")}
           value={[
@@ -123,6 +123,13 @@ export function OrderBill({ data }: { data: OrderBillData }) {
             .filter(Boolean)
             .join(" · ")}
         />
+        {/* Cash given + change — only when the tendered amount was recorded. */}
+        {data.tenderedCents !== null && (
+          <>
+            <Row label={t("orders.bill.tendered")} value={data.tenderedFmt} />
+            <Row label={t("orders.bill.change")} value={data.changeFmt} bold />
+          </>
+        )}
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}

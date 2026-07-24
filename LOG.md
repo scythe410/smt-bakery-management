@@ -5,6 +5,32 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-24 — feat: cash tendered + balance (change) on the bill
+
+Client (WhatsApp): "add the balance and the amount the customer gives on the bill."
+New `order.tendered_cents` (nullable, non-neg check) records the cash handed over; the
+bill derives change = max(0, tendered − total) at render (never stored). Threaded a
+trailing `p_tendered_cents int default null` through `create_order` and `update_order`
+(migration 027, drop+recreate per the migration-021 pattern) — it's a recorded INPUT,
+not a computed total, so it's accepted from the client but still guarded non-negative
+in Zod and the RPC. UI: a "Cash given" field (cash sales only) in Review & pay with a
+live balance, and "Amount given" / "Balance" rows on the receipt. i18n en+si added.
+
+**Decisions:** tendered is nullable = "not recorded" (non-cash / historical orders);
+change clamped ≥ 0 for display (a receipt shows change owed, not a shortfall).
+
+**Changed:** `supabase/migrations/20260724090000_order_tender.sql`; `lib/zod/order.ts`;
+`app/(app)/orders/actions.ts`; `lib/db/selectors/order-bill.ts`;
+`components/orders/{order-bill,new-order-form,order-detail}.tsx`; `lib/supabase/types.ts`
+(regenerated); i18n en+si.
+
+**Verified:** migration pushed to the linked project (history in sync); types
+regenerated; `tsc` + eslint clean; production build passes. Deployed `create_order`
+exercised in a `BEGIN…ROLLBACK` on the linked DB → LKR 1,000.00 tendered on an
+LKR 180.00 order = LKR 820.00 change. Not yet driven in the browser.
+
+---
+
 ## 2026-07-24 — fix: daily stock-take "can't save the count" (negative seeded qty)
 
 Client (WhatsApp): "I can't save the daily count — it's showing an error." Root
