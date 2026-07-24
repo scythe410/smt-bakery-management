@@ -302,6 +302,13 @@
     },
     "new": {
       "action": "නව ඇණවුම",
+      "title": "නව ඇණවුම",
+      "reviewTitle": "සමාලෝචනය සහ ගෙවීම",
+      "reviewPay": "සමාලෝචනය සහ ගෙවීම",
+      "back": "ආපසු",
+      "charge": "අය කරන්න",
+      "close": "වසන්න",
+      "allCategories": "සියල්ල",
       "source": "මූලාශ්‍රය",
       "customer": "පාරිභෝගිකයා",
       "customerPlaceholder": "නම (විකල්ප)",

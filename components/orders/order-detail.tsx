@@ -104,12 +104,9 @@ export function OrderDetail({
         </Link>
       </div>
 
-      {/* Inline edit form (pending orders only) */}
+      {/* Edit composer (pending orders only) — full-screen takeover */}
       {editing && canEdit ? (
-        <Card className="flex flex-col gap-3">
-          <p className="text-h2 text-ink">{t("orders.edit.title", { orderNo: data.orderNo })}</p>
-          <NewOrderForm menu={menu} mode={editMode} onDone={closeEdit} />
-        </Card>
+        <NewOrderForm menu={menu} mode={editMode} onDone={closeEdit} />
       ) : null}
 
       {/* Order header */}

@@ -1,26 +1,28 @@
 "use client";
 
-// New-order form (SPEC §3.4). The client picks a source, optional customer,
-// payment method/status, and menu lines with quantities — and sends ONLY the
-// menu item ids + quantities (a JSON `items` field). It never sends a price or a
-// total: the server looks up stored prices and recomputes subtotal, commission,
-// and total (CLAUDE.md §7.7). The figure shown here is an on-screen ESTIMATE from
-// the same stored prices for UX; it is explicitly labelled as such, and the saved
-// order uses the server's recomputation. Item names/prices are business data,
-// shown as entered/stored — not translated (CLAUDE.md §3).
+// New-order composer (SPEC §3.4). A full-screen, two-step takeover (DESIGN.md §4):
+//   Step 1 "Items" — search, category chips, item grid, always-on scanner.
+//   Step 2 "Review & pay" — cart with steppers, source/customer, discount, payment.
+// The client picks items and sends ONLY menu item ids + quantities (a JSON `items`
+// field). It never sends a price or a total: the server looks up stored prices and
+// recomputes subtotal, commission, and total (CLAUDE.md §7.7). The figure shown here
+// is an on-screen ESTIMATE from the same stored prices; the saved order uses the
+// server's recomputation. Item names/prices are business data, not translated (§3).
 //
-// Quick-add: cashier types an item code (integer) and presses Enter — the item is
-// added with qty 1. Falls back to name-substring search if no code matches.
-// Qty for in-cart items is directly editable (CF2 pattern: type="text").
+// Touch-first: tapping a tile, stepper, or chip NEVER focuses a text field, so the
+// soft keyboard only opens when the cashier taps search or a text input (DESIGN.md
+// §4). The hardware wedge scanner captures at the document level and needs no
+// focused field, so nothing is lost.
 //
-// Barcode checkout: the scanner is ALWAYS ON here (CLAUDE.md §4). A USB/Bluetooth
-// keyboard-wedge scan (useBarcodeScanner, captureInEditable so it works even with
-// the search box focused) OR an optional camera scan maps the barcode to its
-// sold-from-stock menu item and adds a line (qty increments on repeat scans of the
-// same item). On order completion the item's stock DECREMENTS via the FT1 ledger.
+// Quick-add: type an item code (integer) + Enter → adds qty 1 (name-substring
+// fallback). Barcode checkout: the wedge scanner is ALWAYS ON; an optional camera
+// scan maps a barcode to its sold-from-stock menu item and adds a line. On order
+// completion the item's stock DECREMENTS via the FT1 ledger.
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   Camera,
   Image as ImageIcon,
   LayoutGrid,
@@ -47,6 +49,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
 } from "@/lib/orders/order-config";
+import { INVENTORY_CATEGORIES } from "@/lib/inventory-config";
 import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
 import { useCameraScanner, type CameraScannerError } from "@/lib/hooks/use-camera-scanner";
 import type { NewOrderMenuItem } from "@/lib/db/selectors/orders";
@@ -65,7 +68,7 @@ export type OrderFormInitial = {
 };
 
 /**
- * create → the new-order flow (default). edit → same form seeded from a PENDING
+ * create → the new-order flow (default). edit → same composer seeded from a PENDING
  * order; submits to updateOrder, which replaces the lines atomically (the RPC
  * re-guards pending-only — migration 026).
  */
@@ -85,6 +88,9 @@ export function NewOrderForm({
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
   const editInitial = mode.kind === "edit" ? mode.initial : null;
+
+  // Two-step flow: pick items, then review & pay.
+  const [step, setStep] = useState<"items" | "review">("items");
 
   // Menu items linked on the fly from a scanned stock barcode (§4). They aren't in
   // the server-fetched list yet, so we hold them here and merge — the picker, the
@@ -129,6 +135,8 @@ export function NewOrderForm({
   }, []);
   // Quick-add / search query.
   const [quickAdd, setQuickAdd] = useState("");
+  // Category chip filter (null = all). A fast touch path alongside search.
+  const [category, setCategory] = useState<string | null>(null);
   // Item picker layout: an image grid (pick by picture, CF1 photos) or the dense
   // list. Both share the same search + add/qty machinery; grid is the default so
   // the client can pick by picture, list stays a tap away for fast keying.
@@ -137,6 +145,18 @@ export function NewOrderForm({
   // discount + net total from stored prices; this is only the selected rate and
   // the on-screen estimate (CLAUDE.md §7.7).
   const [discountPct, setDiscountPct] = useState<number>(editInitial?.discountPct ?? 0);
+
+  // Order metadata — controlled so it survives switching between steps (an
+  // uncontrolled select would reset to its default on remount). Submitted via
+  // their `name` attributes on step 2, where the submit button lives.
+  const [source, setSource] = useState<string>(editInitial?.source ?? ORDER_SOURCES[0]);
+  const [customerName, setCustomerName] = useState<string>(editInitial?.customerName ?? "");
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    editInitial?.paymentMethod ?? PAYMENT_METHODS[0],
+  );
+  const [paymentStatus, setPaymentStatus] = useState<string>(
+    editInitial?.paymentStatus ?? PAYMENT_STATUSES[0],
+  );
 
   // Barcode checkout state. The wedge scanner is always on; the camera is optional.
   const [scanMsg, setScanMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
@@ -159,6 +179,12 @@ export function NewOrderForm({
     return map;
   }, [menu]);
 
+  // Categories present in the menu, in the fixed enum order — drives the chip rail.
+  const categories = useMemo(() => {
+    const present = new Set(menu.map((m) => m.category).filter(Boolean) as string[]);
+    return INVENTORY_CATEGORIES.filter((c) => present.has(c));
+  }, [menu]);
+
   // One form, two mutations: create posts to createOrder; edit binds the order
   // id onto updateOrder (mode never changes over the component's life).
   const submitAction = useMemo(
@@ -175,23 +201,25 @@ export function NewOrderForm({
     if (state.ok) onDone();
   }, [state.ok, onDone]);
 
-  // Filter menu by quick-add query: pure integer → code lookup (with name fallback),
-  // anything else → name substring.
+  // Filter menu by category chip + quick-add query: pure integer → code lookup
+  // (with name fallback), anything else → name substring.
   const filteredMenu = useMemo(() => {
+    const base = category ? menu.filter((m) => m.category === category) : menu;
     const q = quickAdd.trim();
-    if (!q) return menu;
+    if (!q) return base;
     const asInt = parseInt(q, 10);
     if (!isNaN(asInt) && asInt > 0 && String(asInt) === q) {
-      const byCode = menu.filter((m) => m.itemCode === asInt);
+      const byCode = base.filter((m) => m.itemCode === asInt);
       if (byCode.length > 0) return byCode;
     }
     const lower = q.toLowerCase();
-    return menu.filter((m) => m.name.toLowerCase().includes(lower));
-  }, [menu, quickAdd]);
+    return base.filter((m) => m.name.toLowerCase().includes(lower));
+  }, [menu, quickAdd, category]);
 
   // Add one of `id` to the cart. Functional update so repeat scans of the same
   // code increment correctly (a captured closure would otherwise read a stale qty);
   // the raw override is cleared so the input falls back to the canonical qty.
+  // Deliberately does NOT refocus search — a tile tap must not pop the keyboard.
   const addItem = useCallback((id: string) => {
     setQtyById((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
     setQtyRaw((prev) => {
@@ -201,9 +229,6 @@ export function NewOrderForm({
       return copy;
     });
     setQuickAdd("");
-    // preventScroll: refocusing the (top) search box must NOT yank the viewport
-    // up — the cashier may be scrolled down in the grid or scanning at the counter.
-    searchRef.current?.focus({ preventScroll: true });
   }, []);
 
   // Remove a line from the order entirely (cart trash button).
@@ -298,7 +323,6 @@ export function NewOrderForm({
       setScanMsg({ tone: "ok", text: t("orders.new.scanAdded", { name: res.item.name }) });
       setPricePrompt(null);
       setPriceInput("");
-      searchRef.current?.focus({ preventScroll: true });
     } else {
       setScanMsg({ tone: "warn", text: t("orders.new.scanPriceFailed") });
     }
@@ -359,9 +383,7 @@ export function NewOrderForm({
     [qtyById],
   );
 
-  // The order's current lines, resolved to name + price for the cart summary —
-  // so scanned/added items are visible and adjustable in ONE place, without
-  // hunting for their tile in the full item grid.
+  // The order's current lines, resolved to name + price for the cart summary.
   const cartLines = useMemo(() => {
     const byId = new Map(menu.map((m) => [m.id, m]));
     return lines.map((l) => {
@@ -384,592 +406,660 @@ export function NewOrderForm({
 
   const itemsJson = JSON.stringify(lines);
   const totalQty = lines.reduce((n, l) => n + l.qty, 0);
+  const hasItems = lines.length > 0;
 
   // On-screen discount/net estimate. Round-half-up on positive cents matches the
   // server's round(subtotal × pct / 100). Authoritative figures come from the RPC.
   const discountCents = Math.round((estimatedCents * discountPct) / 100);
   const netCents = estimatedCents - discountCents;
 
+  const composerTitle =
+    step === "review"
+      ? t("orders.new.reviewTitle")
+      : mode.kind === "edit"
+        ? t("orders.edit.action")
+        : t("orders.new.title");
+
   return (
-    <form action={formAction} className="flex flex-col gap-3">
-      {/* Source + customer */}
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-caption text-muted">{t("orders.new.source")}</span>
-          <select
-            name="source"
-            defaultValue={editInitial?.source ?? ORDER_SOURCES[0]}
-            className={FIELD_CLASS}
-          >
-            {ORDER_SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {t(`source.${s}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-caption text-muted">{t("orders.new.customer")}</span>
-          <input
-            type="text"
-            name="customerName"
-            maxLength={120}
-            defaultValue={editInitial?.customerName ?? ""}
-            placeholder={t("orders.new.customerPlaceholder")}
-            className={FIELD_CLASS}
-          />
-        </label>
-      </div>
-
-      {/* Edit mode: order lines that couldn't be carried over (item deleted or
-          unavailable) — the RPC would reject them, so they're named instead. */}
-      {droppedNames.length > 0 ? (
-        <p role="alert" className="text-caption text-danger">
-          {t("orders.edit.droppedLines", { names: droppedNames.join(", ") })}
-        </p>
-      ) : null}
-
-      {/* Barcode checkout — wedge scanner always on; camera optional */}
-      <div className="border-border bg-surface-2 flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-caption text-muted inline-flex items-center gap-1.5">
-            <ScanBarcode className="size-4" aria-hidden />
-            {t("orders.new.scanReady")}
-          </span>
+    <div
+      className="bg-surface fixed inset-0 z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-label={composerTitle}
+    >
+      <form action={formAction} className="mx-auto flex h-full max-w-[430px] flex-col">
+        {/* Header — X closes on step 1, back-arrow returns to items on step 2 */}
+        <header className="border-border flex h-14 shrink-0 items-center gap-1 border-b px-2">
           <button
             type="button"
-            onClick={() => {
-              setCamError(null);
-              setCameraOn((v) => !v);
-              setCamAttempt((a) => a + 1);
-            }}
-            aria-pressed={cameraOn}
-            className={`text-caption inline-flex h-8 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
-              cameraOn
-                ? "border-brand text-brand bg-[var(--red-tint)]"
-                : "border-border-strong text-ink hover:bg-surface"
-            }`}
+            onClick={step === "review" ? () => setStep("items") : onDone}
+            aria-label={step === "review" ? t("orders.new.back") : t("orders.new.close")}
+            className="text-muted hover:text-ink hover:bg-surface-2 flex size-10 shrink-0 items-center justify-center rounded-[var(--radius)] transition-colors"
           >
-            <Camera className="size-3.5" aria-hidden />
-            {cameraOn ? t("orders.new.scanCameraOff") : t("orders.new.scanCameraOn")}
+            {step === "review" ? (
+              <ArrowLeft className="size-5" aria-hidden />
+            ) : (
+              <X className="size-5" aria-hidden />
+            )}
           </button>
-        </div>
-
-        {cameraOn && !camError ? (
-          <div className="border-border relative aspect-video overflow-hidden rounded-[var(--radius)] border bg-black">
-            <video
-              ref={videoRef}
-              className="size-full object-cover"
-              playsInline
-              muted
-              aria-label={t("inventory.scan.viewfinderLabel")}
-            />
-            <div
-              className="border-brand-white/80 pointer-events-none absolute inset-6 rounded-[var(--radius)] border-2"
-              aria-hidden
-            />
-          </div>
-        ) : null}
-
-        {camError ? (
-          <p role="alert" className="text-caption text-danger">
-            {t(`inventory.scan.error.${camError}`)}
-          </p>
-        ) : null}
-
-        {scanMsg ? (
-          <p
-            role="status"
-            className={`text-caption ${scanMsg.tone === "ok" ? "text-success" : "text-danger"}`}
-          >
-            {scanMsg.text}
-          </p>
-        ) : null}
-
-        {/* Inline price prompt — a scanned item with no retail price yet. Set it
-            here and it's saved to stock + billed in one step (no trip to
-            Inventory). */}
-        {pricePrompt ? (
-          <div className="border-border bg-surface flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
-            <span className="text-caption text-ink">
-              {t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
+          <h2 className="text-h2 text-ink font-semibold">{composerTitle}</h2>
+          {hasItems ? (
+            <span className="text-caption text-muted ml-auto pr-2 tabular-nums">
+              {t("orders.new.itemsCount", { count: totalQty })}
             </span>
-            <div className="flex items-center gap-2">
-              <input
-                ref={priceInputRef}
-                type="text"
-                inputMode="decimal"
-                autoFocus
-                value={priceInput}
-                onChange={(e) => setPriceInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    confirmPrice();
-                  }
-                  if (e.key === "Escape") {
-                    setPricePrompt(null);
-                    setPriceInput("");
-                  }
-                }}
-                placeholder={t("orders.new.scanPricePlaceholder")}
-                aria-label={t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
-                className="border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 flex-1 rounded-[var(--radius)] border px-2 tabular-nums outline-none focus-visible:ring-2"
-              />
-              <button
-                type="button"
-                onClick={confirmPrice}
-                disabled={pricePending}
-                className="bg-brand text-brand-white hover:bg-brand-ember text-caption h-9 shrink-0 rounded-[var(--radius)] px-3 font-semibold transition-colors disabled:opacity-50"
-              >
-                {pricePending ? t("orders.new.scanPriceSaving") : t("orders.new.scanPriceAdd")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPricePrompt(null);
-                  setPriceInput("");
-                }}
-                aria-label={t("orders.new.scanPriceCancel")}
-                className="text-muted hover:text-ink h-9 shrink-0 transition-colors"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+        </header>
 
-      {/* Current order (cart) — every added/scanned item lands here with its own
-          stepper, so quantities are adjustable in one place without finding the
-          tile in the grid. Empty until the first item is added. */}
-      {cartLines.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-label text-ink font-semibold">
-              {t("orders.new.cart")} · {t("orders.new.itemsCount", { count: totalQty })}
-            </span>
-            <button
-              type="button"
-              onClick={clearCart}
-              className="text-caption text-muted hover:text-danger transition-colors"
-            >
-              {t("orders.new.clearCart")}
-            </button>
-          </div>
-          <ul className="border-border divide-border bg-surface divide-y rounded-[var(--radius)] border">
-            {cartLines.map((c) => (
-              <li key={c.id} className="flex items-center gap-2 px-2.5 py-2">
-                <div className="min-w-0 flex-1">
-                  <span className="text-label text-ink block truncate">{c.name}</span>
-                  <span className="text-caption text-muted tabular-nums">
-                    {formatLKR(c.priceCents)} × {c.qty} = {formatLKR(c.priceCents * c.qty)}
+        {/* Scrollable body */}
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+          {step === "items" ? (
+            <>
+              {/* Barcode checkout — wedge scanner always on; camera optional */}
+              <div className="border-border bg-surface-2 flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-caption text-muted inline-flex items-center gap-1.5">
+                    <ScanBarcode className="size-4" aria-hidden />
+                    {t("orders.new.scanReady")}
                   </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => bump(c.id, -1)}
-                    aria-label={t("orders.new.decrease", { name: c.name })}
-                    className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
-                  >
-                    <Minus className="size-4" aria-hidden />
-                  </button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={qtyRaw[c.id] ?? String(c.qty)}
-                    onChange={(e) => handleQtyChange(c.id, e.target.value)}
-                    onBlur={() => commitQty(c.id)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    aria-label={t("orders.new.qtyFor", { name: c.name })}
-                    className="border-border focus-visible:ring-brand/40 text-label text-ink h-8 w-10 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => bump(c.id, 1)}
-                    aria-label={t("orders.new.increase", { name: c.name })}
-                    className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
-                  >
-                    <Plus className="size-4" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeLine(c.id)}
-                    aria-label={t("orders.new.removeLine", { name: c.name })}
-                    className="text-muted hover:text-danger ml-0.5 flex size-8 items-center justify-center transition-colors"
-                  >
-                    <Trash2 className="size-4" aria-hidden />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {/* Quick-add / item picker */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-caption text-muted">{t("orders.new.items")}</span>
-          {menu.length > 0 ? (
-            <div
-              role="group"
-              aria-label={t("orders.new.viewToggle")}
-              className="border-border inline-flex rounded-[var(--radius)] border p-0.5"
-            >
-              {(["grid", "list"] as const).map((v) => {
-                const active = view === v;
-                const Icon = v === "grid" ? LayoutGrid : List;
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setView(v)}
-                    aria-pressed={active}
-                    aria-label={t(`orders.new.view.${v}`)}
-                    className={`flex size-7 items-center justify-center rounded-[calc(var(--radius)-4px)] transition-colors ${
-                      active ? "bg-[var(--red-tint)] text-brand" : "text-muted hover:text-ink"
+                    onClick={() => {
+                      setCamError(null);
+                      setCameraOn((v) => !v);
+                      setCamAttempt((a) => a + 1);
+                    }}
+                    aria-pressed={cameraOn}
+                    className={`text-caption inline-flex h-8 items-center gap-1.5 rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
+                      cameraOn
+                        ? "border-brand text-brand bg-[var(--red-tint)]"
+                        : "border-border-strong text-ink hover:bg-surface"
                     }`}
                   >
-                    <Icon className="size-4" aria-hidden />
+                    <Camera className="size-3.5" aria-hidden />
+                    {cameraOn ? t("orders.new.scanCameraOff") : t("orders.new.scanCameraOn")}
                   </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
+                </div>
 
-        {menu.length === 0 ? (
-          <p className="text-caption text-muted py-1">{t("orders.new.noMenu")}</p>
-        ) : (
-          <>
-            {/* Code / name search bar */}
-            <div className="relative">
-              <Search
-                className="text-muted absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-                aria-hidden
-              />
-              <input
-                ref={searchRef}
-                type="text"
-                value={quickAdd}
-                onChange={(e) => setQuickAdd(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const first = filteredMenu[0];
-                    if (first) addItem(first.id);
-                  }
-                }}
-                placeholder={t("orders.new.searchPlaceholder")}
-                className={`${FIELD_CLASS} pl-8 ${quickAdd ? "pr-8" : ""}`}
-              />
-              {quickAdd ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuickAdd("");
-                    searchRef.current?.focus({ preventScroll: true });
-                  }}
-                  aria-label={t("orders.new.clearSearch")}
-                  className="text-muted hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
-              ) : null}
-            </div>
+                {cameraOn && !camError ? (
+                  <div className="border-border relative aspect-video overflow-hidden rounded-[var(--radius)] border bg-black">
+                    <video
+                      ref={videoRef}
+                      className="size-full object-cover"
+                      playsInline
+                      muted
+                      aria-label={t("inventory.scan.viewfinderLabel")}
+                    />
+                    <div
+                      className="border-brand-white/80 pointer-events-none absolute inset-6 rounded-[var(--radius)] border-2"
+                      aria-hidden
+                    />
+                  </div>
+                ) : null}
 
-            {/* Item picker — no max-h, page scroll handles overflow */}
-            {filteredMenu.length === 0 ? (
-              <p className="text-caption text-muted py-1">
-                {t("orders.new.noMatch", { query: quickAdd.trim() })}
-              </p>
-            ) : view === "list" ? (
-              <ul className="border-border divide-border divide-y rounded-[var(--radius)] border">
-                {filteredMenu.map((m) => {
-                  const qty = qtyById[m.id] ?? 0;
-                  const inCart = qty > 0;
-                  return (
-                    <li
-                      key={m.id}
-                      className={`flex items-center gap-2 px-2 py-1.5 transition-colors ${
-                        inCart ? "bg-[var(--red-tint)]" : ""
-                      }`}
-                    >
-                      {/* Item code chip */}
-                      <span className="text-caption text-muted w-7 shrink-0 text-right tabular-nums">
-                        #{m.itemCode}
-                      </span>
+                {camError ? (
+                  <p role="alert" className="text-caption text-danger">
+                    {t(`inventory.scan.error.${camError}`)}
+                  </p>
+                ) : null}
 
-                      {/* Name + price — tap to add 1 */}
+                {scanMsg ? (
+                  <p
+                    role="status"
+                    className={`text-caption ${scanMsg.tone === "ok" ? "text-success" : "text-danger"}`}
+                  >
+                    {scanMsg.text}
+                  </p>
+                ) : null}
+
+                {/* Inline price prompt — a scanned item with no retail price yet. */}
+                {pricePrompt ? (
+                  <div className="border-border bg-surface flex flex-col gap-2 rounded-[var(--radius)] border p-2.5">
+                    <span className="text-caption text-ink">
+                      {t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={priceInputRef}
+                        type="text"
+                        inputMode="decimal"
+                        autoFocus
+                        value={priceInput}
+                        onChange={(e) => setPriceInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            confirmPrice();
+                          }
+                          if (e.key === "Escape") {
+                            setPricePrompt(null);
+                            setPriceInput("");
+                          }
+                        }}
+                        placeholder={t("orders.new.scanPricePlaceholder")}
+                        aria-label={t("orders.new.scanPricePrompt", { name: pricePrompt.name })}
+                        className="border-border text-label text-ink focus-visible:ring-brand/40 bg-surface h-9 flex-1 rounded-[var(--radius)] border px-2 tabular-nums outline-none focus-visible:ring-2"
+                      />
                       <button
                         type="button"
-                        onClick={() => addItem(m.id)}
-                        className="flex min-w-0 flex-1 flex-col text-left"
+                        onClick={confirmPrice}
+                        disabled={pricePending}
+                        className="bg-brand text-brand-white hover:bg-brand-ember text-caption h-9 shrink-0 rounded-[var(--radius)] px-3 font-semibold transition-colors disabled:opacity-50"
                       >
-                        <span
-                          className={`text-label truncate ${
-                            inCart ? "text-ink font-semibold" : "text-ink"
-                          }`}
-                        >
-                          {m.name}
-                        </span>
-                        <span className="text-caption text-muted tabular-nums">
-                          {formatLKR(m.priceCents)}
-                        </span>
+                        {pricePending ? t("orders.new.scanPriceSaving") : t("orders.new.scanPriceAdd")}
                       </button>
-
-                      {/* Stepper — shows qty input when in cart */}
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => bump(m.id, -1)}
-                          disabled={!inCart}
-                          aria-label={t("orders.new.decrease", { name: m.name })}
-                          className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border disabled:opacity-30"
-                        >
-                          <Minus className="size-3.5" aria-hidden />
-                        </button>
-
-                        {inCart ? (
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={qtyRaw[m.id] ?? String(qty)}
-                            onChange={(e) => handleQtyChange(m.id, e.target.value)}
-                            onBlur={() => commitQty(m.id)}
-                            onFocus={(e) => e.currentTarget.select()}
-                            aria-label={t("orders.new.qtyFor", { name: m.name })}
-                            className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
-                          />
-                        ) : (
-                          <span className="text-faint w-9 text-center text-sm tabular-nums">—</span>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => bump(m.id, 1)}
-                          aria-label={t("orders.new.increase", { name: m.name })}
-                          className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border"
-                        >
-                          <Plus className="size-3.5" aria-hidden />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              /* Image grid — pick by picture. Orientation-aware columns so it lays
-                 out well in landscape / on wider frames while staying usable in
-                 portrait (DESIGN.md §4). Tapping the image/name adds 1; the
-                 minus/qty-input/plus footer (same stepper as the list view,
-                 including a typeable qty field) handles the rest. Missing
-                 photos fall back to a placeholder tile. */
-              <ul className="grid grid-cols-2 gap-2 landscape:grid-cols-3 min-[520px]:grid-cols-4">
-                {filteredMenu.map((m) => {
-                  const qty = qtyById[m.id] ?? 0;
-                  const inCart = qty > 0;
-                  return (
-                    <li
-                      key={m.id}
-                      className={`flex flex-col overflow-hidden rounded-[var(--radius)] border transition-colors ${
-                        inCart ? "border-brand bg-[var(--red-tint)]" : "border-border hover:bg-surface-2"
-                      }`}
-                    >
                       <button
                         type="button"
-                        onClick={() => addItem(m.id)}
-                        aria-label={t("orders.new.increase", { name: m.name })}
-                        className="flex w-full flex-col text-left"
+                        onClick={() => {
+                          setPricePrompt(null);
+                          setPriceInput("");
+                        }}
+                        aria-label={t("orders.new.scanPriceCancel")}
+                        className="text-muted hover:text-ink h-9 shrink-0 transition-colors"
                       >
-                        <div className="bg-surface-2 aspect-square w-full">
-                          {m.imageUrl ? (
-                            // Private bucket → short-lived signed URL; a plain img keeps
-                            // us off next/image remote-host config for ephemeral URLs.
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={m.imageUrl}
-                              alt=""
-                              loading="lazy"
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-faint flex size-full items-center justify-center">
-                              <ImageIcon className="size-7" aria-hidden />
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-0.5 p-2">
-                          <span
-                            className={`text-label line-clamp-2 ${
-                              inCart ? "text-ink font-semibold" : "text-ink"
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {menu.length === 0 ? (
+                <p className="text-caption text-muted py-1">{t("orders.new.noMenu")}</p>
+              ) : (
+                <>
+                  {/* Code / name search */}
+                  <div className="relative">
+                    <Search
+                      className="text-muted absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+                      aria-hidden
+                    />
+                    <input
+                      ref={searchRef}
+                      type="text"
+                      value={quickAdd}
+                      onChange={(e) => setQuickAdd(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const first = filteredMenu[0];
+                          if (first) addItem(first.id);
+                        }
+                      }}
+                      placeholder={t("orders.new.searchPlaceholder")}
+                      className={`${FIELD_CLASS} w-full pl-8 ${quickAdd ? "pr-8" : ""}`}
+                    />
+                    {quickAdd ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickAdd("");
+                          searchRef.current?.focus({ preventScroll: true });
+                        }}
+                        aria-label={t("orders.new.clearSearch")}
+                        className="text-muted hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {/* Category chips + view toggle */}
+                  <div className="flex items-center gap-2">
+                    {categories.length > 1 ? (
+                      <div className="-mx-4 flex flex-1 gap-1.5 overflow-x-auto px-4 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+                        {[null, ...categories].map((c) => {
+                          const active = category === c;
+                          return (
+                            <button
+                              key={c ?? "__all"}
+                              type="button"
+                              onClick={() => setCategory(c)}
+                              aria-pressed={active}
+                              className={`text-caption h-8 shrink-0 rounded-[var(--radius-pill)] border px-3 font-medium transition-colors ${
+                                active
+                                  ? "border-brand text-brand bg-[var(--red-tint)]"
+                                  : "border-border-strong text-ink hover:bg-surface-2"
+                              }`}
+                            >
+                              {c ? t(`inventory.category.${c}`) : t("orders.new.allCategories")}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="flex-1" />
+                    )}
+                    <div
+                      role="group"
+                      aria-label={t("orders.new.viewToggle")}
+                      className="border-border inline-flex shrink-0 rounded-[var(--radius)] border p-0.5"
+                    >
+                      {(["grid", "list"] as const).map((v) => {
+                        const active = view === v;
+                        const Icon = v === "grid" ? LayoutGrid : List;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setView(v)}
+                            aria-pressed={active}
+                            aria-label={t(`orders.new.view.${v}`)}
+                            className={`flex size-7 items-center justify-center rounded-[calc(var(--radius)-4px)] transition-colors ${
+                              active ? "bg-[var(--red-tint)] text-brand" : "text-muted hover:text-ink"
                             }`}
                           >
-                            {m.name}
-                          </span>
+                            <Icon className="size-4" aria-hidden />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Item picker */}
+                  {filteredMenu.length === 0 ? (
+                    <p className="text-caption text-muted py-1">
+                      {t("orders.new.noMatch", { query: quickAdd.trim() })}
+                    </p>
+                  ) : view === "list" ? (
+                    <ul className="border-border divide-border divide-y rounded-[var(--radius)] border">
+                      {filteredMenu.map((m) => {
+                        const qty = qtyById[m.id] ?? 0;
+                        const inCart = qty > 0;
+                        return (
+                          <li
+                            key={m.id}
+                            className={`flex items-center gap-2 px-2 py-1.5 transition-colors ${
+                              inCart ? "bg-[var(--red-tint)]" : ""
+                            }`}
+                          >
+                            <span className="text-caption text-muted w-7 shrink-0 text-right tabular-nums">
+                              #{m.itemCode}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addItem(m.id)}
+                              className="flex min-w-0 flex-1 flex-col text-left"
+                            >
+                              <span
+                                className={`text-label truncate ${
+                                  inCart ? "text-ink font-semibold" : "text-ink"
+                                }`}
+                              >
+                                {m.name}
+                              </span>
+                              <span className="text-caption text-muted tabular-nums">
+                                {formatLKR(m.priceCents)}
+                              </span>
+                            </button>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => bump(m.id, -1)}
+                                disabled={!inCart}
+                                aria-label={t("orders.new.decrease", { name: m.name })}
+                                className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border disabled:opacity-30"
+                              >
+                                <Minus className="size-3.5" aria-hidden />
+                              </button>
+                              {inCart ? (
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={qtyRaw[m.id] ?? String(qty)}
+                                  onChange={(e) => handleQtyChange(m.id, e.target.value)}
+                                  onBlur={() => commitQty(m.id)}
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  aria-label={t("orders.new.qtyFor", { name: m.name })}
+                                  className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                                />
+                              ) : (
+                                <span className="text-faint w-9 text-center text-sm tabular-nums">
+                                  —
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => bump(m.id, 1)}
+                                aria-label={t("orders.new.increase", { name: m.name })}
+                                className="border-border-strong text-ink hover:bg-surface-2 flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                              >
+                                <Plus className="size-3.5" aria-hidden />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    /* Image grid — pick by picture. Orientation-aware columns
+                       (DESIGN.md §4). Tapping the image/name adds 1; the footer
+                       stepper handles the rest. Missing photos fall back to a
+                       placeholder tile. */
+                    <ul className="grid grid-cols-2 gap-2 landscape:grid-cols-3 min-[520px]:grid-cols-4">
+                      {filteredMenu.map((m) => {
+                        const qty = qtyById[m.id] ?? 0;
+                        const inCart = qty > 0;
+                        return (
+                          <li
+                            key={m.id}
+                            className={`flex flex-col overflow-hidden rounded-[var(--radius)] border transition-colors ${
+                              inCart
+                                ? "border-brand bg-[var(--red-tint)]"
+                                : "border-border hover:bg-surface-2"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => addItem(m.id)}
+                              aria-label={t("orders.new.increase", { name: m.name })}
+                              className="flex w-full flex-col text-left"
+                            >
+                              <div className="bg-surface-2 aspect-square w-full">
+                                {m.imageUrl ? (
+                                  // Private bucket → short-lived signed URL; a plain img keeps
+                                  // us off next/image remote-host config for ephemeral URLs.
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={m.imageUrl}
+                                    alt=""
+                                    loading="lazy"
+                                    className="size-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-faint flex size-full items-center justify-center">
+                                    <ImageIcon className="size-7" aria-hidden />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-col gap-0.5 p-2">
+                                <span
+                                  className={`text-label line-clamp-2 ${
+                                    inCart ? "text-ink font-semibold" : "text-ink"
+                                  }`}
+                                >
+                                  {m.name}
+                                </span>
+                                <span className="text-caption text-muted tabular-nums">
+                                  #{m.itemCode} · {formatLKR(m.priceCents)}
+                                </span>
+                              </div>
+                            </button>
+
+                            {inCart ? (
+                              <div className="flex items-center justify-center gap-1 px-2 pb-2">
+                                <button
+                                  type="button"
+                                  onClick={() => bump(m.id, -1)}
+                                  aria-label={t("orders.new.decrease", { name: m.name })}
+                                  className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                                >
+                                  <Minus className="size-3.5" aria-hidden />
+                                </button>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={qtyRaw[m.id] ?? String(qty)}
+                                  onChange={(e) => handleQtyChange(m.id, e.target.value)}
+                                  onBlur={() => commitQty(m.id)}
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  aria-label={t("orders.new.qtyFor", { name: m.name })}
+                                  className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => bump(m.id, 1)}
+                                  aria-label={t("orders.new.increase", { name: m.name })}
+                                  className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                                >
+                                  <Plus className="size-3.5" aria-hidden />
+                                </button>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Edit mode: order lines that couldn't be carried over. */}
+              {droppedNames.length > 0 ? (
+                <p role="alert" className="text-caption text-danger">
+                  {t("orders.edit.droppedLines", { names: droppedNames.join(", ") })}
+                </p>
+              ) : null}
+
+              {/* Current order (cart) — every added/scanned line with its own stepper */}
+              {cartLines.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-label text-ink font-semibold">
+                      {t("orders.new.cart")} · {t("orders.new.itemsCount", { count: totalQty })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearCart}
+                      className="text-caption text-muted hover:text-danger transition-colors"
+                    >
+                      {t("orders.new.clearCart")}
+                    </button>
+                  </div>
+                  <ul className="border-border divide-border bg-surface divide-y rounded-[var(--radius)] border">
+                    {cartLines.map((c) => (
+                      <li key={c.id} className="flex items-center gap-2 px-2.5 py-2">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-label text-ink block truncate">{c.name}</span>
                           <span className="text-caption text-muted tabular-nums">
-                            #{m.itemCode} · {formatLKR(m.priceCents)}
+                            {formatLKR(c.priceCents)} × {c.qty} = {formatLKR(c.priceCents * c.qty)}
                           </span>
                         </div>
-                      </button>
-
-                      {inCart ? (
-                        <div className="flex items-center justify-center gap-1 px-2 pb-2">
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => bump(m.id, -1)}
-                            aria-label={t("orders.new.decrease", { name: m.name })}
-                            className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                            onClick={() => bump(c.id, -1)}
+                            aria-label={t("orders.new.decrease", { name: c.name })}
+                            className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
                           >
-                            <Minus className="size-3.5" aria-hidden />
+                            <Minus className="size-4" aria-hidden />
                           </button>
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={qtyRaw[m.id] ?? String(qty)}
-                            onChange={(e) => handleQtyChange(m.id, e.target.value)}
-                            onBlur={() => commitQty(m.id)}
+                            value={qtyRaw[c.id] ?? String(c.qty)}
+                            onChange={(e) => handleQtyChange(c.id, e.target.value)}
+                            onBlur={() => commitQty(c.id)}
                             onFocus={(e) => e.currentTarget.select()}
-                            aria-label={t("orders.new.qtyFor", { name: m.name })}
-                            className="border-border focus-visible:ring-brand/40 text-label text-ink h-7 w-9 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
+                            aria-label={t("orders.new.qtyFor", { name: c.name })}
+                            className="border-border focus-visible:ring-brand/40 text-label text-ink h-8 w-10 rounded border text-center tabular-nums outline-none focus-visible:ring-2"
                           />
                           <button
                             type="button"
-                            onClick={() => bump(m.id, 1)}
-                            aria-label={t("orders.new.increase", { name: m.name })}
-                            className="border-border-strong text-ink hover:bg-surface flex size-7 items-center justify-center rounded-[var(--radius)] border"
+                            onClick={() => bump(c.id, 1)}
+                            aria-label={t("orders.new.increase", { name: c.name })}
+                            className="border-border-strong text-ink hover:bg-surface-2 flex size-8 items-center justify-center rounded-[var(--radius)] border"
                           >
-                            <Plus className="size-3.5" aria-hidden />
+                            <Plus className="size-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeLine(c.id)}
+                            aria-label={t("orders.new.removeLine", { name: c.name })}
+                            className="text-muted hover:text-danger ml-0.5 flex size-8 items-center justify-center transition-colors"
+                          >
+                            <Trash2 className="size-4" aria-hidden />
                           </button>
                         </div>
-                      ) : null}
-                    </li>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Source + customer */}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-caption text-muted">{t("orders.new.source")}</span>
+                  <select
+                    name="source"
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    className={FIELD_CLASS}
+                  >
+                    {ORDER_SOURCES.map((s) => (
+                      <option key={s} value={s}>
+                        {t(`source.${s}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-caption text-muted">{t("orders.new.customer")}</span>
+                  <input
+                    type="text"
+                    name="customerName"
+                    maxLength={120}
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder={t("orders.new.customerPlaceholder")}
+                    className={FIELD_CLASS}
+                  />
+                </label>
+              </div>
+
+              {/* Quick discount — server recomputes the net total */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-caption text-muted mr-auto">{t("orders.new.discount")}</span>
+                {DISCOUNT_PCTS.map((pct) => {
+                  const active = discountPct === pct;
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setDiscountPct(pct)}
+                      aria-pressed={active}
+                      className={`text-caption h-8 min-w-[44px] rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
+                        active
+                          ? "border-brand text-brand bg-[var(--red-tint)]"
+                          : "border-border-strong text-ink hover:bg-surface-2"
+                      }`}
+                    >
+                      {pct === 0 ? t("orders.new.discountNone") : t("orders.new.discountPct", { pct })}
+                    </button>
                   );
                 })}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
+              </div>
 
-      {/* Quick discount — applied to the subtotal; server recomputes the net total */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-caption text-muted mr-auto">{t("orders.new.discount")}</span>
-        {DISCOUNT_PCTS.map((pct) => {
-          const active = discountPct === pct;
-          return (
-            <button
-              key={pct}
-              type="button"
-              onClick={() => setDiscountPct(pct)}
-              aria-pressed={active}
-              className={`text-caption h-8 min-w-[44px] rounded-[var(--radius)] border px-2.5 font-medium transition-colors ${
-                active
-                  ? "border-brand text-brand bg-[var(--red-tint)]"
-                  : "border-border-strong text-ink hover:bg-surface-2"
-              }`}
-            >
-              {pct === 0 ? t("orders.new.discountNone") : t("orders.new.discountPct", { pct })}
-            </button>
-          );
-        })}
-      </div>
+              {/* Payment method + status */}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-caption text-muted">{t("orders.new.paymentMethod")}</span>
+                  <select
+                    name="paymentMethod"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className={FIELD_CLASS}
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m} value={m}>
+                        {t(`orders.payment.${m}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-caption text-muted">{t("orders.new.paymentStatus")}</span>
+                  <select
+                    name="paymentStatus"
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    className={FIELD_CLASS}
+                  >
+                    {PAYMENT_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {t(`orders.paymentStatus.${s}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-      {/* Estimated total — server recomputes the authoritative figure on save */}
-      <div className="bg-surface-2 flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2">
-        {discountPct > 0 ? (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-caption text-muted">{t("orders.bill.subtotal")}</span>
-              <span className="text-caption text-ink tabular-nums">
-                {formatLKR(estimatedCents)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-caption text-muted">
-                {t("orders.bill.discount", { pct: discountPct })}
-              </span>
-              <span className="text-brand-ember text-caption tabular-nums">
-                - {formatLKR(discountCents)}
-              </span>
-            </div>
-          </>
-        ) : null}
-        <div className="flex items-center justify-between">
-          <span className="text-caption text-muted">
-            {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
-          </span>
-          <span className="text-label text-ink font-semibold tabular-nums">
-            {formatLKR(netCents)}
-          </span>
+              {/* Estimated total — server recomputes the authoritative figure */}
+              <div className="bg-surface-2 flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2">
+                {discountPct > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-caption text-muted">{t("orders.bill.subtotal")}</span>
+                      <span className="text-caption text-ink tabular-nums">
+                        {formatLKR(estimatedCents)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-caption text-muted">
+                        {t("orders.bill.discount", { pct: discountPct })}
+                      </span>
+                      <span className="text-brand-ember text-caption tabular-nums">
+                        - {formatLKR(discountCents)}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-caption text-muted">
+                    {t("orders.new.estTotal")} · {t("orders.new.itemsCount", { count: totalQty })}
+                  </span>
+                  <span className="text-label text-ink font-semibold tabular-nums">
+                    {formatLKR(netCents)}
+                  </span>
+                </div>
+              </div>
+
+              {state.error ? (
+                <p role="alert" className="text-caption text-danger">
+                  {t(state.error)}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
-      </div>
 
-      {/* Payment method + status (below items — cashier picks items first) */}
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-caption text-muted">{t("orders.new.paymentMethod")}</span>
-          <select
-            name="paymentMethod"
-            defaultValue={editInitial?.paymentMethod ?? PAYMENT_METHODS[0]}
-            className={FIELD_CLASS}
-          >
-            {PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {t(`orders.payment.${m}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-caption text-muted">{t("orders.new.paymentStatus")}</span>
-          <select
-            name="paymentStatus"
-            defaultValue={editInitial?.paymentStatus ?? PAYMENT_STATUSES[0]}
-            className={FIELD_CLASS}
-          >
-            {PAYMENT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {t(`orders.paymentStatus.${s}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+        <input type="hidden" name="items" value={itemsJson} readOnly />
+        <input type="hidden" name="discountPct" value={discountPct} readOnly />
 
-      <input type="hidden" name="items" value={itemsJson} readOnly />
-      <input type="hidden" name="discountPct" value={discountPct} readOnly />
-
-      {state.error ? (
-        <p role="alert" className="text-caption text-danger">
-          {t(state.error)}
-        </p>
-      ) : null}
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={pending || lines.length === 0}
-          className="bg-brand text-brand-white text-label hover:bg-brand-ember h-10 flex-1 rounded-[var(--radius)] font-semibold transition-colors disabled:opacity-50"
-        >
-          {mode.kind === "edit"
-            ? pending
-              ? t("orders.edit.saving")
-              : t("orders.edit.save")
-            : pending
-              ? t("orders.new.saving")
-              : t("orders.new.save")}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="border-border-strong text-ink text-label hover:bg-surface-2 h-10 rounded-[var(--radius)] border px-4 font-medium transition-colors"
-        >
-          {t("orders.new.cancel")}
-        </button>
-      </div>
-    </form>
+        {/* Sticky action bar — running total + the step's forward CTA (DESIGN.md §4) */}
+        <div className="border-border bg-surface shrink-0 border-t px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          {step === "items" ? (
+            <button
+              type="button"
+              disabled={!hasItems}
+              onClick={() => setStep("review")}
+              className="bg-brand text-brand-white hover:bg-brand-ember text-label flex h-12 w-full items-center justify-between rounded-[var(--radius)] px-4 font-semibold transition-colors disabled:opacity-50"
+            >
+              <span className="tabular-nums">{formatLKR(netCents)}</span>
+              <span className="inline-flex items-center gap-1.5">
+                {t("orders.new.reviewPay")}
+                <ArrowRight className="size-4" aria-hidden />
+              </span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={pending || !hasItems}
+              className="bg-brand text-brand-white text-label hover:bg-brand-ember h-12 w-full rounded-[var(--radius)] font-semibold transition-colors disabled:opacity-50"
+            >
+              {mode.kind === "edit"
+                ? pending
+                  ? t("orders.edit.saving")
+                  : t("orders.edit.save")
+                : pending
+                  ? t("orders.new.saving")
+                  : `${t("orders.new.charge")} ${formatLKR(netCents)}`}
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }

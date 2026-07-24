@@ -302,6 +302,13 @@
     },
     "new": {
       "action": "New Order",
+      "title": "New order",
+      "reviewTitle": "Review & pay",
+      "reviewPay": "Review & pay",
+      "back": "Back",
+      "charge": "Charge",
+      "close": "Close",
+      "allCategories": "All",
       "source": "Source",
       "customer": "Customer",
       "customerPlaceholder": "Name (optional)",

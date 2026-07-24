@@ -210,16 +210,14 @@ export function OrdersBrowser({
       </button>
 
       {creating ? (
-        <Card>
-          <NewOrderForm
-            menu={menu}
-            onDone={() => {
-              setCreating(false);
-              // Reload page 0 so the new (pending) order appears in the Active tab.
-              setReloadToken((n) => n + 1);
-            }}
-          />
-        </Card>
+        <NewOrderForm
+          menu={menu}
+          onDone={() => {
+            setCreating(false);
+            // Reload page 0 so the new (pending) order appears in the Active tab.
+            setReloadToken((n) => n + 1);
+          }}
+        />
       ) : null}
 
       {/* Search */}

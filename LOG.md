@@ -5,6 +5,57 @@ Each entry: what changed, decisions made, deviations, open questions. One prompt
 
 ---
 
+## 2026-07-24 — refactor: full-screen two-step order composer (UX revamp)
+
+Client: the new-order flow "is long, keyboard pops up when you add something,
+hard to select things, looks irritating." Revamped the composer UX/UI.
+
+Root cause of the keyboard nuisance: `addItem` (and `confirmPrice`) refocused the
+search box after every add — added for a USB counter scanner, but the wedge
+scanner (`use-barcode-scanner`) captures at the document level and needs NO
+focused field, so on touch the refocus only re-summoned the soft keyboard on
+every tile tap. Removed both refocuses; kept refocus only on the search's own
+clear-X (user is already typing there).
+
+new-order-form.tsx — rewritten as a full-screen, two-step takeover
+(`fixed inset-0 z-50`, own scroll, above the z-20 bottom nav):
+- Step 1 "Items": scanner strip, search, **category chip rail** (All + present
+  menu categories, from INVENTORY_CATEGORIES order, labelled via
+  `inventory.category.*`), grid/list picker. Sticky bottom bar: running total +
+  "Review & pay →" (disabled until an item is added).
+- Step 2 "Review & pay": cart with steppers, source/customer, discount, payment
+  method/status, estimate. Sticky bar: "Charge LKR …" (create) / "Save changes"
+  (edit). Header X closes on step 1, back-arrow returns to items on step 2.
+- source/customer/paymentMethod/paymentStatus converted to **controlled** state
+  (seeded from editInitial) so they survive step switches — an uncontrolled
+  select would reset to default on remount when leaving/re-entering step 2.
+- Tapping tiles/steppers/chips never focuses a text field → keyboard only on
+  explicit search/text-input tap.
+
+orders-browser.tsx / order-detail.tsx — dropped the `<Card>` wrapper around
+NewOrderForm (the composer now owns its full-screen chrome). Edit mode on the
+detail page is now the same full-screen composer.
+
+DESIGN.md — documented the new patterns under §4: Full-screen flows (order
+composer), Sticky action bar, Category chips (filter rail), and the
+"keyboard is summoned, never sprung" rule.
+
+i18n (en+si): orders.new.title, reviewTitle, reviewPay, back, charge, close,
+allCategories.
+
+Verified: tsc, eslint (all 3 changed components), `next build` — all clean;
+locale JSON valid. NOT verified in-browser: Docker/local Supabase is down (per
+project note, no Docker/psql) and the composer is auth-gated, so no live drive
+of the interactive flow. Manual check needed: open Orders → New order on a
+phone-width viewport; confirm no keyboard on tile taps, sticky bar, chips, and
+the two-step charge/edit flow.
+
+Open: category chips single-select only (no multi); scanner panel still shows
+only on step 1 (a scan while on step 2 still adds to cart but its toast/price
+prompt isn't visible there).
+
+---
+
 ## 2026-07-23 — feat: order cart + inventory Edit Item (client UX)
 
 Client: order scan flow "just says added, can't adjust amounts", and the page
